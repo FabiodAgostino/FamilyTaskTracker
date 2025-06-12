@@ -3,6 +3,9 @@
 import { removeUndefinedFields } from "../utils";
 export interface FirestoreSerializable {
   toFirestore(): Record<string, any>;
+  createdAt: Date;
+  updatedAt?: Date;
+
 }
 
 export class User implements FirestoreSerializable {
@@ -14,7 +17,8 @@ export class User implements FirestoreSerializable {
     public displayName?: string,
     public photoURL?: string,
     public createdAt: Date = new Date(),
-    public lastLoginAt?: Date
+    public lastLoginAt?: Date,
+    public updatedAt?: Date
   ) {}
 
   static fromFirestore(data: any): User {
@@ -200,7 +204,8 @@ export class Category implements FirestoreSerializable{
     public color: string = "#6B7280",
     public icon?: string,
     public isDefault: boolean = false,
-    public itemCount: number = 0
+    public itemCount: number = 0,
+    public updatedAt?: Date
   ) {}
 
   static fromFirestore(data: any): Category {
@@ -567,8 +572,59 @@ export type EventType = "personal" | "family" | "work" | "appointment" | "remind
 // ===== SAFE FACTORY FUNCTIONS =====
 
 export class ModelFactory {
-  static createCategory(arg0: { id: string; name: string; createdBy: any; createdAt: Date; }) : Category {
-    throw new Error('Method not implemented.');
+ static createCategory(data: Partial<Category>): Category {
+    try {
+      // Prima validiamo i dati in input
+      if (!data.name || data.name.trim().length === 0) {
+        throw new ValidationError('Category validation failed', ['Category name is required']);
+      }
+      
+      if (data.name.length > 50) {
+        throw new ValidationError('Category validation failed', ['Category name must be less than 50 characters']);
+      }
+      
+      if (!data.createdBy || data.createdBy.trim().length === 0) {
+        throw new ValidationError('Category validation failed', ['Created by is required']);
+      }
+      
+      if (data.color && !/^#[0-9A-F]{6}$/i.test(data.color)) {
+        throw new ValidationError('Category validation failed', ['Invalid color format - must be hex color (e.g., #FF0000)']);
+      }
+      
+      if (data.description && data.description.length > 100) {
+        throw new ValidationError('Category validation failed', ['Description must be less than 100 characters']);
+      }
+      
+      if (data.icon && data.icon.length > 2) {
+        throw new ValidationError('Category validation failed', ['Icon must be less than 2 characters']);
+      }
+      
+      // Crea la categoria con i dati validati
+      const category = new Category(
+        data.id || `category_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        data.name.trim(),
+        data.createdBy,
+        data.createdAt || new Date(),
+        data.description?.trim() || undefined,
+        data.color || "#6B7280",
+        data.icon || "🏷️",
+        data.isDefault || false,
+        data.itemCount || 0
+      );
+      
+      // Validazione aggiuntiva tramite il metodo della classe
+      if (!category.isValidColor()) {
+        throw new ValidationError('Category validation failed', ['Invalid color format']);
+      }
+      
+      return category;
+      
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        throw error;
+      }
+      throw new ValidationError('Failed to create category', ['Unknown validation error']);
+    }
   }
   // Factory con validazione sicura per Note
   static createNote(data: Partial<Note>): Note {

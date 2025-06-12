@@ -1,3 +1,5 @@
+
+// src/components/layout/Layout.tsx
 import { useState } from 'react';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
@@ -7,20 +9,21 @@ interface LayoutProps {
 }
 
 export function Layout({ children }: LayoutProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-eggshell">
-      <Header onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
-      <div className="flex">
-        <Sidebar 
-          isOpen={sidebarOpen} 
-          onClose={() => setSidebarOpen(false)} 
-        />
-        <main className="flex-1 lg:ml-0">
-          <div className="px-4 sm:px-6 lg:px-8 py-8">
-            {children}
-          </div>
+    <div className="h-screen bg-background flex flex-col">
+      {/* Header fisso - altezza fissa */}
+      <Header onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)} />
+      
+      {/* Container principale - prende lo spazio rimanente */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar */}
+        <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+        
+        {/* Content - scrollabile */}
+        <main className="flex-1 overflow-auto bg-background">
+          {children}
         </main>
       </div>
     </div>

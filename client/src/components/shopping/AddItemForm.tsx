@@ -1,6 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { ShoppingCart, Loader2, Link as LinkIcon, Tag, Euro, StickyNote } from 'lucide-react';
+import { 
+  ShoppingCart, 
+  Loader2, 
+  Link as LinkIcon, 
+  Tag, 
+  Euro, 
+  StickyNote, 
+  Plus,
+  Smile,
+  Check 
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -8,12 +18,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ShoppingItem, Category, ModelFactory, Priority, ValidationError } from '@/lib/models/types';
 import { useFirestore } from '@/hooks/useFirestore';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
-// Tipo semplice per il form - la validazione è gestita dalle classi
+// Emoji picker semplice per le icone
+const EMOJI_OPTIONS = [
+  '🛒', '📱', '🏠', '👕', '🧴', '🚗', '📚', '⚽', 
+  '💊', '🎮', '🍕', '🧽', '💰', '🎨', '🔧', '📦'
+];
+
 interface ShoppingItemFormData {
   name: string;
   link?: string;
@@ -23,6 +39,13 @@ interface ShoppingItemFormData {
   priority: Priority;
   estimatedPrice?: number;
   notes?: string;
+}
+
+interface NewCategoryData {
+  name: string;
+  icon: string;
+  description?: string;
+  color: string;
 }
 
 interface AddItemFormProps {
@@ -36,11 +59,14 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
   const { user } = useAuthContext();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [newCategory, setNewCategory] = useState('');
-  const { data: categories, add: addCategory } = useFirestore<Category>('categories');
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [showNewCategoryForm, setShowNewCategoryForm] = useState(false);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  
+  const { data: categories, add: addCategory, loading: categoriesLoading } = useFirestore<Category>('categories');
 
+  // Form per il nuovo elemento
   const form = useForm<ShoppingItemFormData>({
-    // Nessun resolver - la validazione è gestita dalle classi
     defaultValues: {
       name: '',
       link: '',
@@ -51,6 +77,14 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
       estimatedPrice: undefined,
       notes: '',
     },
+  });
+
+  // Form separato per la nuova categoria
+  const [newCategory, setNewCategory] = useState<NewCategoryData>({
+    name: '',
+    icon: '🏷️',
+    description: '',
+    color: '#6B7280'
   });
 
   useEffect(() => {
@@ -79,50 +113,97 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
     }
   }, [editItem, form, user]);
 
+  const handleAddCategory = async () => {
+    if (!newCategory.name.trim()) {
+      toast({
+        title: 'Errore',
+        description: 'Il nome della categoria è obbligatorio',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Verifica se la categoria esiste già
+    if (categories?.find(c => c.name.toLowerCase() === newCategory.name.toLowerCase())) {
+      toast({
+        title: 'Errore',
+        description: 'Una categoria con questo nome esiste già',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsAddingCategory(true);
+    
+    try {
+      const categoryData = ModelFactory.createCategory({
+        id: `category_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name: newCategory.name.trim(),
+        createdBy: user?.username || '',
+        createdAt: new Date(),
+        description: newCategory.description || undefined,
+        color: newCategory.color,
+        icon: newCategory.icon,
+        isDefault: false,
+        itemCount: 0
+      });
+
+      await addCategory(categoryData);
+      
+      // Preseleziona la categoria appena creata
+      form.setValue('category', newCategory.name);
+      
+      // Reset del form categoria
+      setNewCategory({
+        name: '',
+        icon: '🏷️',
+        description: '',
+        color: '#6B7280'
+      });
+      
+      setShowNewCategoryForm(false);
+      
+      toast({
+        title: 'Categoria aggiunta',
+        description: `La categoria "${newCategory.name}" è stata aggiunta con successo`,
+      });
+      
+    } catch (validationError) {
+      if (validationError instanceof ValidationError) {
+        toast({
+          title: 'Errore di validazione categoria',
+          description: validationError.errors.join(', '),
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Errore',
+          description: 'Impossibile aggiungere la categoria',
+          variant: 'destructive',
+        });
+      }
+    } finally {
+      setIsAddingCategory(false);
+    }
+  };
+
   const onSubmit = async (data: ShoppingItemFormData) => {
     setIsLoading(true);
     
     try {
-      // Aggiungi nuova categoria se necessario
-      if (newCategory && !categories?.find(c => c.name.toLowerCase() === newCategory.toLowerCase())) {
-        try {
-          const newCat = ModelFactory.createCategory({
-            id: `category_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            name: newCategory,
-            createdBy: user?.username || '',
-            createdAt: new Date(),
-          });
-          await addCategory(newCat);
-          data.category = newCategory;
-        } catch (validationError) {
-          if (validationError instanceof ValidationError) {
-            toast({
-              title: 'Errore di validazione categoria',
-              description: validationError.errors.join(', '),
-              variant: 'destructive',
-            });
-            return;
-          }
-          throw validationError;
-        }
-      }
-
       let shoppingItem: ShoppingItem;
       
       if (editItem) {
-        // Aggiorna articolo esistente usando metodi della classe
         shoppingItem = editItem;
         try {
-          // Usa i metodi della classe che includono validazione automatica
-          shoppingItem.updateName(data.name);
+          console.log(shoppingItem)
+          shoppingItem.name = data.name;
           shoppingItem.link = data.link;
           shoppingItem.category = data.category;
           shoppingItem.priority = data.priority;
           shoppingItem.estimatedPrice = data.estimatedPrice;
           shoppingItem.notes = data.notes;
           shoppingItem.updatedAt = new Date();
-          
-          // Ri-valida l'intero oggetto dopo le modifiche
           shoppingItem.validate();
           
         } catch (validationError) {
@@ -137,7 +218,6 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
           throw validationError;
         }
       } else {
-        // Crea nuovo articolo usando ModelFactory (con validazione automatica)
         try {
           shoppingItem = ModelFactory.createShoppingItem({
             id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -172,7 +252,13 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
       
       onClose();
       form.reset();
-      setNewCategory('');
+      setNewCategory({
+        name: '',
+        icon: '🏷️',
+        description: '',
+        color: '#6B7280'
+      });
+      setShowNewCategoryForm(false);
     } catch (error) {
       console.error('Errore durante il salvataggio dell\'articolo:', error);
       toast({
@@ -187,11 +273,10 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
 
   const handleCategorySelect = (value: string) => {
     if (value === 'new') {
-      // Non impostare il valore nel form, lascia che l'utente scriva la nuova categoria
+      setShowNewCategoryForm(true);
       return;
     }
     form.setValue('category', value);
-    setNewCategory('');
   };
 
   const priorityOptions = [
@@ -200,15 +285,15 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
     { value: 'high' as Priority, label: 'Alta', color: '#EF4444', icon: '⬆️' },
   ];
 
-  const defaultCategories = [
-    { value: 'groceries', label: 'Alimentari', icon: '🛒' },
-    { value: 'electronics', label: 'Elettronica', icon: '📱' },
-    { value: 'household', label: 'Casa', icon: '🏠' },
-    { value: 'clothing', label: 'Abbigliamento', icon: '👕' },
-    { value: 'personal-care', label: 'Cura Personale', icon: '🧴' },
-    { value: 'automotive', label: 'Auto', icon: '🚗' },
-    { value: 'books', label: 'Libri', icon: '📚' },
-    { value: 'sports', label: 'Sport', icon: '⚽' },
+const defaultCategories = [
+  { name:"Tutte le categorie",value: 'all', label: 'Tutte le categorie', icon: '🛍️' },
+];
+
+  const colorOptions = [
+    '#EF4444', '#F97316', '#F59E0B', '#EAB308', 
+    '#84CC16', '#22C55E', '#10B981', '#14B8A6',
+    '#06B6D4', '#0EA5E9', '#3B82F6', '#6366F1',
+    '#8B5CF6', '#A855F7', '#D946EF', '#EC4899'
   ];
 
   return (
@@ -223,6 +308,7 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {/* Nome Prodotto */}
             <FormField
               control={form.control}
               name="name"
@@ -247,6 +333,7 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
               )}
             />
 
+            {/* Link Prodotto */}
             <FormField
               control={form.control}
               name="link"
@@ -275,6 +362,7 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
               )}
             />
 
+            {/* Categoria con form dinamico */}
             <FormField
               control={form.control}
               name="category"
@@ -284,13 +372,15 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
                     <Tag className="mr-2 h-4 w-4" />
                     Categoria *
                   </FormLabel>
+                  
                   <Select onValueChange={handleCategorySelect} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Seleziona o inserisci nuova categoria" />
+                        <SelectValue placeholder="Seleziona categoria" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
+                      {/* Categorie predefinite */}
                       {defaultCategories.map((category) => (
                         <SelectItem key={category.value} value={category.value}>
                           <div className="flex items-center space-x-2">
@@ -299,36 +389,151 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
                           </div>
                         </SelectItem>
                       ))}
+                      
+                      {/* Categorie personalizzate */}
                       {categories?.filter(cat => !defaultCategories.some(def => def.value === cat.name)).map((category) => (
                         <SelectItem key={category.id} value={category.name}>
                           <div className="flex items-center space-x-2">
-                            <span>🏷️</span>
+                            <span>{category.icon || '🏷️'}</span>
                             <span>{category.name}</span>
                           </div>
                         </SelectItem>
                       ))}
+                      
+                      {/* Opzione per aggiungere nuova categoria */}
                       <SelectItem value="new">
                         <div className="flex items-center space-x-2 text-burnt-sienna font-medium">
-                          <span>➕</span>
+                          <Plus className="h-4 w-4" />
                           <span>Aggiungi Nuova Categoria</span>
                         </div>
                       </SelectItem>
                     </SelectContent>
                   </Select>
-                  <Input
-                    placeholder="Oppure inserisci nuova categoria"
-                    value={newCategory}
-                    onChange={(e) => {
-                      setNewCategory(e.target.value);
-                      form.setValue('category', e.target.value);
-                    }}
-                    className="mt-2"
-                  />
+
+                  {/* Form per nuova categoria */}
+                  {showNewCategoryForm && (
+                    <div className="mt-4 p-4 border rounded-lg bg-gray-50 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium text-sm">Nuova Categoria</h4>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowNewCategoryForm(false)}
+                        >
+                          ✕
+                        </Button>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        {/* Nome categoria */}
+                        <div>
+                          <label className="text-xs font-medium text-gray-600">Nome *</label>
+                          <Input
+                            value={newCategory.name}
+                            onChange={(e) => setNewCategory(prev => ({ ...prev, name: e.target.value }))}
+                            placeholder="Nome categoria"
+                            maxLength={50}
+                          />
+                        </div>
+
+                        {/* Icona categoria */}
+                        <div>
+                          <label className="text-xs font-medium text-gray-600">Icona</label>
+                          <div className="flex items-center space-x-2">
+                            <Popover open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen}>
+                              <PopoverTrigger asChild>
+                                <Button type="button" variant="outline" className="w-12 h-10">
+                                  {newCategory.icon}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-64 p-2">
+                                <div className="grid grid-cols-8 gap-1">
+                                  {EMOJI_OPTIONS.map((emoji) => (
+                                    <Button
+                                      key={emoji}
+                                      type="button"
+                                      variant="ghost"
+                                      className="w-8 h-8 p-0"
+                                      onClick={() => {
+                                        setNewCategory(prev => ({ ...prev, icon: emoji }));
+                                        setEmojiPickerOpen(false);
+                                      }}
+                                    >
+                                      {emoji}
+                                    </Button>
+                                  ))}
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                            <Input
+                              value={newCategory.icon}
+                              onChange={(e) => setNewCategory(prev => ({ ...prev, icon: e.target.value }))}
+                              placeholder="🏷️"
+                              className="w-20"
+                              maxLength={2}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Colore categoria */}
+                        <div>
+                          <label className="text-xs font-medium text-gray-600">Colore</label>
+                          <div className="flex items-center space-x-2">
+                            <div 
+                              className="w-6 h-6 rounded border"
+                              style={{ backgroundColor: newCategory.color }}
+                            />
+                            <div className="flex space-x-1">
+                              {colorOptions.map((color) => (
+                                <button
+                                  key={color}
+                                  type="button"
+                                  className={`w-5 h-5 rounded-full border-2 ${newCategory.color === color ? 'border-gray-800' : 'border-gray-300'}`}
+                                  style={{ backgroundColor: color }}
+                                  onClick={() => setNewCategory(prev => ({ ...prev, color }))}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Descrizione */}
+                        <div>
+                          <label className="text-xs font-medium text-gray-600">Descrizione (opzionale)</label>
+                          <Input
+                            value={newCategory.description}
+                            onChange={(e) => setNewCategory(prev => ({ ...prev, description: e.target.value }))}
+                            placeholder="Breve descrizione"
+                            maxLength={100}
+                          />
+                        </div>
+
+                        {/* Pulsante Aggiungi */}
+                        <Button
+                          type="button"
+                          onClick={handleAddCategory}
+                          disabled={!newCategory.name.trim() || isAddingCategory}
+                          className="w-full"
+                          size="sm"
+                        >
+                          {isAddingCategory ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <Plus className="h-4 w-4 mr-2" />
+                          )}
+                          {isAddingCategory ? 'Aggiungendo...' : 'Aggiungi Categoria'}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  
                   <FormMessage />
                 </FormItem>
               )}
             />
 
+            {/* Priorità e Prezzo */}
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -391,6 +596,7 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
               />
             </div>
 
+            {/* Note */}
             <FormField
               control={form.control}
               name="notes"
@@ -413,7 +619,7 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
               )}
             />
 
-            {/* Anteprima priorità selezionata */}
+            {/* Anteprima */}
             {form.watch('priority') && (
               <div className="bg-gray-50 rounded-lg p-3">
                 <p className="text-sm text-gray-600 mb-2">Anteprima:</p>
@@ -440,11 +646,26 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
               </div>
             )}
 
+            {/* Pulsanti */}
             <div className="flex justify-end space-x-2">
-              <Button variant="secondary" onClick={() => { onClose(); form.reset(); setNewCategory(''); }} disabled={isLoading}>
+              <Button 
+                variant="secondary" 
+                onClick={() => { 
+                  onClose(); 
+                  form.reset(); 
+                  setNewCategory({
+                    name: '',
+                    icon: '🏷️',
+                    description: '',
+                    color: '#6B7280'
+                  });
+                  setShowNewCategoryForm(false);
+                }} 
+                disabled={isLoading}
+              >
                 Annulla
               </Button>
-              <Button type="submit" disabled={isLoading}>
+              <Button type="submit" disabled={isLoading || !form.watch('name') || !form.watch('category')}>
                 {isLoading ? <Loader2 className="animate-spin h-5 w-5 mr-2" /> : (editItem ? 'Aggiorna' : 'Aggiungi')}
               </Button>
             </div>

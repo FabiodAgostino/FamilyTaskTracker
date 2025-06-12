@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuthContext } from "@/contexts/AuthContext";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
+import { ThemeProvider } from "./contexts/ThemeContext";
 
 function AppContent() {
   const { user, isLoading } = useAuthContext();
@@ -28,6 +29,7 @@ function AppContent() {
 
 function App() {
   return (
+    <ThemeProvider>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
@@ -36,6 +38,7 @@ function App() {
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 

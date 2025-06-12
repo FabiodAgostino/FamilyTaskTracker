@@ -1,10 +1,22 @@
 // src/components/shopping/ShoppingItemCard.tsx
 import { useState } from 'react';
-import { Edit, Trash2, ExternalLink, User, Clock, Check } from 'lucide-react';
+import { 
+  Edit, 
+  Trash2, 
+  ExternalLink, 
+  User, 
+  Clock, 
+  Check, 
+  Euro,
+  AlertTriangle,
+  ArrowUp,
+  ArrowRight,
+  ArrowDown,
+  StickyNote
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { it } from 'date-fns/locale';
-
 import { Badge } from '@/components/ui/badge';
 import {
   AlertDialog,
@@ -20,16 +32,23 @@ import {
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
-import { ShoppingItem } from '@/lib/models/types';
+import { ShoppingItem, Category } from '@/lib/models/types';
 
-interface ShoppingItemCardProps { // ✅ Interface rinominata
-  item: ShoppingItem; // ✅ Usa direttamente la classe
+interface ShoppingItemCardProps {
+  item: ShoppingItem;
+  categories: Category[]; // ✅ NUOVO: Ricevi le categorie per colori dinamici
   onEdit: (item: ShoppingItem) => void;
   onDelete: (id: string) => void;
   onComplete: (id: string) => void;
 }
 
-export function ShoppingItemCard({ item, onEdit, onDelete, onComplete }: ShoppingItemCardProps) { // ✅ Componente rinominato
+export function ShoppingItemCard({ 
+  item, 
+  categories, 
+  onEdit, 
+  onDelete, 
+  onComplete 
+}: ShoppingItemCardProps) {
   const { user } = useAuthContext();
   const { toast } = useToast();
   const [isCompleting, setIsCompleting] = useState(false);
@@ -71,28 +90,122 @@ export function ShoppingItemCard({ item, onEdit, onDelete, onComplete }: Shoppin
     }
   };
 
-  const getCategoryColor = (category: string) => {
-    const colors: Record<string, string> = {
-      'groceries': 'bg-cambridge-blue/20 text-cambridge-blue',
-      'electronics': 'bg-sunset/50 text-delft-blue',
-      'household': 'bg-burnt-sienna/20 text-burnt-sienna',
-      'clothing': 'bg-purple-100 text-purple-700',
+  // ✅ MIGLIORATO: Usa i colori dinamici delle categorie dal database
+  const getCategoryStyle = (categoryName: string) => {
+    const category = categories.find(c => c.name.toLowerCase() === categoryName.toLowerCase());
+    
+    if (category && category.color) {
+      // Converte hex in classi Tailwind usando variabili CSS custom
+      return {
+        backgroundColor: `${category.color}20`, // 20% opacity
+        color: category.color,
+        borderColor: category.color
+      };
+    }
+    
+    // Fallback per categorie non trovate o predefinite
+    const defaultColors: Record<string, { bg: string; text: string; border: string }> = {
+      'groceries': { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-300' },
+      'electronics': { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-300' },
+      'household': { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-300' },
+      'clothing': { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-300' },
     };
-    return colors[category.toLowerCase()] || 'bg-gray-100 text-gray-700';
+    
+    const defaultStyle = defaultColors[categoryName.toLowerCase()];
+    return defaultStyle 
+      ? { className: `${defaultStyle.bg} ${defaultStyle.text} ${defaultStyle.border}` }
+      : { className: 'bg-gray-100 text-gray-700 border-gray-300' };
   };
 
+  // ✅ NUOVO: Funzione per ottenere icona e colore della priorità
+  const getPriorityDisplay = (priority: 'low' | 'medium' | 'high') => {
+    const priorityConfig = {
+      low: { 
+        icon: ArrowDown, 
+        label: 'Bassa', 
+        color: 'text-green-600',
+        bgColor: 'bg-green-100' 
+      },
+      medium: { 
+        icon: ArrowRight, 
+        label: 'Media', 
+        color: 'text-yellow-600',
+        bgColor: 'bg-yellow-100' 
+      },
+      high: { 
+        icon: ArrowUp, 
+        label: 'Alta', 
+        color: 'text-red-600',
+        bgColor: 'bg-red-100' 
+      }
+    };
+    
+    return priorityConfig[priority];
+  };
+
+  // ✅ NUOVO: Formatta il prezzo
+  const formatPrice = (price?: number): string => {
+    if (!price) return '';
+    return new Intl.NumberFormat('it-IT', {
+      style: 'currency',
+      currency: 'EUR'
+    }).format(price);
+  };
+
+  const categoryStyle = getCategoryStyle(item.category);
+  const priorityDisplay = getPriorityDisplay(item.priority);
+  const PriorityIcon = priorityDisplay.icon;
+
+  // ✅ NUOVO: Trova la categoria per mostrare l'icona
+  const categoryData = categories.find(c => c.name.toLowerCase() === item.category.toLowerCase());
+
   return (
-    <Card className="hover:shadow-md transition-shadow duration-200">
-      <CardContent className="p-6">
+    <Card className={`hover:shadow-lg transition-all duration-200 flex flex-col h-full border border-border ${
+      item.completed ? 'opacity-60' : ''
+    } ${item.priority === 'high' ? 'ring-2 ring-red-400 dark:ring-red-500' : ''}`}>
+      <CardContent className="p-6 flex flex-col flex-1">
+        {/* Header con nome, prezzo e azioni */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1">
-            <h3 className="font-semibold text-delft-blue mb-1">{item.name}</h3>
-            <Badge className={getCategoryColor(item.category)}>
-              {item.category}
-            </Badge>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className={`font-semibold text-card-foreground ${item.completed ? 'line-through' : ''}`}>
+                {item.name}
+              </h3>
+              {item.estimatedPrice && (
+                <div className="flex items-center text-green-600 dark:text-green-400 font-semibold">
+                  <Euro className="h-4 w-4 mr-1" />
+                  {formatPrice(item.estimatedPrice)}
+                </div>
+              )}
+            </div>
+            
+            {/* Badge categoria e priorità */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge 
+                variant="outline"
+                style={categoryStyle.className ? undefined : categoryStyle}
+                className={categoryStyle.className || 'border'}
+              >
+                {categoryData?.icon && <span className="mr-1">{categoryData.icon}</span>}
+                {item.category}
+              </Badge>
+              
+              <Badge 
+                variant="outline"
+                className={`${priorityDisplay.color} border-current ${
+                  item.priority === 'high' ? 'badge-high-priority' :
+                  item.priority === 'medium' ? 'badge-medium-priority' : 
+                  'badge-low-priority'
+                }`}
+              >
+                <PriorityIcon className="h-3 w-3 mr-1" />
+                {priorityDisplay.label}
+              </Badge>
+            </div>
           </div>
+          
           {canEdit && (
-            <div className="flex space-x-2">
+            <div className="flex space-x-2 ml-4">
               <Button
                 variant="ghost"
                 size="sm"
@@ -133,15 +246,26 @@ export function ShoppingItemCard({ item, onEdit, onDelete, onComplete }: Shoppin
           )}
         </div>
 
-        <div className="space-y-3">
-          <div className="flex items-center text-sm text-gray-600">
+        {/* ✅ NUOVO: Note se disponibili */}
+        {item.notes && (
+          <div className="mb-3 p-3 bg-muted rounded-lg border border-border">
+            <div className="flex items-start text-sm text-muted-foreground">
+              <StickyNote className="h-4 w-4 mr-2 mt-0.5 text-muted-foreground" />
+              <span className="italic">{item.notes}</span>
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-3 flex-1">
+          <div className="flex items-center text-sm text-muted-foreground">
             <User className="mr-2 h-4 w-4" />
             Aggiunto da {item.createdBy}
           </div>
-          <div className="flex items-center text-sm text-gray-600">
+          <div className="flex items-center text-sm text-muted-foreground">
             <Clock className="mr-2 h-4 w-4" />
-            {formatDistanceToNow(item.createdAt, { addSuffix: true, locale: it  })}
+            {formatDistanceToNow(item.createdAt, { addSuffix: true, locale: it })}
           </div>
+          
           {item.link && (
             <div className="flex items-center text-sm">
               <ExternalLink className="mr-2 h-4 w-4 text-cambridge-blue" />
@@ -155,27 +279,47 @@ export function ShoppingItemCard({ item, onEdit, onDelete, onComplete }: Shoppin
               </a>
             </div>
           )}
-          {!item.link && (
-            <div className="text-sm text-gray-500">Nessun link al prodotto</div>
+          
+          {/* ✅ MIGLIORATO: Mostra info prezzo solo se non già mostrato in alto */}
+          {!item.estimatedPrice && !item.link && (
+            <div className="text-sm text-muted-foreground">
+              Nessun link o prezzo specificato
+            </div>
           )}
+          
+          {/* ✅ NUOVO: Spacer per allineare i pulsanti */}
+          <div className="flex-1"></div>
         </div>
 
-        <div className="mt-4 pt-4 border-t border-gray-100">
+        {/* ✅ MIGLIORATO: Pulsante completamento con stile arancione e allineamento */}
+        <div className="mt-auto pt-4 border-t border-border">
           {item.completed ? (
             <Button
               disabled
-              className="w-full bg-gray-400 text-white cursor-not-allowed"
+              className="w-full bg-muted text-muted-foreground cursor-not-allowed"
             >
               <Check className="mr-2 h-4 w-4" />
               Completato
+              {item.completedAt && (
+                <span className="ml-2 text-xs opacity-75">
+                  ({formatDistanceToNow(item.completedAt, { locale: it })})
+                </span>
+              )}
             </Button>
           ) : (
             <Button
               onClick={handleComplete}
               disabled={isCompleting}
-              className="w-full bg-cambridge-blue hover:bg-cambridge-blue/90 text-white"
+              className="w-full bg-burnt-sienna hover:bg-burnt-sienna/90 text-white transition-colors"
             >
-              {isCompleting ? 'Segnando...' : 'Segna come completato'}
+              {isCompleting ? (
+                'Segnando...'
+              ) : (
+                <>
+                  <PriorityIcon className="mr-2 h-4 w-4" />
+                  Segna come completato
+                </>
+              )}
             </Button>
           )}
         </div>

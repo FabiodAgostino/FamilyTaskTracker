@@ -39,17 +39,26 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       {/* Mobile overlay */}
       {isOpen && (
         <div 
-          className="fixed inset-0 z-20 bg-black bg-opacity-50 lg:hidden"
+          className="fixed inset-0 z-20 bg-black/50 lg:hidden"
           onClick={onClose}
         />
       )}
 
+      {/* ✅ CORRETTO: Sidebar full-height con theme support */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-30 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out mt-16 lg:mt-0 lg:translate-x-0 lg:static lg:inset-0",
+        "fixed inset-y-0 left-0 z-30 w-64 bg-card border-r border-border shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:w-64",
         isOpen ? "translate-x-0" : "-translate-x-full"
       )}>
-        <div className="flex flex-col h-full pt-5 pb-4">
-          <nav className="flex-1 px-4 space-y-2">
+        {/* ✅ NUOVO: Container full-height che parte da sotto header su mobile */}
+        <div className="flex flex-col h-full pt-16 lg:pt-0">
+          
+          {/* ✅ Header sidebar (solo desktop) */}
+          <div className="hidden lg:block px-6 py-4 border-b border-border">
+            <h2 className="text-lg font-semibold text-card-foreground">Menu</h2>
+          </div>
+
+          {/* Navigation */}
+          <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
             {sidebarItems.map((item) => {
               const Icon = item.icon;
               const isActive = location === item.path;
@@ -58,20 +67,23 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 <Link key={item.name} href={item.path}>
                   <div 
                     className={cn(
-                      "flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors cursor-pointer",
+                      "group flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200 cursor-pointer",
                       isActive
-                        ? "bg-burnt-sienna bg-opacity-10 text-burnt-sienna"
-                        : "text-gray-600 hover:bg-gray-50 hover:text-delft-blue"
+                        ? "bg-burnt-sienna/10 text-burnt-sienna border border-burnt-sienna/20"
+                        : "text-muted-foreground hover:bg-muted hover:text-card-foreground border border-transparent"
                     )}
                     onClick={() => window.innerWidth < 1024 && onClose()}
                   >
-                    <Icon className="mr-3 h-5 w-5" />
-                    {item.name}
+                    <Icon className={cn(
+                      "mr-3 h-5 w-5 transition-colors",
+                      isActive ? "text-burnt-sienna" : "text-muted-foreground group-hover:text-card-foreground"
+                    )} />
+                    <span className="flex-1">{item.name}</span>
                     <span className={cn(
-                      "ml-auto text-xs px-2 py-1 rounded-full",
+                      "text-xs px-2 py-1 rounded-full font-medium transition-colors",
                       isActive
                         ? "bg-burnt-sienna text-white"
-                        : "text-gray-400"
+                        : "bg-muted text-muted-foreground group-hover:bg-muted-foreground/10"
                     )}>
                       {item.count}
                     </span>
@@ -81,17 +93,21 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             })}
           </nav>
           
-          <div className="px-4 pt-4 border-t border-gray-200">
-            <div className="bg-cambridge-blue bg-opacity-10 rounded-lg p-4">
-              <h3 className="text-sm font-semibold text-delft-blue mb-2">Statistiche Rapide</h3>
+          {/* ✅ MIGLIORATO: Footer statistiche con theme support */}
+          <div className="px-4 py-4 border-t border-border mt-auto">
+            <div className="bg-cambridge-blue/10 dark:bg-cambridge-blue/20 rounded-lg p-4 border border-cambridge-blue/20">
+              <div className="flex items-center mb-3">
+                <Clock className="h-4 w-4 text-cambridge-blue mr-2" />
+                <h3 className="text-sm font-semibold text-card-foreground">Statistiche Rapide</h3>
+              </div>
               <div className="space-y-2 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Completati Oggi</span>
-                  <span className="font-medium">5</span>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Completati Oggi</span>
+                  <span className="font-medium text-cambridge-blue bg-cambridge-blue/10 px-2 py-1 rounded-full">5</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Eventi Prossimi</span>
-                  <span className="font-medium">2</span>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Eventi Prossimi</span>
+                  <span className="font-medium text-sunset bg-sunset/10 px-2 py-1 rounded-full">2</span>
                 </div>
               </div>
             </div>
