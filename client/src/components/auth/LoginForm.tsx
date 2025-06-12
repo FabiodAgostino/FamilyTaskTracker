@@ -12,8 +12,8 @@ import { useAuthContext } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
 const loginSchema = z.object({
-  username: z.string().min(1, 'Please select a username'),
-  password: z.string().min(1, 'Please enter a password'),
+  username: z.string().min(1, 'Seleziona un nome utente'),
+  password: z.string().min(1, 'Inserisci una password'),
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
@@ -36,13 +36,13 @@ export function LoginForm() {
     try {
       await login(data);
       toast({
-        title: 'Welcome back!',
-        description: 'Successfully logged in.',
+        title: 'Bentornato!',
+        description: 'Accesso effettuato con successo.',
       });
     } catch (error) {
       toast({
-        title: 'Login failed',
-        description: error instanceof Error ? error.message : 'Invalid credentials',
+        title: 'Accesso fallito',
+        description: error instanceof Error ? error.message : 'Credenziali non valide',
         variant: 'destructive',
       });
     } finally {
@@ -58,8 +58,8 @@ export function LoginForm() {
             <div className="w-16 h-16 bg-burnt-sienna rounded-full flex items-center justify-center mx-auto mb-4">
               <Home className="h-8 w-8 text-white" />
             </div>
-            <h1 className="text-3xl font-bold text-delft-blue mb-2">Family Task Manager</h1>
-            <p className="text-gray-600">Accedi per gestire le attività familiari</p>
+            <h1 className="text-3xl font-bold text-delft-blue mb-2">Gestore Attività Familiari</h1>
+            <p className="text-gray-600">Accedi per gestire le attività della tua famiglia</p>
           </div>
 
           <Form {...form}>
@@ -69,7 +69,7 @@ export function LoginForm() {
                 name="username"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-sm font-medium text-delft-blue">Nome Utente</FormLabel>
+                    <FormLabel className="text-sm font-medium text-delft-blue">Nome utente</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
@@ -78,8 +78,8 @@ export function LoginForm() {
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="admin">admin (Amministratore)</SelectItem>
-                        <SelectItem value="user1">user1 (Membro Famiglia)</SelectItem>
-                        <SelectItem value="user2">user2 (Membro Famiglia)</SelectItem>
+                        <SelectItem value="user1">user1 (Membro della famiglia)</SelectItem>
+                        <SelectItem value="user2">user2 (Membro della famiglia)</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -97,10 +97,10 @@ export function LoginForm() {
                       <Input
                         {...field}
                         type="password"
-                        placeholder="Inserisci password"
+                        placeholder="Inserisci la password"
                       />
                     </FormControl>
-                    <p className="text-xs text-gray-500 mt-1">Suggerimento: admin123, pass123, o pass456</p>
+                    <p className="text-xs text-gray-500 mt-1">Suggerimento: admin123, pass123 o pass456</p>
                     <FormMessage />
                   </FormItem>
                 )}

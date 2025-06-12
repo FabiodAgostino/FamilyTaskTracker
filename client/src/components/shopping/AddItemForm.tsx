@@ -83,7 +83,7 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
     setIsLoading(true);
     
     try {
-      // Add new category if needed
+      // Aggiungi nuova categoria se necessario
       if (newCategory && !categories?.find(c => c.name.toLowerCase() === newCategory.toLowerCase())) {
         try {
           const newCat = ModelFactory.createCategory({
@@ -97,7 +97,7 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
         } catch (validationError) {
           if (validationError instanceof ValidationError) {
             toast({
-              title: 'Category Validation Error',
+              title: 'Errore di validazione categoria',
               description: validationError.errors.join(', '),
               variant: 'destructive',
             });
@@ -110,7 +110,7 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
       let shoppingItem: ShoppingItem;
       
       if (editItem) {
-        // Aggiornamento item esistente usando metodi della classe
+        // Aggiorna articolo esistente usando metodi della classe
         shoppingItem = editItem;
         try {
           // Usa i metodi della classe che includono validazione automatica
@@ -128,7 +128,7 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
         } catch (validationError) {
           if (validationError instanceof ValidationError) {
             toast({
-              title: 'Validation Error',
+              title: 'Errore di validazione',
               description: validationError.errors.join(', '),
               variant: 'destructive',
             });
@@ -137,7 +137,7 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
           throw validationError;
         }
       } else {
-        // Creazione nuovo item usando ModelFactory (con validazione automatica)
+        // Crea nuovo articolo usando ModelFactory (con validazione automatica)
         try {
           shoppingItem = ModelFactory.createShoppingItem({
             id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -153,7 +153,7 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
         } catch (validationError) {
           if (validationError instanceof ValidationError) {
             toast({
-              title: 'Validation Error',
+              title: 'Errore di validazione',
               description: validationError.errors.join(', '),
               variant: 'destructive',
             });
@@ -166,18 +166,18 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
       await onAdd(shoppingItem);
       
       toast({
-        title: editItem ? 'Item updated' : 'Item added',
-        description: editItem ? 'Shopping item updated successfully!' : 'Shopping item added successfully!',
+        title: editItem ? 'Articolo aggiornato' : 'Articolo aggiunto',
+        description: editItem ? 'Articolo aggiornato con successo!' : 'Articolo aggiunto con successo!',
       });
       
       onClose();
       form.reset();
       setNewCategory('');
     } catch (error) {
-      console.error('Error saving shopping item:', error);
+      console.error('Errore durante il salvataggio dell\'articolo:', error);
       toast({
-        title: 'Error',
-        description: editItem ? 'Failed to update item' : 'Failed to add item',
+        title: 'Errore',
+        description: editItem ? 'Impossibile aggiornare l\'articolo' : 'Impossibile aggiungere l\'articolo',
         variant: 'destructive',
       });
     } finally {
@@ -187,7 +187,7 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
 
   const handleCategorySelect = (value: string) => {
     if (value === 'new') {
-      // Don't set the form value, let user type new category
+      // Non impostare il valore nel form, lascia che l'utente scriva la nuova categoria
       return;
     }
     form.setValue('category', value);
@@ -413,7 +413,7 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
               )}
             />
 
-            {/* Preview della priorità selezionata */}
+            {/* Anteprima priorità selezionata */}
             {form.watch('priority') && (
               <div className="bg-gray-50 rounded-lg p-3">
                 <p className="text-sm text-gray-600 mb-2">Anteprima:</p>
@@ -437,30 +437,15 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
                     </span>
                   )}
                 </div>
-                {form.watch('category') && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Categoria: {form.watch('category')}
-                  </p>
-                )}
               </div>
             )}
 
-            <div className="flex space-x-4 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                className="flex-1"
-                onClick={onClose}
-              >
+            <div className="flex justify-end space-x-2">
+              <Button variant="secondary" onClick={() => { onClose(); form.reset(); setNewCategory(''); }} disabled={isLoading}>
                 Annulla
               </Button>
-              <Button
-                type="submit"
-                disabled={isLoading}
-                className="flex-1 bg-burnt-sienna hover:bg-burnt-sienna/90 text-white"
-              >
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {editItem ? 'Aggiorna Articolo' : 'Aggiungi Articolo'}
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? <Loader2 className="animate-spin h-5 w-5 mr-2" /> : (editItem ? 'Aggiorna' : 'Aggiungi')}
               </Button>
             </div>
           </form>

@@ -4,10 +4,22 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { EventModal } from './EventModal';
-import { CalendarEvent } from '@shared/schema';
 import { useFirestore } from '@/hooks/useFirestore';
 import { useAuthContext } from '@/contexts/AuthContext';
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, addMonths, subMonths, isToday } from 'date-fns';
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  startOfWeek,
+  endOfWeek,
+  addDays,
+  isSameMonth,
+  isSameDay,
+  addMonths,
+  subMonths,
+  isToday,
+} from 'date-fns';
+import { CalendarEvent } from '@/lib/models/types';
 
 export function Calendar() {
   const { user } = useAuthContext();
@@ -16,37 +28,40 @@ export function Calendar() {
   const [editEvent, setEditEvent] = useState<CalendarEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
 
-  const { 
-    data: events, 
-    loading, 
-    add: addEvent, 
-    update: updateEvent, 
-    remove: deleteEvent 
+  const {
+    data: events,
+    loading,
+    add: addEvent,
+    update: updateEvent,
+    remove: deleteEvent,
   } = useFirestore<CalendarEvent>('calendar_events');
 
-  // Filter events based on visibility rules
   const visibleEvents = useMemo(() => {
-    return events.filter(event => 
-      event.isPublic || event.createdBy === user?.username || user?.role === 'admin'
+    return events.filter(
+      (event) =>
+        event.isPublic ||
+        event.createdBy === user?.username ||
+        user?.role === 'admin'
     );
   }, [events, user]);
 
-  // Get upcoming events
   const upcomingEvents = useMemo(() => {
     const now = new Date();
     return visibleEvents
-      .filter(event => event.startDate >= now)
-      .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+      .filter((event) => event.startDate >= now)
+      .sort(
+        (a, b) =>
+          new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+      )
       .slice(0, 5);
   }, [visibleEvents]);
 
-  // Calendar grid calculation
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(monthStart);
   const startDate = startOfWeek(monthStart);
   const endDate = endOfWeek(monthEnd);
 
-  const dateFormat = "d";
+  const dateFormat = 'd';
   const rows = [];
   let days = [];
   let day = startDate;
@@ -54,9 +69,10 @@ export function Calendar() {
   while (day <= endDate) {
     for (let i = 0; i < 7; i++) {
       const cloneDay = day;
-      const dayEvents = visibleEvents.filter(event =>
-        isSameDay(event.startDate, cloneDay) || 
-        (event.startDate <= cloneDay && event.endDate >= cloneDay)
+      const dayEvents = visibleEvents.filter(
+        (event) =>
+          isSameDay(event.startDate, cloneDay) ||
+          (event.startDate <= cloneDay && event.endDate >= cloneDay)
       );
 
       days.push(
@@ -77,7 +93,7 @@ export function Calendar() {
           {format(day, dateFormat)}
           {dayEvents.length > 0 && (
             <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 flex space-x-1">
-              {dayEvents.slice(0, 3).map((event, index) => (
+              {dayEvents.slice(0, 3).map((event) => (
                 <div
                   key={event.id}
                   className="w-1 h-1 rounded-full"
@@ -135,31 +151,31 @@ export function Calendar() {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-burnt-sienna"></div>
-        <span className="ml-3 text-delft-blue font-medium">Loading...</span>
+        <span className="ml-3 text-delft-blue font-medium">Caricamento...</span>
       </div>
     );
   }
 
   return (
     <div>
-      {/* Header Section */}
+      {/* Intestazione */}
       <div className="mb-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-3xl font-bold text-delft-blue">Family Calendar</h2>
-            <p className="text-gray-600 mt-1">Track important family events and appointments</p>
+            <h2 className="text-3xl font-bold text-delft-blue">Calendario Familiare</h2>
+            <p className="text-gray-600 mt-1">Tieni traccia di eventi e appuntamenti importanti</p>
           </div>
           <Button
             onClick={() => setIsEventModalOpen(true)}
             className="mt-4 sm:mt-0 bg-burnt-sienna hover:bg-burnt-sienna/90 text-white font-semibold"
           >
             <Plus className="mr-2 h-4 w-4" />
-            Add Event
+            Aggiungi Evento
           </Button>
         </div>
       </div>
 
-      {/* Calendar View */}
+      {/* Vista Calendario */}
       <Card className="mb-6">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-6">
@@ -167,46 +183,33 @@ export function Calendar() {
               {format(currentDate, 'MMMM yyyy')}
             </h3>
             <div className="flex space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={prevMonth}
-                className="p-2"
-              >
+              <Button variant="outline" size="sm" onClick={prevMonth} className="p-2">
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={nextMonth}
-                className="p-2"
-              >
+              <Button variant="outline" size="sm" onClick={nextMonth} className="p-2">
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           </div>
-          
-          {/* Calendar Grid */}
+
+          {/* Giorni della settimana */}
           <div className="space-y-1">
-            {/* Day Headers */}
             <div className="grid grid-cols-7 gap-1">
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+              {['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'].map((day) => (
                 <div key={day} className="p-2 text-center text-sm font-medium text-gray-500">
                   {day}
                 </div>
               ))}
             </div>
-            
-            {/* Calendar Days */}
             {rows}
           </div>
         </CardContent>
       </Card>
 
-      {/* Upcoming Events */}
+      {/* Eventi in arrivo */}
       <Card>
         <CardContent className="p-6">
-          <h3 className="text-lg font-semibold text-delft-blue mb-4">Upcoming Events</h3>
+          <h3 className="text-lg font-semibold text-delft-blue mb-4">Prossimi Eventi</h3>
           {upcomingEvents.length > 0 ? (
             <div className="space-y-4">
               {upcomingEvents.map((event) => (
@@ -216,7 +219,7 @@ export function Calendar() {
                   style={{ backgroundColor: `${event.color}20` }}
                   onClick={() => handleEditEvent(event)}
                 >
-                  <div 
+                  <div
                     className="w-3 h-3 rounded-full flex-shrink-0"
                     style={{ backgroundColor: event.color }}
                   />
@@ -224,18 +227,18 @@ export function Calendar() {
                     <h4 className="font-medium text-delft-blue truncate">{event.title}</h4>
                     <div className="flex items-center text-sm text-gray-600 mt-1">
                       <Clock className="mr-1 h-3 w-3" />
-                      {format(event.startDate, 'MMM d, yyyy')}
+                      {format(event.startDate, 'd MMM yyyy')}
                       {!isSameDay(event.startDate, event.endDate) && (
-                        <span> - {format(event.endDate, 'MMM d, yyyy')}</span>
+                        <span> - {format(event.endDate, 'd MMM yyyy')}</span>
                       )}
                     </div>
                   </div>
-                  <Badge 
+                  <Badge
                     variant="outline"
                     className="capitalize text-xs"
-                    style={{ 
+                    style={{
                       borderColor: event.color,
-                      color: event.color 
+                      color: event.color,
                     }}
                   >
                     {event.eventType}
@@ -246,14 +249,14 @@ export function Calendar() {
           ) : (
             <div className="text-center py-8">
               <Clock className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-              <p className="text-gray-600">No upcoming events</p>
-              <p className="text-sm text-gray-500 mt-1">Add an event to get started</p>
+              <p className="text-gray-600">Nessun evento in arrivo</p>
+              <p className="text-sm text-gray-500 mt-1">Aggiungi un evento per iniziare</p>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Event Modal */}
+      {/* Modal Evento */}
       <EventModal
         isOpen={isEventModalOpen}
         onClose={handleCloseModal}

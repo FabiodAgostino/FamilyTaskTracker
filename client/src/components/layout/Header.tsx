@@ -12,7 +12,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
   const [location] = useLocation();
 
   const navItems = [
-    { name: 'Lista Spesa', path: '/shopping' },
+    { name: 'Lista della Spesa', path: '/shopping' },
     { name: 'Note', path: '/notes' },
     { name: 'Calendario', path: '/calendar' }
   ];
@@ -21,7 +21,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
     <header className="bg-white shadow-md border-b border-gray-200 sticky top-0 z-40">
       <div className="px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          {/* Logo and Menu Toggle */}
+          {/* Logo e pulsante menu mobile */}
           <div className="flex items-center">
             <Button
               variant="ghost"
@@ -35,11 +35,11 @@ export function Header({ onMenuToggle }: HeaderProps) {
               <div className="w-8 h-8 bg-burnt-sienna rounded-lg flex items-center justify-center mr-3">
                 <Home className="h-5 w-5 text-white" />
               </div>
-              <h1 className="text-xl font-bold text-delft-blue">Family Tasks</h1>
+              <h1 className="text-xl font-bold text-delft-blue">Compiti di Famiglia</h1>
             </div>
           </div>
 
-          {/* Navigation */}
+          {/* Navigazione */}
           <nav className="hidden md:flex space-x-8">
             {navItems.map((item) => (
               <Link key={item.name} href={item.path}>
@@ -54,7 +54,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
             ))}
           </nav>
 
-          {/* User Menu */}
+          {/* Menu utente */}
           <div className="flex items-center space-x-4">
             <div className="hidden sm:flex items-center space-x-2">
               <div className="w-8 h-8 bg-cambridge-blue rounded-full flex items-center justify-center">

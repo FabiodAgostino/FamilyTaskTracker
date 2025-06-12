@@ -3,21 +3,33 @@ import { useState } from 'react';
 import { Edit, Trash2, ExternalLink, User, Clock, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { it } from 'date-fns/locale';
+
 import { Badge } from '@/components/ui/badge';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger
+} from '@/components/ui/alert-dialog';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { ShoppingItem } from '@/lib/models/types';
 
-interface ShoppingItemCardProps { // ✅ Rinominato interface
+interface ShoppingItemCardProps { // ✅ Interface rinominata
   item: ShoppingItem; // ✅ Usa direttamente la classe
   onEdit: (item: ShoppingItem) => void;
   onDelete: (id: string) => void;
   onComplete: (id: string) => void;
 }
 
-export function ShoppingItemCard({ item, onEdit, onDelete, onComplete }: ShoppingItemCardProps) { // ✅ Rinominato componente
+export function ShoppingItemCard({ item, onEdit, onDelete, onComplete }: ShoppingItemCardProps) { // ✅ Componente rinominato
   const { user } = useAuthContext();
   const { toast } = useToast();
   const [isCompleting, setIsCompleting] = useState(false);
@@ -29,13 +41,13 @@ export function ShoppingItemCard({ item, onEdit, onDelete, onComplete }: Shoppin
     try {
       await onComplete(item.id);
       toast({
-        title: 'Item completed',
-        description: 'Shopping item marked as complete!',
+        title: 'Elemento completato',
+        description: 'Elemento della lista della spesa segnato come completato!',
       });
     } catch (error) {
       toast({
-        title: 'Error',
-        description: 'Failed to mark item as complete',
+        title: 'Errore',
+        description: "Impossibile segnare l'elemento come completato",
         variant: 'destructive',
       });
     } finally {
@@ -47,13 +59,13 @@ export function ShoppingItemCard({ item, onEdit, onDelete, onComplete }: Shoppin
     try {
       await onDelete(item.id);
       toast({
-        title: 'Item deleted',
-        description: 'Shopping item deleted successfully!',
+        title: 'Elemento eliminato',
+        description: 'Elemento della lista della spesa eliminato con successo!',
       });
     } catch (error) {
       toast({
-        title: 'Error',
-        description: 'Failed to delete item',
+        title: 'Errore',
+        description: "Impossibile eliminare l'elemento",
         variant: 'destructive',
       });
     }
@@ -101,18 +113,18 @@ export function ShoppingItemCard({ item, onEdit, onDelete, onComplete }: Shoppin
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Confirm Delete</AlertDialogTitle>
+                    <AlertDialogTitle>Conferma eliminazione</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Are you sure you want to delete "{item.name}"? This action cannot be undone.
+                      Sei sicuro di voler eliminare "{item.name}"? Questa azione non può essere annullata.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogCancel>Annulla</AlertDialogCancel>
                     <AlertDialogAction
                       onClick={handleDelete}
                       className="bg-red-500 hover:bg-red-600"
                     >
-                      Delete
+                      Elimina
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
@@ -124,11 +136,11 @@ export function ShoppingItemCard({ item, onEdit, onDelete, onComplete }: Shoppin
         <div className="space-y-3">
           <div className="flex items-center text-sm text-gray-600">
             <User className="mr-2 h-4 w-4" />
-            Added by {item.createdBy}
+            Aggiunto da {item.createdBy}
           </div>
           <div className="flex items-center text-sm text-gray-600">
             <Clock className="mr-2 h-4 w-4" />
-            {formatDistanceToNow(item.createdAt, { addSuffix: true })}
+            {formatDistanceToNow(item.createdAt, { addSuffix: true, locale: it  })}
           </div>
           {item.link && (
             <div className="flex items-center text-sm">
@@ -139,12 +151,12 @@ export function ShoppingItemCard({ item, onEdit, onDelete, onComplete }: Shoppin
                 rel="noopener noreferrer"
                 className="text-cambridge-blue hover:underline"
               >
-                View Product
+                Vedi prodotto
               </a>
             </div>
           )}
           {!item.link && (
-            <div className="text-sm text-gray-500">No product link</div>
+            <div className="text-sm text-gray-500">Nessun link al prodotto</div>
           )}
         </div>
 
@@ -155,7 +167,7 @@ export function ShoppingItemCard({ item, onEdit, onDelete, onComplete }: Shoppin
               className="w-full bg-gray-400 text-white cursor-not-allowed"
             >
               <Check className="mr-2 h-4 w-4" />
-              Completed
+              Completato
             </Button>
           ) : (
             <Button
@@ -163,7 +175,7 @@ export function ShoppingItemCard({ item, onEdit, onDelete, onComplete }: Shoppin
               disabled={isCompleting}
               className="w-full bg-cambridge-blue hover:bg-cambridge-blue/90 text-white"
             >
-              {isCompleting ? 'Marking...' : 'Mark Complete'}
+              {isCompleting ? 'Segnando...' : 'Segna come completato'}
             </Button>
           )}
         </div>

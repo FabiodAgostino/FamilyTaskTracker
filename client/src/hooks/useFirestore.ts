@@ -61,16 +61,19 @@ export function useFirestore<T>(collectionName: string) {
     return () => unsubscribe();
   }, [collectionName, user]);
 
-  const add = async (item: Omit<T, 'id'>): Promise<string> => {
+  const add = async (item: T | Omit<T, 'id'>): Promise<string> => {
     if (!user) throw new Error('User not authenticated');
     if (!hasFirebaseConfig || !db) throw new Error('Firebase not configured');
 
+    const itemData = (item as any).toFirestore?.() ?? { ...item };
+    
     const itemWithMetadata = {
-      ...item,
+      ...itemData,
       createdBy: user.username,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     };
+
 
     const docRef = await addDoc(collection(db, collectionName), itemWithMetadata);
     return docRef.id;

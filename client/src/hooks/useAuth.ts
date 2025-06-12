@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { User } from '@shared/schema';
 import { AuthService, LoginCredentials } from '@/lib/auth';
+import { User } from '@/lib/models/types';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);

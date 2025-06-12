@@ -1,6 +1,11 @@
 // ===== USER MODELS =====
 
-export class User {
+import { removeUndefinedFields } from "../utils";
+export interface FirestoreSerializable {
+  toFirestore(): Record<string, any>;
+}
+
+export class User implements FirestoreSerializable {
   constructor(
     public id: string,
     public username: string,
@@ -26,7 +31,7 @@ export class User {
   }
 
   toFirestore() {
-    return {
+    const data = {
       username: this.username,
       role: this.role,
       email: this.email,
@@ -35,6 +40,7 @@ export class User {
       createdAt: this.createdAt,
       lastLoginAt: this.lastLoginAt,
     };
+    return removeUndefinedFields(data);
   }
 
   isAdmin(): boolean {
@@ -59,7 +65,7 @@ export class ValidationError extends Error {
 
 // ===== SHOPPING ITEM MODELS =====
 
-export class ShoppingItem {
+export class ShoppingItem implements FirestoreSerializable{
   constructor(
     public id: string,
     public name: string,
@@ -133,7 +139,7 @@ export class ShoppingItem {
   }
 
   toFirestore() {
-    return {
+    const data = {
       name: this.name,
       category: this.category,
       createdBy: this.createdBy,
@@ -147,6 +153,7 @@ export class ShoppingItem {
       notes: this.notes,
       updatedAt: this.updatedAt,
     };
+    return removeUndefinedFields(data);
   }
 
   complete(userId: string): void {
@@ -183,7 +190,7 @@ export class ShoppingItem {
 
 // ===== CATEGORY MODELS =====
 
-export class Category {
+export class Category implements FirestoreSerializable{
   constructor(
     public id: string,
     public name: string,
@@ -211,7 +218,7 @@ export class Category {
   }
 
   toFirestore() {
-    return {
+    const data = {
       name: this.name,
       createdBy: this.createdBy,
       createdAt: this.createdAt,
@@ -221,6 +228,7 @@ export class Category {
       isDefault: this.isDefault,
       itemCount: this.itemCount,
     };
+      return removeUndefinedFields(data);
   }
 
   incrementItemCount(): void {
@@ -240,7 +248,7 @@ export class Category {
 
 // ===== NOTE MODELS =====
 
-export class Note {
+export class Note implements FirestoreSerializable{
   constructor(
     public id: string,
     public title: string,
@@ -308,7 +316,7 @@ export class Note {
   }
 
   toFirestore() {
-    return {
+    const data = {
       title: this.title,
       content: this.content,
       createdBy: this.createdBy,
@@ -321,6 +329,7 @@ export class Note {
       sharedWith: this.sharedWith,
       lastViewedAt: this.lastViewedAt,
     };
+    return removeUndefinedFields(data);
   }
 
   // Aggiornamento sicuro con validazione
@@ -386,7 +395,7 @@ export class Note {
 
 // ===== CALENDAR EVENT MODELS =====
 
-export class CalendarEvent {
+export class CalendarEvent implements FirestoreSerializable{
   constructor(
     public id: string,
     public title: string,
@@ -462,7 +471,7 @@ export class CalendarEvent {
   }
 
   toFirestore() {
-    return {
+    const data = {
       title: this.title,
       startDate: this.startDate,
       endDate: this.endDate,
@@ -477,6 +486,7 @@ export class CalendarEvent {
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
     };
+    return removeUndefinedFields(data);
   }
 
   getDuration(): number {

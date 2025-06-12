@@ -25,13 +25,13 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
     try {
       await onDelete(note.id);
       toast({
-        title: 'Note deleted',
-        description: 'Note deleted successfully!',
+        title: 'Nota eliminata',
+        description: 'La nota è stata eliminata con successo!',
       });
     } catch (error) {
       toast({
-        title: 'Error',
-        description: 'Failed to delete note',
+        title: 'Errore',
+        description: 'Impossibile eliminare la nota',
         variant: 'destructive',
       });
     }
@@ -61,12 +61,12 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
               {note.isPublic ? (
                 <>
                   <Globe className="w-3 h-3 mr-1" />
-                  Public
+                  Pubblica
                 </>
               ) : (
                 <>
                   <Lock className="w-3 h-3 mr-1" />
-                  Private
+                  Privata
                 </>
               )}
             </Badge>
@@ -77,6 +77,7 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
                   size="sm"
                   onClick={() => onEdit(note)}
                   className="text-gray-400 hover:text-cambridge-blue h-8 w-8 p-0"
+                  aria-label="Modifica nota"
                 >
                   <Edit className="h-3 w-3" />
                 </Button>
@@ -86,24 +87,25 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
                       variant="ghost"
                       size="sm"
                       className="text-gray-400 hover:text-red-500 h-8 w-8 p-0"
+                      aria-label="Elimina nota"
                     >
                       <Trash2 className="h-3 w-3" />
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Confirm Delete</AlertDialogTitle>
+                      <AlertDialogTitle>Conferma eliminazione</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Are you sure you want to delete "{note.title}"? This action cannot be undone.
+                        Sei sicuro di voler eliminare "{note.title}"? Questa azione non può essere annullata.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogCancel>Annulla</AlertDialogCancel>
                       <AlertDialogAction
                         onClick={handleDelete}
                         className="bg-red-500 hover:bg-red-600"
                       >
-                        Delete
+                        Elimina
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
@@ -130,11 +132,11 @@ export function NoteCard({ note, onEdit, onDelete }: NoteCardProps) {
         <div className="flex items-center justify-between text-xs text-gray-500">
           <div className="flex items-center">
             <User className="mr-1 h-3 w-3" />
-            By {note.createdBy}
+            Di {note.createdBy}
           </div>
-          <div className="flex items-center">
+          <div className="flex items-center" title={note.updatedAt.toLocaleString()}>
             <Clock className="mr-1 h-3 w-3" />
-            {formatDistanceToNow(note.updatedAt, { addSuffix: true })}
+            {formatDistanceToNow(note.updatedAt, { addSuffix: true, locale: undefined /* Puoi impostare 'it' se hai installato date-fns/locale/it */ })}
           </div>
         </div>
       </CardContent>

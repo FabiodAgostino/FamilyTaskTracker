@@ -26,14 +26,14 @@ export function NotesList() {
     remove: deleteNote 
   } = useFirestore<Note>('notes');
 
-  // Filter and sort notes
+  // Filtra e ordina le note
   const filteredNotes = useMemo(() => {
     let filtered = notes.filter(note => {
-      // Check visibility (public notes for everyone, private only for creator + admin)
+      // Controlla visibilità (note pubbliche per tutti, private solo per creatore + admin)
       const canView = note.isPublic || note.createdBy === user?.username || user?.role === 'admin';
       if (!canView) return false;
 
-      // Apply search filter
+      // Applica filtro ricerca
       if (searchTerm) {
         const searchLower = searchTerm.toLowerCase();
         const matchesTitle = note.title.toLowerCase().includes(searchLower);
@@ -45,7 +45,7 @@ export function NotesList() {
         }
       }
 
-      // Apply visibility filter
+      // Applica filtro visibilità
       if (filterBy === 'public' && !note.isPublic) return false;
       if (filterBy === 'private' && note.isPublic) return false;
       if (filterBy === 'mine' && note.createdBy !== user?.username) return false;
@@ -53,7 +53,7 @@ export function NotesList() {
       return true;
     });
 
-    // Apply sorting
+    // Applica ordinamento
     switch (sortBy) {
       case 'oldest':
         filtered.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
@@ -99,40 +99,40 @@ export function NotesList() {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-burnt-sienna"></div>
-        <span className="ml-3 text-delft-blue font-medium">Loading...</span>
+        <span className="ml-3 text-delft-blue font-medium">Caricamento...</span>
       </div>
     );
   }
 
   return (
     <div>
-      {/* Header Section */}
+      {/* Sezione Intestazione */}
       <div className="mb-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-3xl font-bold text-delft-blue">Family Notes</h2>
-            <p className="text-gray-600 mt-1">Share thoughts and important information</p>
+            <h2 className="text-3xl font-bold text-delft-blue">Note Familiari</h2>
+            <p className="text-gray-600 mt-1">Condividi pensieri e informazioni importanti</p>
           </div>
           <Button
             onClick={() => setIsEditorOpen(true)}
             className="mt-4 sm:mt-0 bg-burnt-sienna hover:bg-burnt-sienna/90 text-white font-semibold"
           >
             <Plus className="mr-2 h-4 w-4" />
-            Create Note
+            Crea Nota
           </Button>
         </div>
       </div>
 
-      {/* Filters and Search */}
+      {/* Filtri e Ricerca */}
       <Card className="mb-6">
         <CardContent className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-delft-blue mb-2">Search Notes</label>
+              <label className="block text-sm font-medium text-delft-blue mb-2">Cerca Note</label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
-                  placeholder="Search titles, content, or tags..."
+                  placeholder="Cerca titoli, contenuti o tag..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -140,30 +140,30 @@ export function NotesList() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-delft-blue mb-2">Filter by Visibility</label>
+              <label className="block text-sm font-medium text-delft-blue mb-2">Filtra per Visibilità</label>
               <Select value={filterBy} onValueChange={setFilterBy}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Notes</SelectItem>
-                  <SelectItem value="public">Public Notes</SelectItem>
-                  <SelectItem value="private">Private Notes</SelectItem>
-                  <SelectItem value="mine">My Notes</SelectItem>
+                  <SelectItem value="all">Tutte le Note</SelectItem>
+                  <SelectItem value="public">Note Pubbliche</SelectItem>
+                  <SelectItem value="private">Note Private</SelectItem>
+                  <SelectItem value="mine">Le Mie Note</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-delft-blue mb-2">Sort By</label>
+              <label className="block text-sm font-medium text-delft-blue mb-2">Ordina per</label>
               <Select value={sortBy} onValueChange={setSortBy}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="newest">Newest First</SelectItem>
-                  <SelectItem value="oldest">Oldest First</SelectItem>
-                  <SelectItem value="title">Title A-Z</SelectItem>
-                  <SelectItem value="updated">Recently Updated</SelectItem>
+                  <SelectItem value="newest">Più Recenti</SelectItem>
+                  <SelectItem value="oldest">Più Vecchie</SelectItem>
+                  <SelectItem value="title">Titolo A-Z</SelectItem>
+                  <SelectItem value="updated">Aggiornate di Recente</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -171,7 +171,7 @@ export function NotesList() {
         </CardContent>
       </Card>
 
-      {/* Notes Grid */}
+      {/* Griglia delle Note */}
       {filteredNotes.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredNotes.map((note) => (
@@ -188,11 +188,11 @@ export function NotesList() {
           <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <Plus className="h-12 w-12 text-gray-400" />
           </div>
-          <h3 className="text-xl font-semibold text-delft-blue mb-2">No notes found</h3>
+          <h3 className="text-xl font-semibold text-delft-blue mb-2">Nessuna nota trovata</h3>
           <p className="text-gray-600 mb-6">
             {searchTerm || filterBy !== 'all' 
-              ? 'Try adjusting your search or filters.'
-              : 'Create your first note to share thoughts and important information.'
+              ? 'Prova a modificare la ricerca o i filtri.'
+              : 'Crea la tua prima nota per condividere pensieri e informazioni importanti.'
             }
           </p>
           <Button
@@ -200,12 +200,12 @@ export function NotesList() {
             className="bg-burnt-sienna hover:bg-burnt-sienna/90 text-white font-semibold"
           >
             <Plus className="mr-2 h-4 w-4" />
-            Create First Note
+            Crea Prima Nota
           </Button>
         </div>
       )}
 
-      {/* Note Editor Modal */}
+      {/* Modale Editor Note */}
       <NoteEditor
         isOpen={isEditorOpen}
         onClose={handleCloseEditor}

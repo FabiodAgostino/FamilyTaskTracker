@@ -1,5 +1,7 @@
 // Mock Firestore implementation for demo purposes when Firebase credentials are not available
-import { ShoppingItem, Note, CalendarEvent, Category } from '@shared/schema';
+
+import { ShoppingItem, Note, CalendarEvent, Category } from "./models/types";
+
 
 interface MockData {
   shopping_items: ShoppingItem[];
@@ -14,24 +16,10 @@ class MockFirestore {
     notes: [],
     calendar_events: [],
     categories: [
-      {
-        id: '1',
-        name: 'groceries',
-        createdBy: 'admin',
-        createdAt: new Date(),
-      },
-      {
-        id: '2',
-        name: 'electronics',
-        createdBy: 'admin',
-        createdAt: new Date(),
-      },
-      {
-        id: '3',
-        name: 'household',
-        createdBy: 'admin',
-        createdAt: new Date(),
-      },
+      new Category('1', 'groceries', 'admin', new Date()),
+      new Category('2', 'electronics', 'admin', new Date()),
+      new Category('3', 'household', 'admin', new Date()),
+      new Category('4', 'clothing', 'admin', new Date()),
     ],
   };
   private listeners: Map<string, (data: any[]) => void> = new Map();
@@ -64,43 +52,82 @@ class MockFirestore {
   }
 
   async addDoc(collectionRef: any, data: any) {
-    const collectionName = collectionRef.name;
-    const id = Date.now().toString();
-    const newItem = {
-      ...data,
-      id,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+    try {
+      console.log('MockFirestore: Adding document to', collectionRef.name); // ✅ Sostituito alert con console.log
+      console.log('MockFirestore: Data being added:', data); // ✅ Debug dei dati
+      
+      const collectionName = collectionRef.name;
+      const id = Date.now().toString();
+      
+      // ✅ Rimuovi campi undefined prima di salvare nel mock
+      const cleanData = this.removeUndefinedFields(data);
+      
+      const newItem = {
+        ...cleanData,
+        id,
+        createdAt: cleanData.createdAt || new Date(),
+        updatedAt: cleanData.updatedAt || new Date(),
+      };
 
-    (this.data[collectionName as keyof MockData] as any[]).push(newItem);
-    this.notifyListeners(collectionName);
-    return { id };
+      console.log('MockFirestore: Clean item being saved:', newItem); // ✅ Debug
+
+      (this.data[collectionName as keyof MockData] as any[]).push(newItem);
+      this.notifyListeners(collectionName);
+      
+      console.log('MockFirestore: Document added successfully with id:', id); // ✅ Conferma
+      return { id };
+    } catch (error) {
+      console.error('MockFirestore: Error adding document:', error);
+      throw error;
+    }
   }
 
   async updateDoc(docRef: any, updates: any) {
-    const { collectionName, id } = docRef;
-    const collection = this.data[collectionName as keyof MockData] as any[];
-    const index = collection.findIndex((item: any) => item.id === id);
-    
-    if (index !== -1) {
-      collection[index] = {
-        ...collection[index],
-        ...updates,
-        updatedAt: new Date(),
-      };
-      this.notifyListeners(collectionName);
+    try {
+      console.log('MockFirestore: Updating document', docRef.id, 'in', docRef.collectionName);
+      
+      const { collectionName, id } = docRef;
+      const collection = this.data[collectionName as keyof MockData] as any[];
+      const index = collection.findIndex((item: any) => item.id === id);
+      
+      if (index !== -1) {
+        // ✅ Rimuovi campi undefined dagli updates
+        const cleanUpdates = this.removeUndefinedFields(updates);
+        
+        collection[index] = {
+          ...collection[index],
+          ...cleanUpdates,
+          updatedAt: new Date(),
+        };
+        this.notifyListeners(collectionName);
+        console.log('MockFirestore: Document updated successfully');
+      } else {
+        console.warn('MockFirestore: Document not found for update:', id);
+      }
+    } catch (error) {
+      console.error('MockFirestore: Error updating document:', error);
+      throw error;
     }
   }
 
   async deleteDoc(docRef: any) {
-    const { collectionName, id } = docRef;
-    const collection = this.data[collectionName as keyof MockData] as any[];
-    const index = collection.findIndex((item: any) => item.id === id);
-    
-    if (index !== -1) {
-      collection.splice(index, 1);
-      this.notifyListeners(collectionName);
+    try {
+      console.log('MockFirestore: Deleting document', docRef.id, 'from', docRef.collectionName);
+      
+      const { collectionName, id } = docRef;
+      const collection = this.data[collectionName as keyof MockData] as any[];
+      const index = collection.findIndex((item: any) => item.id === id);
+      
+      if (index !== -1) {
+        collection.splice(index, 1);
+        this.notifyListeners(collectionName);
+        console.log('MockFirestore: Document deleted successfully');
+      } else {
+        console.warn('MockFirestore: Document not found for deletion:', id);
+      }
+    } catch (error) {
+      console.error('MockFirestore: Error deleting document:', error);
+      throw error;
     }
   }
 
@@ -111,11 +138,59 @@ class MockFirestore {
     };
   }
 
+  // ✅ Metodo per rimuovere campi undefined (come nel vero Firestore)
+  private removeUndefinedFields(obj: any): any {
+    if (obj === null || obj === undefined) {
+      return obj;
+    }
+
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.removeUndefinedFields(item));
+    }
+
+    if (typeof obj === 'object' && !(obj instanceof Date)) {
+      const cleaned: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        if (value !== undefined) {
+          cleaned[key] = this.removeUndefinedFields(value);
+        }
+      }
+      return cleaned;
+    }
+
+    return obj;
+  }
+
   private notifyListeners(collectionName: string) {
     const listener = this.listeners.get(collectionName);
     if (listener) {
       listener(this.data[collectionName as keyof MockData] || []);
     }
+  }
+
+  // ✅ Metodo per ottenere dati (utile per debug)
+  getData() {
+    return this.data;
+  }
+
+  // ✅ Metodo per reset dati (utile per testing)
+  clearData() {
+    this.data = {
+      shopping_items: [],
+      notes: [],
+      calendar_events: [],
+      categories: [
+        new Category('1', 'groceries', 'admin', new Date()),
+        new Category('2', 'electronics', 'admin', new Date()),
+        new Category('3', 'household', 'admin', new Date()),
+        new Category('4', 'clothing', 'admin', new Date()),
+      ],
+    };
+    
+    // Notify all listeners
+    Object.keys(this.data).forEach(collectionName => {
+      this.notifyListeners(collectionName);
+    });
   }
 }
 
@@ -149,4 +224,9 @@ export async function mockDeleteDoc(docRef: any) {
 // Mock Timestamp
 export const mockTimestamp = {
   now: () => new Date(),
+  fromDate: (date: Date) => date,
+  toDate: (timestamp: any) => timestamp instanceof Date ? timestamp : new Date(),
 };
+
+// ✅ Export dell'istanza mockFirestore per debug
+export { mockFirestore as __mockFirestoreInstance__ };

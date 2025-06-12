@@ -192,12 +192,12 @@ export function NoteEditor({ isOpen, onClose, onSave, editNote }: NoteEditorProp
     }
   };
 
-  return (
+ return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-delft-blue">
-            {editNote ? 'Edit Note' : 'Create Note'}
+            {editNote ? 'Modifica Nota' : 'Crea Nota'}
           </DialogTitle>
         </DialogHeader>
 
@@ -209,12 +209,12 @@ export function NoteEditor({ isOpen, onClose, onSave, editNote }: NoteEditorProp
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-sm font-medium text-delft-blue">
-                    Title *
+                    Titolo *
                   </FormLabel>
                   <FormControl>
                     <Input 
                       {...field} 
-                      placeholder="Enter note title"
+                      placeholder="Inserisci il titolo della nota"
                       maxLength={100}
                     />
                   </FormControl>
@@ -229,12 +229,12 @@ export function NoteEditor({ isOpen, onClose, onSave, editNote }: NoteEditorProp
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-sm font-medium text-delft-blue">
-                    Content *
+                    Contenuto *
                   </FormLabel>
                   <FormControl>
                     <Textarea
                       {...field}
-                      placeholder="Write your note content here..."
+                      placeholder="Scrivi qui il contenuto della nota..."
                       rows={8}
                       className="resize-none"
                     />
@@ -245,10 +245,10 @@ export function NoteEditor({ isOpen, onClose, onSave, editNote }: NoteEditorProp
             />
 
             <div>
-              <label className="text-sm font-medium text-delft-blue mb-2 block">Tags</label>
+              <label className="text-sm font-medium text-delft-blue mb-2 block">Tag</label>
               <div className="flex space-x-2 mb-2">
                 <Input
-                  placeholder="Add tags..."
+                  placeholder="Aggiungi tag..."
                   value={tagInput}
                   onChange={(e) => setTagInput(e.target.value)}
                   onKeyPress={handleTagInputKeyPress}
@@ -288,7 +288,7 @@ export function NoteEditor({ isOpen, onClose, onSave, editNote }: NoteEditorProp
                 <FormItem>
                   <FormLabel className="text-sm font-medium text-delft-blue flex items-center">
                     <Palette className="mr-2 h-4 w-4" />
-                    Note Color
+                    Colore Nota
                   </FormLabel>
                   <div className="grid grid-cols-4 gap-2">
                     {noteColors.map((color) => (
@@ -322,10 +322,10 @@ export function NoteEditor({ isOpen, onClose, onSave, editNote }: NoteEditorProp
                   <div className="space-y-0.5">
                     <FormLabel className="text-sm font-medium text-delft-blue flex items-center">
                       <Pin className="mr-2 h-4 w-4" />
-                      Pin Note
+                      Fissa Nota
                     </FormLabel>
                     <p className="text-sm text-gray-600">
-                      Pinned notes appear at the top of your list
+                      Le note fissate appariranno in cima all'elenco
                     </p>
                   </div>
                   <FormControl>
@@ -348,20 +348,19 @@ export function NoteEditor({ isOpen, onClose, onSave, editNote }: NoteEditorProp
                       {field.value ? (
                         <>
                           <Globe className="mr-2 h-4 w-4" />
-                          Public Note
+                          Nota Pubblica
                         </>
                       ) : (
                         <>
                           <Lock className="mr-2 h-4 w-4" />
-                          Private Note
+                          Nota Privata
                         </>
                       )}
                     </FormLabel>
                     <p className="text-sm text-gray-600">
                       {field.value 
-                        ? 'This note will be visible to all family members'
-                        : 'This note will only be visible to you'
-                      }
+                        ? 'Questa nota sarà visibile a tutti i membri della famiglia'
+                        : 'Questa nota sarà visibile solo a te'}
                     </p>
                   </div>
                   <FormControl>
@@ -371,7 +370,7 @@ export function NoteEditor({ isOpen, onClose, onSave, editNote }: NoteEditorProp
                     />
                   </FormControl>
                 </FormItem>
-                )}
+              )}
             />
 
             <div className="flex space-x-4 pt-4">
@@ -381,7 +380,7 @@ export function NoteEditor({ isOpen, onClose, onSave, editNote }: NoteEditorProp
                 className="flex-1"
                 onClick={onClose}
               >
-                Cancel
+                Annulla
               </Button>
               <Button
                 type="submit"
@@ -389,7 +388,7 @@ export function NoteEditor({ isOpen, onClose, onSave, editNote }: NoteEditorProp
                 className="flex-1 bg-burnt-sienna hover:bg-burnt-sienna/90 text-white"
               >
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {editNote ? 'Update Note' : 'Create Note'}
+                {editNote ? 'Aggiorna Nota' : 'Crea Nota'}
               </Button>
             </div>
           </form>
