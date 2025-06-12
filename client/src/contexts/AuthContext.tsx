@@ -1,7 +1,7 @@
 import { createContext, useContext, ReactNode } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { User } from '@shared/schema';
 import { LoginCredentials } from '@/lib/auth';
+import { User } from '@/lib/models/types';
 
 interface AuthContextType {
   user: User | null;

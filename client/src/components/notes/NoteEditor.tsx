@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { X, Loader2, Globe, Lock, Plus } from 'lucide-react';
+import { X, Loader2, Globe, Lock, Plus, Palette, Pin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,14 +8,26 @@ import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Badge } from '@/components/ui/badge';
-import { insertNoteSchema, Note } from '@shared/schema';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Note, ModelFactory, ValidationError } from '@/lib/models/types';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+
+// Tipo semplice per il form - la validazione è gestita dalle classi
+interface NoteFormData {
+  title: string;
+  content: string;
+  isPublic: boolean;
+  createdBy: string;
+  tags: string[];
+  isPinned: boolean;
+  color: string;
+}
 
 interface NoteEditorProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (note: any) => Promise<void>;
+  onSave: (note: Note) => Promise<void>;
   editNote?: Note | null;
 }
 
@@ -27,14 +38,28 @@ export function NoteEditor({ isOpen, onClose, onSave, editNote }: NoteEditorProp
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>([]);
 
-  const form = useForm({
-    resolver: zodResolver(insertNoteSchema),
+  // Colori predefiniti per le note
+  const noteColors = [
+    { name: 'Default', value: '#F3F4F6', textColor: '#111827' },
+    { name: 'Yellow', value: '#FEF3C7', textColor: '#92400E' },
+    { name: 'Green', value: '#D1FAE5', textColor: '#065F46' },
+    { name: 'Blue', value: '#DBEAFE', textColor: '#1E40AF' },
+    { name: 'Purple', value: '#E9D5FF', textColor: '#7C2D12' },
+    { name: 'Pink', value: '#FCE7F3', textColor: '#BE185D' },
+    { name: 'Orange', value: '#FED7AA', textColor: '#C2410C' },
+    { name: 'Red', value: '#FECACA', textColor: '#DC2626' },
+  ];
+
+  const form = useForm<NoteFormData>({
+    // Nessun resolver - la validazione è gestita dalle classi
     defaultValues: {
       title: '',
       content: '',
       isPublic: false,
       createdBy: user?.username || '',
       tags: [],
+      isPinned: false,
+      color: '#F3F4F6',
     },
   });
 
@@ -46,6 +71,8 @@ export function NoteEditor({ isOpen, onClose, onSave, editNote }: NoteEditorProp
         isPublic: editNote.isPublic,
         createdBy: editNote.createdBy,
         tags: editNote.tags,
+        isPinned: editNote.isPinned,
+        color: editNote.color,
       });
       setTags(editNote.tags);
     } else {
@@ -55,20 +82,76 @@ export function NoteEditor({ isOpen, onClose, onSave, editNote }: NoteEditorProp
         isPublic: false,
         createdBy: user?.username || '',
         tags: [],
+        isPinned: false,
+        color: '#F3F4F6',
       });
       setTags([]);
     }
   }, [editNote, form, user]);
 
-  const onSubmit = async (data: any) => {
+  const onSubmit = async (data: NoteFormData) => {
     setIsLoading(true);
+    
     try {
       const noteData = {
         ...data,
         tags,
       };
 
-      await onSave(noteData);
+      let note: Note;
+      
+      if (editNote) {
+        // Aggiornamento nota esistente
+        note = editNote;
+        try {
+          // Usa i metodi della classe che includono validazione automatica
+          note.update(noteData.title, noteData.content);
+          note.isPublic = noteData.isPublic;
+          note.color = noteData.color;
+          note.isPinned = noteData.isPinned;
+          
+          // Gestione tag con validazione
+          note.tags = [];
+          tags.forEach(tag => note.addTag(tag));
+          
+        } catch (validationError) {
+          if (validationError instanceof ValidationError) {
+            toast({
+              title: 'Validation Error',
+              description: validationError.errors.join(', '),
+              variant: 'destructive',
+            });
+            return;
+          }
+          throw validationError;
+        }
+      } else {
+        // Creazione nuova nota usando ModelFactory (con validazione automatica)
+        try {
+          note = ModelFactory.createNote({
+            id: `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            title: noteData.title,
+            content: noteData.content,
+            isPublic: noteData.isPublic,
+            createdBy: noteData.createdBy,
+            tags: tags,
+            isPinned: noteData.isPinned,
+            color: noteData.color,
+          });
+        } catch (validationError) {
+          if (validationError instanceof ValidationError) {
+            toast({
+              title: 'Validation Error',
+              description: validationError.errors.join(', '),
+              variant: 'destructive',
+            });
+            return;
+          }
+          throw validationError;
+        }
+      }
+
+      await onSave(note);
       
       toast({
         title: editNote ? 'Note updated' : 'Note created',
@@ -80,6 +163,7 @@ export function NoteEditor({ isOpen, onClose, onSave, editNote }: NoteEditorProp
       setTags([]);
       setTagInput('');
     } catch (error) {
+      console.error('Error saving note:', error);
       toast({
         title: 'Error',
         description: editNote ? 'Failed to update note' : 'Failed to create note',
@@ -128,7 +212,11 @@ export function NoteEditor({ isOpen, onClose, onSave, editNote }: NoteEditorProp
                     Title *
                   </FormLabel>
                   <FormControl>
-                    <Input {...field} placeholder="Enter note title" />
+                    <Input 
+                      {...field} 
+                      placeholder="Enter note title"
+                      maxLength={100}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -195,6 +283,63 @@ export function NoteEditor({ isOpen, onClose, onSave, editNote }: NoteEditorProp
 
             <FormField
               control={form.control}
+              name="color"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium text-delft-blue flex items-center">
+                    <Palette className="mr-2 h-4 w-4" />
+                    Note Color
+                  </FormLabel>
+                  <div className="grid grid-cols-4 gap-2">
+                    {noteColors.map((color) => (
+                      <button
+                        key={color.value}
+                        type="button"
+                        onClick={() => field.onChange(color.value)}
+                        className={`p-3 rounded-lg border-2 text-sm font-medium transition-all ${
+                          field.value === color.value 
+                            ? 'border-burnt-sienna ring-2 ring-burnt-sienna/20' 
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                        style={{ 
+                          backgroundColor: color.value,
+                          color: color.textColor 
+                        }}
+                      >
+                        {color.name}
+                      </button>
+                    ))}
+                  </div>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="isPinned"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-sm font-medium text-delft-blue flex items-center">
+                      <Pin className="mr-2 h-4 w-4" />
+                      Pin Note
+                    </FormLabel>
+                    <p className="text-sm text-gray-600">
+                      Pinned notes appear at the top of your list
+                    </p>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name="isPublic"
               render={({ field }) => (
                 <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
@@ -226,7 +371,7 @@ export function NoteEditor({ isOpen, onClose, onSave, editNote }: NoteEditorProp
                     />
                   </FormControl>
                 </FormItem>
-              )}
+                )}
             />
 
             <div className="flex space-x-4 pt-4">

@@ -1,22 +1,23 @@
+// src/components/shopping/ShoppingItemCard.tsx
 import { useState } from 'react';
 import { Edit, Trash2, ExternalLink, User, Clock, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { ShoppingItem as ShoppingItemType } from '@shared/schema';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
+import { ShoppingItem } from '@/lib/models/types';
 
-interface ShoppingItemProps {
-  item: ShoppingItemType;
-  onEdit: (item: ShoppingItemType) => void;
+interface ShoppingItemCardProps { // ✅ Rinominato interface
+  item: ShoppingItem; // ✅ Usa direttamente la classe
+  onEdit: (item: ShoppingItem) => void;
   onDelete: (id: string) => void;
   onComplete: (id: string) => void;
 }
 
-export function ShoppingItem({ item, onEdit, onDelete, onComplete }: ShoppingItemProps) {
+export function ShoppingItemCard({ item, onEdit, onDelete, onComplete }: ShoppingItemCardProps) { // ✅ Rinominato componente
   const { user } = useAuthContext();
   const { toast } = useToast();
   const [isCompleting, setIsCompleting] = useState(false);

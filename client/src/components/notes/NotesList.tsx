@@ -6,9 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent } from '@/components/ui/card';
 import { NoteCard } from './NoteCard';
 import { NoteEditor } from './NoteEditor';
-import { Note } from '@shared/schema';
 import { useFirestore } from '@/hooks/useFirestore';
 import { useAuthContext } from '@/contexts/AuthContext';
+import { Note } from '@/lib/models/types';
 
 export function NotesList() {
   const { user } = useAuthContext();
