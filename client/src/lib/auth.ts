@@ -1,10 +1,10 @@
-import { User } from '@shared/schema';
+import {UserLogin } from "./models/types";
 
 // Pre-loaded user credentials as specified in requirements
-const USERS: User[] = [
-  { id: "1", username: "admin", password: "admin123", role: "admin" },
-  { id: "2", username: "user1", password: "pass123", role: "user" },
-  { id: "3", username: "user2", password: "pass456", role: "user" }
+const USERS: UserLogin[] = [
+  { username: "admin", password: "ittopolini", role: "admin" },
+  {  username: "Fabio", password: "ittopolino", role: "user" },
+  { username: "Ludovica", password: "ittopolina", role: "user" }
 ];
 
 export interface LoginCredentials {
@@ -13,14 +13,14 @@ export interface LoginCredentials {
 }
 
 export interface AuthState {
-  user: User | null;
+  user: UserLogin | null;
   isAuthenticated: boolean;
 }
 
 export class AuthService {
   private static readonly STORAGE_KEY = 'familyTaskManager_auth';
 
-  static async login(credentials: LoginCredentials): Promise<User> {
+  static async login(credentials: LoginCredentials): Promise<UserLogin> {
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 1000));
 
@@ -47,7 +47,7 @@ export class AuthService {
     localStorage.removeItem(this.STORAGE_KEY);
   }
 
-  static getCurrentUser(): User | null {
+  static getCurrentUser(): UserLogin | null {
     try {
       const authData = localStorage.getItem(this.STORAGE_KEY);
       if (!authData) return null;

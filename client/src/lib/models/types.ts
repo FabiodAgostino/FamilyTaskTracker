@@ -8,6 +8,15 @@ export interface FirestoreSerializable {
 
 }
 
+export class UserLogin
+{
+  constructor(
+    public username: string,
+    public role: "admin" | "user" = "user",
+    public password:string
+  ) {}
+}
+
 export class User implements FirestoreSerializable {
   constructor(
     public id: string,
@@ -18,8 +27,9 @@ export class User implements FirestoreSerializable {
     public photoURL?: string,
     public createdAt: Date = new Date(),
     public lastLoginAt?: Date,
-    public updatedAt?: Date
+    public updatedAt?: Date,
   ) {}
+
 
   static fromFirestore(data: any): User {
     return new User(
@@ -83,7 +93,8 @@ export class ShoppingItem implements FirestoreSerializable{
     public priority: "low" | "medium" | "high" = "medium",
     public estimatedPrice?: number,
     public notes?: string,
-    public updatedAt: Date = new Date()
+    public updatedAt: Date = new Date(),
+    public isPublic:boolean = false
   ) {
     // Validazione nel costruttore
     this.validate();
@@ -138,7 +149,8 @@ export class ShoppingItem implements FirestoreSerializable{
       data.priority || "medium",
       data.estimatedPrice,
       data.notes,
-      data.updatedAt?.toDate() || new Date()
+      data.updatedAt?.toDate() || new Date(),
+      data.isPublic
     );
   }
 
@@ -156,6 +168,7 @@ export class ShoppingItem implements FirestoreSerializable{
       estimatedPrice: this.estimatedPrice,
       notes: this.notes,
       updatedAt: this.updatedAt,
+      isPublic: this.isPublic,
     };
     return removeUndefinedFields(data);
   }

@@ -133,7 +133,6 @@ export function useFirestore<T>(collectionName: string) {
     try {
       // Serializza l'oggetto per Firestore
       const itemData = serializeForFirestore(item);
-      
       const itemWithMetadata = {
         ...itemData,
         createdBy: user.username,
@@ -186,11 +185,13 @@ export function useFirestore<T>(collectionName: string) {
   };
 
   const getByUser = (username: string) => {
-    return data.filter((item: any) => 
+    var d= data.filter((item: any) => 
       item.createdBy === username || 
       (item.isPublic === true) || 
       user?.role === 'admin'
     );
+    console.log(d);
+    return d;
   };
 
   // Metodi di utilità aggiuntivi

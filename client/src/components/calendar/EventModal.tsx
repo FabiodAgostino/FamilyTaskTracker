@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Loader2, Globe, Lock, Calendar as CalendarIcon, MapPin, Clock, Users } from 'lucide-react';
+import { Loader2, Globe, Lock, Calendar as CalendarIcon, MapPin, Clock, Users, Plus, X, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
@@ -13,10 +14,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { it } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { CalendarEvent, ModelFactory, ValidationError, EventType } from '@/lib/models/types';
 
-// Tipo semplice per il form - la validazione è gestita dalle classi
 interface EventFormData {
   title: string;
   description?: string;
@@ -35,26 +36,28 @@ interface EventModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (event: CalendarEvent) => Promise<void>;
+  onDelete?: (eventId: string) => Promise<void>; // Aggiunta funzione delete
   editEvent?: CalendarEvent | null;
   selectedDate?: Date;
 }
 
-export function EventModal({ isOpen, onClose, onSave, editEvent, selectedDate }: EventModalProps) {
+export function EventModal({ isOpen, onClose, onSave, onDelete, editEvent, selectedDate }: EventModalProps) {
   const { user } = useAuthContext();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false); // Stato per delete
   const [attendeeInput, setAttendeeInput] = useState('');
 
+  // Tipi di evento tradotti in italiano
   const eventTypes = [
-    { value: 'personal' as EventType, label: 'Personal', color: '#81B29A', icon: '👤' },
-    { value: 'family' as EventType, label: 'Family', color: '#E07A5F', icon: '👨‍👩‍👧‍👦' },
-    { value: 'work' as EventType, label: 'Work', color: '#3D405B', icon: '💼' },
-    { value: 'appointment' as EventType, label: 'Appointment', color: '#F4A261', icon: '📅' },
-    { value: 'reminder' as EventType, label: 'Reminder', color: '#2A9D8F', icon: '⏰' },
+    { value: 'personal' as EventType, label: 'Personale', color: '#81B29A', icon: '👤' },
+    { value: 'family' as EventType, label: 'Famiglia', color: '#E07A5F', icon: '👨‍👩‍👧‍👦' },
+    { value: 'work' as EventType, label: 'Lavoro', color: '#3D405B', icon: '💼' },
+    { value: 'appointment' as EventType, label: 'Appuntamento', color: '#F4A261', icon: '📅' },
+    { value: 'reminder' as EventType, label: 'Promemoria', color: '#2A9D8F', icon: '⏰' },
   ];
 
   const form = useForm<EventFormData>({
-    // Nessun resolver - la validazione è gestita dalle classi
     defaultValues: {
       title: '',
       description: '',
@@ -70,47 +73,53 @@ export function EventModal({ isOpen, onClose, onSave, editEvent, selectedDate }:
     },
   });
 
-  // Watch per gestire la sincronizzazione delle date
   const watchedStartDate = form.watch('startDate');
   const watchedIsAllDay = form.watch('isAllDay');
 
-  useEffect(() => {
-    if (editEvent) {
-      form.reset({
-        title: editEvent.title,
-        description: editEvent.description || '',
-        startDate: editEvent.startDate,
-        endDate: editEvent.endDate,
-        isAllDay: editEvent.isAllDay,
-        isPublic: editEvent.isPublic,
-        createdBy: editEvent.createdBy,
-        eventType: editEvent.eventType,
-        color: editEvent.color,
-        location: editEvent.location || '',
-        attendees: editEvent.attendees || [],
-      });
-    } else {
-      const defaultDate = selectedDate || new Date();
-      const endDate = new Date(defaultDate);
-      endDate.setHours(defaultDate.getHours() + 1); // Default 1 hour duration
-      
-      form.reset({
-        title: '',
-        description: '',
-        startDate: defaultDate,
-        endDate: endDate,
-        isAllDay: false,
-        isPublic: false,
-        createdBy: user?.username || '',
-        eventType: 'personal',
-        color: '#E07A5F',
-        location: '',
-        attendees: [],
-      });
-    }
-  }, [editEvent, selectedDate, form, user]);
+  // Controllo permessi per delete
+  const canDelete = editEvent && (user?.username === editEvent.createdBy || user?.role === 'admin');
 
-  // Auto-adjust end date when start date changes
+  // Reset form quando cambia evento o data selezionata
+  useEffect(() => {
+    if (isOpen) {
+      if (editEvent) {
+        form.reset({
+          title: editEvent.title,
+          description: editEvent.description || '',
+          startDate: editEvent.startDate,
+          endDate: editEvent.endDate,
+          isAllDay: editEvent.isAllDay,
+          isPublic: editEvent.isPublic,
+          createdBy: editEvent.createdBy,
+          eventType: editEvent.eventType,
+          color: editEvent.color,
+          location: editEvent.location || '',
+          attendees: editEvent.attendees || [],
+        });
+      } else {
+        const defaultDate = selectedDate || new Date();
+        const endDate = new Date(defaultDate);
+        endDate.setHours(defaultDate.getHours() + 1);
+        
+        form.reset({
+          title: '',
+          description: '',
+          startDate: defaultDate,
+          endDate: endDate,
+          isAllDay: false,
+          isPublic: false,
+          createdBy: user?.username || '',
+          eventType: 'personal',
+          color: '#E07A5F',
+          location: '',
+          attendees: [],
+        });
+      }
+      setAttendeeInput('');
+    }
+  }, [editEvent, selectedDate, form, user, isOpen]);
+
+  // Aggiusta automaticamente la data di fine quando cambia quella di inizio
   useEffect(() => {
     const currentEndDate = form.getValues('endDate');
     if (watchedStartDate && currentEndDate <= watchedStartDate) {
@@ -120,7 +129,7 @@ export function EventModal({ isOpen, onClose, onSave, editEvent, selectedDate }:
     }
   }, [watchedStartDate, form]);
 
-  // Auto-adjust times for all-day events
+  // Aggiusta automaticamente gli orari per eventi giornata intera
   useEffect(() => {
     if (watchedIsAllDay) {
       const startDate = new Date(form.getValues('startDate'));
@@ -134,35 +143,81 @@ export function EventModal({ isOpen, onClose, onSave, editEvent, selectedDate }:
     }
   }, [watchedIsAllDay, form]);
 
+  const handleClose = () => {
+    onClose();
+    setTimeout(() => {
+      form.reset();
+      setAttendeeInput('');
+    }, 150);
+  };
+
+  // Funzione delete con conferma
+  const handleDelete = async () => {
+    if (!editEvent || !onDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      await onDelete(editEvent.id);
+      toast({
+        title: 'Evento eliminato',
+        description: 'L\'evento è stato eliminato con successo!',
+      });
+      handleClose();
+    } catch (error) {
+      console.error('Errore nell\'eliminare l\'evento:', error);
+      toast({
+        title: 'Errore',
+        description: 'Impossibile eliminare l\'evento',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const onSubmit = async (data: EventFormData) => {
+    if (!data.title.trim()) {
+      toast({
+        title: 'Errore',
+        description: 'Il titolo dell\'evento è obbligatorio',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsLoading(true);
     
     try {
+      const eventData = {
+        ...data,
+        title: data.title.trim(),
+        description: data.description?.trim(),
+        location: data.location?.trim(),
+        attendees: data.attendees.filter(a => a.trim() !== ''),
+      };
+
       let calendarEvent: CalendarEvent;
       
       if (editEvent) {
-        // Aggiornamento evento esistente
         calendarEvent = editEvent;
         try {
-          // Usa i metodi della classe che includono validazione automatica
-          calendarEvent.title = data.title;
-          calendarEvent.description = data.description;
-          calendarEvent.updateDates(data.startDate, data.endDate);
-          calendarEvent.isAllDay = data.isAllDay;
-          calendarEvent.isPublic = data.isPublic;
-          calendarEvent.eventType = data.eventType;
-          calendarEvent.color = data.color;
-          calendarEvent.location = data.location;
-          calendarEvent.attendees = data.attendees;
+          calendarEvent.title = eventData.title;
+          calendarEvent.description = eventData.description;
+          calendarEvent.updateDates(eventData.startDate, eventData.endDate);
+          calendarEvent.isAllDay = eventData.isAllDay;
+          calendarEvent.isPublic = eventData.isPublic;
+          calendarEvent.eventType = eventData.eventType;
+          calendarEvent.color = eventData.color;
+          calendarEvent.location = eventData.location;
+          calendarEvent.attendees = eventData.attendees;
           calendarEvent.updatedAt = new Date();
           
-          // Ri-valida l'intero oggetto dopo le modifiche
           calendarEvent.validate();
           
         } catch (validationError) {
           if (validationError instanceof ValidationError) {
             toast({
-              title: 'Validation Error',
+              title: 'Errore di Validazione',
               description: validationError.errors.join(', '),
               variant: 'destructive',
             });
@@ -171,26 +226,25 @@ export function EventModal({ isOpen, onClose, onSave, editEvent, selectedDate }:
           throw validationError;
         }
       } else {
-        // Creazione nuovo evento usando ModelFactory (con validazione automatica)
         try {
           calendarEvent = ModelFactory.createCalendarEvent({
             id: `event_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            title: data.title,
-            description: data.description,
-            startDate: data.startDate,
-            endDate: data.endDate,
-            isAllDay: data.isAllDay,
-            isPublic: data.isPublic,
-            createdBy: data.createdBy,
-            eventType: data.eventType,
-            color: data.color,
-            location: data.location,
-            attendees: data.attendees,
+            title: eventData.title,
+            description: eventData.description,
+            startDate: eventData.startDate,
+            endDate: eventData.endDate,
+            isAllDay: eventData.isAllDay,
+            isPublic: eventData.isPublic,
+            createdBy: eventData.createdBy,
+            eventType: eventData.eventType,
+            color: eventData.color,
+            location: eventData.location,
+            attendees: eventData.attendees,
           });
         } catch (validationError) {
           if (validationError instanceof ValidationError) {
             toast({
-              title: 'Validation Error',
+              title: 'Errore di Validazione',
               description: validationError.errors.join(', '),
               variant: 'destructive',
             });
@@ -203,18 +257,16 @@ export function EventModal({ isOpen, onClose, onSave, editEvent, selectedDate }:
       await onSave(calendarEvent);
       
       toast({
-        title: editEvent ? 'Event updated' : 'Event created',
-        description: editEvent ? 'Event updated successfully!' : 'Event created successfully!',
+        title: editEvent ? 'Evento aggiornato' : 'Evento creato',
+        description: editEvent ? 'L\'evento è stato aggiornato con successo!' : 'L\'evento è stato creato con successo!',
       });
       
-      onClose();
-      form.reset();
-      setAttendeeInput('');
+      handleClose();
     } catch (error) {
-      console.error('Error saving event:', error);
+      console.error('Errore nel salvare l\'evento:', error);
       toast({
-        title: 'Error',
-        description: editEvent ? 'Failed to update event' : 'Failed to create event',
+        title: 'Errore',
+        description: editEvent ? 'Impossibile aggiornare l\'evento' : 'Impossibile creare l\'evento',
         variant: 'destructive',
       });
     } finally {
@@ -231,10 +283,11 @@ export function EventModal({ isOpen, onClose, onSave, editEvent, selectedDate }:
   };
 
   const addAttendee = () => {
-    if (attendeeInput.trim()) {
+    const trimmedAttendee = attendeeInput.trim();
+    if (trimmedAttendee) {
       const currentAttendees = form.getValues('attendees');
-      if (!currentAttendees.includes(attendeeInput.trim())) {
-        form.setValue('attendees', [...currentAttendees, attendeeInput.trim()]);
+      if (!currentAttendees.includes(trimmedAttendee) && currentAttendees.length < 20) {
+        form.setValue('attendees', [...currentAttendees, trimmedAttendee]);
         setAttendeeInput('');
       }
     }
@@ -249,53 +302,119 @@ export function EventModal({ isOpen, onClose, onSave, editEvent, selectedDate }:
     if (e.key === 'Enter') {
       e.preventDefault();
       addAttendee();
+    } else if (e.key === 'Backspace' && attendeeInput === '' && form.getValues('attendees').length > 0) {
+      const attendees = form.getValues('attendees');
+      removeAttendee(attendees[attendees.length - 1]);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-delft-blue">
-            {editEvent ? 'Edit Event' : 'Add Event'}
-          </DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle className="text-2xl font-bold text-delft-blue flex items-center">
+              {editEvent ? (
+                <>
+                  <CalendarIcon className="mr-3 h-6 w-6 text-burnt-sienna" />
+                  Modifica Evento
+                </>
+              ) : (
+                <>
+                  <Plus className="mr-3 h-6 w-6 text-burnt-sienna" />
+                  Crea Nuovo Evento
+                </>
+              )}
+            </DialogTitle>
+            
+            {/* Pulsante Delete in alto a destra */}
+            {editEvent && canDelete && onDelete && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-400 hover:text-red-500 transition-colors"
+                    disabled={isLoading || isDeleting}
+                  >
+                    <Trash2 className="h-5 w-5" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Conferma Eliminazione</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Sei sicuro di voler eliminare l'evento "{editEvent.title}"? 
+                      Questa azione non può essere annullata.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isDeleting}>
+                      Annulla
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDelete}
+                      disabled={isDeleting}
+                      className="bg-red-500 hover:bg-red-600 text-white"
+                    >
+                      {isDeleting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Eliminando...
+                        </>
+                      ) : (
+                        'Elimina'
+                      )}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {/* Titolo */}
             <FormField
               control={form.control}
               name="title"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-sm font-medium text-delft-blue">
-                    Event Title *
+                    Titolo Evento *
                   </FormLabel>
                   <FormControl>
                     <Input 
                       {...field} 
-                      placeholder="Enter event title"
+                      placeholder="Inserisci il titolo dell'evento..."
                       maxLength={100}
+                      className="text-lg"
                     />
                   </FormControl>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {field.value?.length || 0}/100 caratteri
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
+            {/* Descrizione */}
             <FormField
               control={form.control}
               name="description"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-sm font-medium text-delft-blue">
-                    Description
+                    Descrizione
                   </FormLabel>
                   <FormControl>
                     <Textarea
                       {...field}
-                      placeholder="Event description (optional)"
-                      rows={3}
+                      placeholder="Descrizione dell'evento (opzionale)..."
+                      rows={4}
+                      className="resize-y"
                     />
                   </FormControl>
                   <FormMessage />
@@ -303,18 +422,19 @@ export function EventModal({ isOpen, onClose, onSave, editEvent, selectedDate }:
               )}
             />
 
+            {/* Evento giornata intera */}
             <FormField
               control={form.control}
               name="isAllDay"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border border-gray-200 p-4 hover:bg-gray-50 transition-colors">
                   <div className="space-y-0.5">
-                    <FormLabel className="text-sm font-medium text-delft-blue flex items-center">
+                    <FormLabel className="text-sm font-medium text-delft-blue flex items-center cursor-pointer">
                       <Clock className="mr-2 h-4 w-4" />
-                      All Day Event
+                      Evento Giornata Intera
                     </FormLabel>
-                    <p className="text-sm text-gray-600">
-                      Event lasts the entire day
+                    <p className="text-xs text-gray-600">
+                      L'evento dura tutto il giorno
                     </p>
                   </div>
                   <FormControl>
@@ -327,13 +447,16 @@ export function EventModal({ isOpen, onClose, onSave, editEvent, selectedDate }:
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            {/* Date e Orari */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="startDate"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel className="text-sm font-medium text-delft-blue">Start Date & Time</FormLabel>
+                    <FormLabel className="text-sm font-medium text-delft-blue">
+                      Data e Ora Inizio
+                    </FormLabel>
                     <Popover>
                       <PopoverTrigger asChild>
                         <FormControl>
@@ -345,9 +468,9 @@ export function EventModal({ isOpen, onClose, onSave, editEvent, selectedDate }:
                             )}
                           >
                             {field.value ? (
-                              format(field.value, watchedIsAllDay ? "PPP" : "PPP p")
+                              format(field.value, watchedIsAllDay ? "PPP" : "PPP p", { locale: it })
                             ) : (
-                              <span>Pick a date</span>
+                              <span>Seleziona una data</span>
                             )}
                             <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                           </Button>
@@ -360,7 +483,6 @@ export function EventModal({ isOpen, onClose, onSave, editEvent, selectedDate }:
                           onSelect={(date) => {
                             if (date) {
                               if (!watchedIsAllDay) {
-                                // Preserve time for non-all-day events
                                 const newDate = new Date(date);
                                 const currentTime = field.value;
                                 if (currentTime) {
@@ -405,7 +527,9 @@ export function EventModal({ isOpen, onClose, onSave, editEvent, selectedDate }:
                 name="endDate"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel className="text-sm font-medium text-delft-blue">End Date & Time</FormLabel>
+                    <FormLabel className="text-sm font-medium text-delft-blue">
+                      Data e Ora Fine
+                    </FormLabel>
                     <Popover>
                       <PopoverTrigger asChild>
                         <FormControl>
@@ -417,9 +541,9 @@ export function EventModal({ isOpen, onClose, onSave, editEvent, selectedDate }:
                             )}
                           >
                             {field.value ? (
-                              format(field.value, watchedIsAllDay ? "PPP" : "PPP p")
+                              format(field.value, watchedIsAllDay ? "PPP" : "PPP p", { locale: it })
                             ) : (
-                              <span>Pick a date</span>
+                              <span>Seleziona una data</span>
                             )}
                             <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                           </Button>
@@ -432,7 +556,6 @@ export function EventModal({ isOpen, onClose, onSave, editEvent, selectedDate }:
                           onSelect={(date) => {
                             if (date) {
                               if (!watchedIsAllDay) {
-                                // Preserve time for non-all-day events
                                 const newDate = new Date(date);
                                 const currentTime = field.value;
                                 if (currentTime) {
@@ -474,31 +597,34 @@ export function EventModal({ isOpen, onClose, onSave, editEvent, selectedDate }:
               />
             </div>
 
+            {/* Tipo Evento */}
             <FormField
               control={form.control}
               name="eventType"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="text-sm font-medium text-delft-blue">Event Type</FormLabel>
+                  <FormLabel className="text-sm font-medium text-delft-blue">
+                    Tipo di Evento
+                  </FormLabel>
                   <Select 
                     onValueChange={handleEventTypeChange} 
                     defaultValue={field.value}
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select event type" />
+                        <SelectValue placeholder="Seleziona il tipo di evento" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       {eventTypes.map((type) => (
                         <SelectItem key={type.value} value={type.value}>
-                          <div className="flex items-center space-x-2">
+                          <div className="flex items-center space-x-3">
                             <span className="text-lg">{type.icon}</span>
                             <div 
                               className="w-3 h-3 rounded-full" 
                               style={{ backgroundColor: type.color }}
                             />
-                            <span>{type.label}</span>
+                            <span className="font-medium">{type.label}</span>
                           </div>
                         </SelectItem>
                       ))}
@@ -509,6 +635,7 @@ export function EventModal({ isOpen, onClose, onSave, editEvent, selectedDate }:
               )}
             />
 
+            {/* Luogo */}
             <FormField
               control={form.control}
               name="location"
@@ -516,12 +643,12 @@ export function EventModal({ isOpen, onClose, onSave, editEvent, selectedDate }:
                 <FormItem>
                   <FormLabel className="text-sm font-medium text-delft-blue flex items-center">
                     <MapPin className="mr-2 h-4 w-4" />
-                    Location (Optional)
+                    Luogo (Opzionale)
                   </FormLabel>
                   <FormControl>
                     <Input 
                       {...field} 
-                      placeholder="Enter event location"
+                      placeholder="Inserisci il luogo dell'evento..."
                     />
                   </FormControl>
                   <FormMessage />
@@ -529,26 +656,30 @@ export function EventModal({ isOpen, onClose, onSave, editEvent, selectedDate }:
               )}
             />
 
-            <div>
-              <label className="text-sm font-medium text-delft-blue mb-2 block flex items-center">
+            {/* Partecipanti */}
+            <div className="space-y-3">
+              <label className="text-sm font-medium text-delft-blue flex items-center">
                 <Users className="mr-2 h-4 w-4" />
-                Attendees (Optional)
+                Partecipanti {form.watch('attendees').length > 0 && 
+                  <span className="ml-2 text-xs text-gray-500">({form.watch('attendees').length}/20)</span>
+                }
               </label>
-              <div className="flex space-x-2 mb-2">
+              <div className="flex space-x-2">
                 <Input
-                  placeholder="Add attendee email or name..."
+                  placeholder="Aggiungi email o nome partecipante..."
                   value={attendeeInput}
                   onChange={(e) => setAttendeeInput(e.target.value)}
-                  onKeyPress={handleAttendeeInputKeyPress}
+                  onKeyDown={handleAttendeeInputKeyPress}
                   className="flex-1"
+                  disabled={form.watch('attendees').length >= 20}
                 />
                 <Button
                   type="button"
                   variant="outline"
                   onClick={addAttendee}
-                  disabled={!attendeeInput.trim()}
+                  disabled={!attendeeInput.trim() || form.watch('attendees').length >= 20}
                 >
-                  Add
+                  <Plus className="h-4 w-4" />
                 </Button>
               </div>
               {form.watch('attendees').length > 0 && (
@@ -556,15 +687,15 @@ export function EventModal({ isOpen, onClose, onSave, editEvent, selectedDate }:
                   {form.watch('attendees').map((attendee, index) => (
                     <div
                       key={index}
-                      className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm flex items-center"
+                      className="bg-cambridge-blue/10 text-cambridge-blue px-3 py-1 rounded-full text-sm flex items-center border border-cambridge-blue/20"
                     >
                       {attendee}
                       <button
                         type="button"
                         onClick={() => removeAttendee(attendee)}
-                        className="ml-2 text-gray-500 hover:text-red-500"
+                        className="ml-2 text-cambridge-blue hover:text-red-500 transition-colors"
                       >
-                        ×
+                        <X className="h-3 w-3" />
                       </button>
                     </div>
                   ))}
@@ -572,29 +703,30 @@ export function EventModal({ isOpen, onClose, onSave, editEvent, selectedDate }:
               )}
             </div>
 
+            {/* Visibilità */}
             <FormField
               control={form.control}
               name="isPublic"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border border-gray-200 p-4 hover:bg-gray-50 transition-colors">
                   <div className="space-y-0.5">
-                    <FormLabel className="text-sm font-medium text-delft-blue flex items-center">
+                    <FormLabel className="text-sm font-medium text-delft-blue flex items-center cursor-pointer">
                       {field.value ? (
                         <>
-                          <Globe className="mr-2 h-4 w-4" />
-                          Public Event
+                          <Globe className="mr-2 h-4 w-4 text-green-600" />
+                          Evento Pubblico
                         </>
                       ) : (
                         <>
-                          <Lock className="mr-2 h-4 w-4" />
-                          Private Event
+                          <Lock className="mr-2 h-4 w-4 text-orange-600" />
+                          Evento Privato
                         </>
                       )}
                     </FormLabel>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-xs text-gray-600">
                       {field.value 
-                        ? 'This event will be visible to all family members'
-                        : 'This event will only be visible to you'
+                        ? 'Questo evento sarà visibile a tutti i membri della famiglia'
+                        : 'Questo evento sarà visibile solo a te'
                       }
                     </p>
                   </div>
@@ -608,22 +740,24 @@ export function EventModal({ isOpen, onClose, onSave, editEvent, selectedDate }:
               )}
             />
 
-            <div className="flex space-x-4 pt-4">
+            {/* Pulsanti Azione */}
+            <div className="flex gap-3 pt-6 border-t">
               <Button
                 type="button"
                 variant="outline"
                 className="flex-1"
-                onClick={onClose}
+                onClick={handleClose}
+                disabled={isLoading || isDeleting}
               >
-                Cancel
+                Annulla
               </Button>
               <Button
                 type="submit"
-                disabled={isLoading}
-                className="flex-1 bg-burnt-sienna hover:bg-burnt-sienna/90 text-white"
+                disabled={isLoading || isDeleting}
+                className="flex-1 bg-burnt-sienna hover:bg-burnt-sienna/90 text-white font-semibold"
               >
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {editEvent ? 'Update Event' : 'Add Event'}
+                {editEvent ? 'Aggiorna Evento' : 'Crea Evento'}
               </Button>
             </div>
           </form>

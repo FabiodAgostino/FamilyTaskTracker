@@ -12,7 +12,9 @@ import {
   ArrowUp,
   ArrowRight,
   ArrowDown,
-  StickyNote
+  StickyNote,
+  Globe,
+  Lock
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -36,7 +38,7 @@ import { ShoppingItem, Category } from '@/lib/models/types';
 
 interface ShoppingItemCardProps {
   item: ShoppingItem;
-  categories: Category[]; // ✅ NUOVO: Ricevi le categorie per colori dinamici
+  categories: Category[];
   onEdit: (item: ShoppingItem) => void;
   onDelete: (id: string) => void;
   onComplete: (id: string) => void;
@@ -49,6 +51,7 @@ export function ShoppingItemCard({
   onDelete, 
   onComplete 
 }: ShoppingItemCardProps) {
+  console.log(item)
   const { user } = useAuthContext();
   const { toast } = useToast();
   const [isCompleting, setIsCompleting] = useState(false);
@@ -90,20 +93,17 @@ export function ShoppingItemCard({
     }
   };
 
-  // ✅ MIGLIORATO: Usa i colori dinamici delle categorie dal database
   const getCategoryStyle = (categoryName: string) => {
     const category = categories.find(c => c.name.toLowerCase() === categoryName.toLowerCase());
     
     if (category && category.color) {
-      // Converte hex in classi Tailwind usando variabili CSS custom
       return {
-        backgroundColor: `${category.color}20`, // 20% opacity
+        backgroundColor: `${category.color}20`,
         color: category.color,
         borderColor: category.color
       };
     }
     
-    // Fallback per categorie non trovate o predefinite
     const defaultColors: Record<string, { bg: string; text: string; border: string }> = {
       'groceries': { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-300' },
       'electronics': { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-300' },
@@ -117,7 +117,6 @@ export function ShoppingItemCard({
       : { className: 'bg-gray-100 text-gray-700 border-gray-300' };
   };
 
-  // ✅ NUOVO: Funzione per ottenere icona e colore della priorità
   const getPriorityDisplay = (priority: 'low' | 'medium' | 'high') => {
     const priorityConfig = {
       low: { 
@@ -143,7 +142,6 @@ export function ShoppingItemCard({
     return priorityConfig[priority];
   };
 
-  // ✅ NUOVO: Formatta il prezzo
   const formatPrice = (price?: number): string => {
     if (!price) return '';
     return new Intl.NumberFormat('it-IT', {
@@ -155,8 +153,7 @@ export function ShoppingItemCard({
   const categoryStyle = getCategoryStyle(item.category);
   const priorityDisplay = getPriorityDisplay(item.priority);
   const PriorityIcon = priorityDisplay.icon;
-
-  // ✅ NUOVO: Trova la categoria per mostrare l'icona
+  
   const categoryData = categories.find(c => c.name.toLowerCase() === item.category.toLowerCase());
 
   return (
@@ -167,12 +164,18 @@ export function ShoppingItemCard({
         {/* Header con nome, prezzo e azioni */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className={`font-semibold text-card-foreground ${item.completed ? 'line-through' : ''}`}>
+            {/* ✅ NUOVO: Icona visibilità in alto a sinistra */}
+            <div className="flex items-center mb-2">
+              {item.isPublic ? (
+                <Globe className="w-4 h-4 mr-2 text-green-600" />
+              ) : (
+                <Lock className="w-4 h-4 mr-2 text-orange-600" />
+              )}
+              <h3 className={`font-semibold text-card-foreground flex-1 ${item.completed ? 'line-through' : ''}`}>
                 {item.name}
               </h3>
               {item.estimatedPrice && (
-                <div className="flex items-center text-green-600 dark:text-green-400 font-semibold">
+                <div className="flex items-center text-green-600 dark:text-green-400 font-semibold ml-auto">
                   <Euro className="h-4 w-4 mr-1" />
                   {formatPrice(item.estimatedPrice)}
                 </div>
@@ -246,7 +249,7 @@ export function ShoppingItemCard({
           )}
         </div>
 
-        {/* ✅ NUOVO: Note se disponibili */}
+        {/* Note se disponibili */}
         {item.notes && (
           <div className="mb-3 p-3 bg-muted rounded-lg border border-border">
             <div className="flex items-start text-sm text-muted-foreground">
@@ -280,18 +283,16 @@ export function ShoppingItemCard({
             </div>
           )}
           
-          {/* ✅ MIGLIORATO: Mostra info prezzo solo se non già mostrato in alto */}
           {!item.estimatedPrice && !item.link && (
             <div className="text-sm text-muted-foreground">
               Nessun link o prezzo specificato
             </div>
           )}
           
-          {/* ✅ NUOVO: Spacer per allineare i pulsanti */}
           <div className="flex-1"></div>
         </div>
 
-        {/* ✅ MIGLIORATO: Pulsante completamento con stile arancione e allineamento */}
+        {/* Pulsante completamento */}
         <div className="mt-auto pt-4 border-t border-border">
           {item.completed ? (
             <Button

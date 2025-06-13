@@ -11,7 +11,15 @@ interface LayoutProps {
 export function Layout({ children }: LayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  return (
+  const handleMenuToggle = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
+
+  const handleSidebarClose = () => {
+    setIsSidebarOpen(false);
+  };
+
+   return (
     <div className="h-screen bg-background flex flex-col">
       {/* Header fisso - altezza fissa */}
       <Header onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)} />
@@ -20,7 +28,6 @@ export function Layout({ children }: LayoutProps) {
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
         <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
-        
         {/* Content - scrollabile */}
         <main className="flex-1 overflow-auto bg-background">
           {children}

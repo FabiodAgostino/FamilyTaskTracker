@@ -58,8 +58,8 @@ export function LoginForm() {
             <div className="w-16 h-16 bg-burnt-sienna rounded-full flex items-center justify-center mx-auto mb-4">
               <Home className="h-8 w-8 text-white" />
             </div>
-            <h1 className="text-3xl font-bold text-delft-blue mb-2">Gestore Attività Familiari</h1>
-            <p className="text-gray-600">Accedi per gestire le attività della tua famiglia</p>
+            <h1 className="text-3xl font-bold text-delft-blue mb-2">HomeTask</h1>
+            <p className="text-gray-600">Accedi per gestire le attività</p>
           </div>
 
           <Form {...form}>
@@ -78,8 +78,8 @@ export function LoginForm() {
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="admin">admin (Amministratore)</SelectItem>
-                        <SelectItem value="user1">user1 (Membro della famiglia)</SelectItem>
-                        <SelectItem value="user2">user2 (Membro della famiglia)</SelectItem>
+                        <SelectItem value="Fabio">Fabio (Membro della famiglia)</SelectItem>
+                        <SelectItem value="Ludovica">Ludovica (Membro della famiglia)</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -100,7 +100,6 @@ export function LoginForm() {
                         placeholder="Inserisci la password"
                       />
                     </FormControl>
-                    <p className="text-xs text-gray-500 mt-1">Suggerimento: admin123, pass123 o pass456</p>
                     <FormMessage />
                   </FormItem>
                 )}

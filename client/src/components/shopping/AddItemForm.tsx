@@ -9,11 +9,14 @@ import {
   StickyNote, 
   Plus,
   Smile,
-  Check 
+  Check,
+  Globe,
+  Lock
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -39,6 +42,7 @@ interface ShoppingItemFormData {
   priority: Priority;
   estimatedPrice?: number;
   notes?: string;
+  isPublic: boolean;  // AGGIUNTO: campo per visibilità
 }
 
 interface NewCategoryData {
@@ -76,6 +80,7 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
       priority: 'medium',
       estimatedPrice: undefined,
       notes: '',
+      isPublic: true,  // AGGIUNTO: default pubblico
     },
   });
 
@@ -98,6 +103,7 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
         priority: editItem.priority,
         estimatedPrice: editItem.estimatedPrice,
         notes: editItem.notes || '',
+        isPublic: editItem.isPublic !== undefined ? editItem.isPublic : true,  // AGGIUNTO
       });
     } else {
       form.reset({
@@ -109,6 +115,7 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
         priority: 'medium',
         estimatedPrice: undefined,
         notes: '',
+        isPublic: true,  // AGGIUNTO
       });
     }
   }, [editItem, form, user]);
@@ -203,6 +210,7 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
           shoppingItem.priority = data.priority;
           shoppingItem.estimatedPrice = data.estimatedPrice;
           shoppingItem.notes = data.notes;
+          shoppingItem.isPublic = data.isPublic;  // AGGIUNTO
           shoppingItem.updatedAt = new Date();
           shoppingItem.validate();
           
@@ -229,6 +237,7 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
             priority: data.priority,
             estimatedPrice: data.estimatedPrice,
             notes: data.notes,
+            isPublic: data.isPublic,  // AGGIUNTO
           });
         } catch (validationError) {
           if (validationError instanceof ValidationError) {
@@ -619,6 +628,43 @@ const defaultCategories = [
               )}
             />
 
+            {/* AGGIUNTO: Visibilità Pubblica/Privata */}
+            <FormField
+              control={form.control}
+              name="isPublic"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border border-gray-200 p-4 hover:bg-gray-50 transition-colors">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-sm font-medium text-delft-blue flex items-center cursor-pointer">
+                      {field.value ? (
+                        <>
+                          <Globe className="mr-2 h-4 w-4 text-green-600" />
+                          Articolo Pubblico
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="mr-2 h-4 w-4 text-orange-600" />
+                          Articolo Privato
+                        </>
+                      )}
+                    </FormLabel>
+                    <p className="text-xs text-gray-600">
+                      {field.value 
+                        ? 'Questo articolo sarà visibile a tutti i membri della famiglia'
+                        : 'Questo articolo sarà visibile solo a te'
+                      }
+                    </p>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
             {/* Anteprima */}
             {form.watch('priority') && (
               <div className="bg-gray-50 rounded-lg p-3">
@@ -635,6 +681,20 @@ const defaultCategories = [
                       }}
                     >
                       {priorityOptions.find(p => p.value === form.watch('priority'))?.label}
+                    </Badge>
+                    {/* AGGIUNTO: Badge visibilità nell'anteprima */}
+                    <Badge variant="outline" className={form.watch('isPublic') ? 'text-green-600 border-green-200' : 'text-orange-600 border-orange-200'}>
+                      {form.watch('isPublic') ? (
+                        <>
+                          <Globe className="mr-1 h-3 w-3" />
+                          Pubblico
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="mr-1 h-3 w-3" />
+                          Privato
+                        </>
+                      )}
                     </Badge>
                   </div>
                   {form.watch('estimatedPrice') && (

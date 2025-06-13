@@ -1,6 +1,6 @@
 // src/components/shopping/ShoppingList.tsx
 import { useState, useMemo } from 'react';
-import { Plus, Search, Filter, ShoppingCart, TrendingUp, Euro } from 'lucide-react';
+import { Plus, Search, Filter, ShoppingCart, TrendingUp, Euro, Globe, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -27,10 +27,11 @@ export function ShoppingList() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ShoppingItem | null>(null);
   
-  // ✅ Filtri semplificati
+  // ✅ Filtri semplificati + AGGIUNTO: filtro visibilità
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
+  const [visibilityFilter, setVisibilityFilter] = useState('all'); // AGGIUNTO
   const [showCompleted, setShowCompleted] = useState(false);
 
   // ✅ Hooks Firebase
@@ -44,13 +45,13 @@ export function ShoppingList() {
   
   const { data: categories } = useFirestore<Category>('categories');
 
-  // ✅ MIGLIORATO: Filtri con useMemo per performance
+  // ✅ MIGLIORATO: Filtri con useMemo per performance + AGGIUNTA: logica visibilità
   const filteredItems = useMemo(() => {
     if (!items) return [];
     
     return items.filter(item => {
-      // Filtro utente (solo i propri elementi + pubblici per admin)
-      const canView = item.createdBy === user?.username || user?.role === 'admin';
+      // AGGIUNTO: Filtro visibilità (pubblici per tutti, privati solo per creatore + admin)
+      const canView = item.isPublic || item.createdBy === user?.username || user?.role === 'admin';
       if (!canView) return false;
 
       // Filtro ricerca
@@ -68,19 +69,33 @@ export function ShoppingList() {
       // Filtro priorità
       if (priorityFilter !== 'all' && item.priority !== priorityFilter) return false;
 
+      // AGGIUNTO: Filtro visibilità
+      if (visibilityFilter === 'public' && !item.isPublic) return false;
+      if (visibilityFilter === 'private' && item.isPublic) return false;
+      if (visibilityFilter === 'mine' && item.createdBy !== user?.username) return false;
+
       // Filtro completamento
       if (!showCompleted && item.completed) return false;
 
       return true;
     });
-  }, [items, user, searchTerm, categoryFilter, priorityFilter, showCompleted]);
+  }, [items, user, searchTerm, categoryFilter, priorityFilter, visibilityFilter, showCompleted]); // AGGIUNTO: visibilityFilter
 
-  // ✅ NUOVO: Statistiche calcolate
+  // ✅ NUOVO: Statistiche calcolate + AGGIUNTA: statistiche visibilità
   const stats = useMemo(() => {
+    const visibleItems = items?.filter(item => 
+      item.isPublic || item.createdBy === user?.username || user?.role === 'admin'
+    ) || [];
+    
     const pending = filteredItems.filter(item => !item.completed);
     const completed = filteredItems.filter(item => item.completed);
     const highPriority = pending.filter(item => item.priority === 'high').length;
     const totalCost = pending.reduce((sum, item) => sum + (item.estimatedPrice || 0), 0);
+    
+    // AGGIUNTO: Statistiche visibilità
+    const publicItems = visibleItems.filter(item => item.isPublic).length;
+    const privateItems = visibleItems.filter(item => !item.isPublic).length;
+    const myItems = visibleItems.filter(item => item.createdBy === user?.username).length;
     
     return {
       pending: pending.length,
@@ -88,9 +103,14 @@ export function ShoppingList() {
       highPriority,
       totalCost,
       pendingItems: pending,
-      completedItems: completed
+      completedItems: completed,
+      // AGGIUNTO: Statistiche visibilità
+      publicItems,
+      privateItems,
+      myItems,
+      total: visibleItems.length
     };
-  }, [filteredItems]);
+  }, [filteredItems, items, user]);
 
   // ✅ SEMPLIFICATO: Gestori delle azioni
   const handleOpenModal = (item?: ShoppingItem) => {
@@ -179,11 +199,12 @@ export function ShoppingList() {
     }
   };
 
-  // ✅ NUOVO: Reset filtri
+  // ✅ NUOVO: Reset filtri + AGGIUNTO: reset visibilità
   const handleClearFilters = () => {
     setSearchTerm('');
     setCategoryFilter('all');
     setPriorityFilter('all');
+    setVisibilityFilter('all'); // AGGIUNTO
     setShowCompleted(false);
   };
 
@@ -191,6 +212,7 @@ export function ShoppingList() {
     searchTerm.length > 0,
     categoryFilter !== 'all',
     priorityFilter !== 'all',
+    visibilityFilter !== 'all', // AGGIUNTO
     showCompleted
   ].filter(Boolean).length;
 
@@ -208,7 +230,7 @@ export function ShoppingList() {
 
   return (
     <div className="container mx-auto p-6 max-w-7xl">
-      {/* ✅ HEADER con statistiche */}
+      {/* ✅ HEADER con statistiche + AGGIUNTA: statistiche visibilità */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-3">
@@ -216,14 +238,31 @@ export function ShoppingList() {
             <h1 className="text-3xl font-bold text-delft-blue">Lista della Spesa</h1>
           </div>
           
-          {/* ✅ Statistiche visuali */}
+          {/* ✅ Statistiche visuali + AGGIUNTA: badge visibilità */}
           <div className="flex flex-wrap gap-4">
+            <Badge variant="outline" className="text-cambridge-blue border-cambridge-blue">
+              {stats.total} {stats.total === 1 ? 'articolo' : 'articoli'}
+            </Badge>
             <Badge variant="outline" className="text-cambridge-blue border-cambridge-blue">
               {stats.pending} da comprare
             </Badge>
             <Badge variant="outline" className="text-green-600 border-green-300">
               {stats.completed} completati
             </Badge>
+            {/* AGGIUNTO: Badge visibilità */}
+            <Badge variant="outline" className="text-blue-600 border-blue-300">
+              <Globe className="w-3 h-3 mr-1" />
+              {stats.publicItems} pubblici
+            </Badge>
+            <Badge variant="outline" className="text-orange-600 border-orange-300">
+              <Lock className="w-3 h-3 mr-1" />
+              {stats.privateItems} privati
+            </Badge>
+            {user?.role === 'admin' && (
+              <Badge variant="outline" className="text-purple-600 border-purple-300">
+                {stats.myItems} miei
+              </Badge>
+            )}
             {stats.highPriority > 0 && (
               <Badge variant="destructive" className="bg-red-100 text-red-700">
                 <TrendingUp className="w-3 h-3 mr-1" />
@@ -245,11 +284,11 @@ export function ShoppingList() {
   size="lg"
 >
   <Plus className="mr-2 h-5 w-5" />
-  Aggiungi elemento
+  Nuovo elemento
 </Button>
       </div>
 
-      {/* ✅ FILTRI compatti */}
+      {/* ✅ FILTRI compatti + AGGIUNTO: filtro visibilità */}
       <Card className="mb-6">
         <CardContent className="p-4">
           <div className="flex flex-col lg:flex-row gap-4">
@@ -266,7 +305,7 @@ export function ShoppingList() {
               </div>
             </div>
             
-            {/* Filtri */}
+            {/* Filtri + AGGIUNTO: filtro visibilità */}
             <div className="flex flex-wrap gap-2">
               <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                 <SelectTrigger className="w-48">
@@ -292,6 +331,29 @@ export function ShoppingList() {
                   <SelectItem value="high">🔴 Alta</SelectItem>
                   <SelectItem value="medium">🟡 Media</SelectItem>
                   <SelectItem value="low">🟢 Bassa</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* AGGIUNTO: Filtro visibilità */}
+              <Select value={visibilityFilter} onValueChange={setVisibilityFilter}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Visibilità" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tutti</SelectItem>
+                  <SelectItem value="public">
+                    <div className="flex items-center">
+                      <Globe className="w-4 h-4 mr-2 text-green-600" />
+                      Pubblici
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="private">
+                    <div className="flex items-center">
+                      <Lock className="w-4 h-4 mr-2 text-orange-600" />
+                      Privati
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="mine">I Miei</SelectItem>
                 </SelectContent>
               </Select>
 
