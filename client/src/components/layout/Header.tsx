@@ -3,7 +3,8 @@ import { Button } from '@/components/ui/button';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Link, useLocation } from 'wouter';
-
+import { Bell, BellOff } from 'lucide-react';
+import { useNotifications } from '@/hooks/useNotifications';
 interface HeaderProps {
   onMenuToggle: () => void;
 }
@@ -19,6 +20,7 @@ const RatIcon = ({ className }: { className?: string }) => (
 );
 
 export function Header({ onMenuToggle }: HeaderProps) {
+  const { permission, requestPermission, isSupported } = useNotifications();
   const { user, logout } = useAuthContext();
   const { theme, toggleTheme } = useTheme();
   const [location] = useLocation();
@@ -145,6 +147,22 @@ export function Header({ onMenuToggle }: HeaderProps) {
                 <Sun className="h-4 w-4" />
               )}
             </Button>
+
+            {isSupported && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={requestPermission}
+                className="w-9 h-9 rounded-full text-muted-foreground hover:text-delft-blue hover:bg-muted transition-colors"
+                title={permission === 'granted' ? 'Notifiche attive' : 'Attiva notifiche'}
+              >
+                {permission === 'granted' ? (
+                  <Bell className="h-4 w-4" />
+                ) : (
+                  <BellOff className="h-4 w-4" />
+                )}
+              </Button>
+            )}
 
             {/* User info con tema personalizzato */}
             <div className="hidden sm:flex items-center space-x-2 ml-2">
