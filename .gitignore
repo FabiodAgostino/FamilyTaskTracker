@@ -7,3 +7,5 @@ vite.config.ts.*
 
 # functions/.gitignore
 service-account.json
+
+functions/
