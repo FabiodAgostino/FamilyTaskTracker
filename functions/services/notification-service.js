@@ -94,7 +94,7 @@ class UnifiedNotificationService {
     }
 
     /**
-     * Invia notifica FCM con sommario aggiornamenti
+     * ✅ FIXED: Invia notifica FCM con payload corretto (senza icon nel notification)
      */
     async sendFCMNotification(summary) {
         try {
@@ -121,11 +121,12 @@ class UnifiedNotificationService {
                 body = `${summary.notes} note, ${summary.shopping} articoli, ${summary.events} eventi`;
             }
             
+            // ✅ FIXED: Payload FCM corretto senza icon nel notification
             const message = {
                 notification: {
                     title: title,
-                    body: body,
-                    icon: '/icon-192x192.png'
+                    body: body
+                    // ❌ RIMOSSO: icon field non supportato qui
                 },
                 data: {
                     click_action: 'https://familytasktracker-c2dfe.web.app',
@@ -139,7 +140,10 @@ class UnifiedNotificationService {
                         channelId: 'family-updates',
                         priority: 'high',
                         defaultSound: true,
-                        defaultVibrateTimings: true
+                        defaultVibrateTimings: true,
+                        // ✅ ICON per Android va qui
+                        icon: 'ic_notification',
+                        color: '#2196F3'
                     }
                 },
                 apns: {
@@ -152,6 +156,8 @@ class UnifiedNotificationService {
                 },
                 webpush: {
                     notification: {
+                        // ✅ ICON per Web va qui
+                        icon: '/icon-192x192.png',
                         badge: '/badge-72x72.png',
                         requireInteraction: false,
                         renotify: false,
@@ -215,58 +221,41 @@ class UnifiedNotificationService {
     }
 
     /**
-     * Gestisce i reminder per eventi programmati
+     * Gestisce i reminder per eventi del giorno successivo
      */
     async handleEventReminders(db, now) {
         console.log("⏰ Controllo reminder eventi...");
         
+        // Calcola la finestra temporale per "domani"
+        const tomorrow = new Date(now);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(0, 0, 0, 0);
+        
+        const dayAfterTomorrow = new Date(tomorrow);
+        dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 1);
+        
         try {
-            const tomorrow = new Date(now);
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            tomorrow.setHours(0, 0, 0, 0);
-            
-            const dayAfterTomorrow = new Date(tomorrow);
-            dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 1);
-            
-            // Query eventi nelle prossime 24-48 ore che non hanno reminder inviato
+            // Query eventi per domani
             const eventsQuery = await db.collection('calendar_events')
                 .where('isPublic', '==', true)
                 .where('startDate', '>=', tomorrow)
                 .where('startDate', '<', dayAfterTomorrow)
-                .where('reminderSent', '==', false) // Campo per evitare duplicati
                 .get();
             
-            console.log(`⏰ Trovati ${eventsQuery.size} eventi per reminder`);
+            const eventDocs = eventsQuery.docs;
             
-            if (eventsQuery.size > 0) {
-                await this.sendEventReminders(eventsQuery.docs);
+            if (eventDocs.length > 0) {
+                console.log(`⏰ Invio reminder per ${eventDocs.length} eventi di domani`);
                 
-                // Marca eventi come "reminder inviato"
-                const batch = db.batch();
-                eventsQuery.docs.forEach(doc => {
-                    batch.update(doc.ref, { reminderSent: true });
-                });
-                await batch.commit();
+                // 1. Invio FCM per reminder
+                await this.sendReminderFCM(eventDocs);
                 
-                console.log(`✅ Reminder inviati e marcati per ${eventsQuery.size} eventi`);
+                // 2. Invio Email per reminder
+                await emailService.sendReminderEmail(eventDocs);
+                
+            } else {
+                console.log("⏰ Nessun evento per domani");
             }
-            
-        } catch (error) {
-            console.error("❌ Errore reminder eventi:", error);
-            throw error;
-        }
-    }
-
-    /**
-     * Invia reminder per eventi programmati (FCM + Email)
-     */
-    async sendEventReminders(eventDocs) {
-        try {
-            // 1. Invio FCM per reminder
-            await this.sendReminderFCM(eventDocs);
-            
-            // 2. Invio Email per reminder
-            await emailService.sendReminderEmail(eventDocs);
             
         } catch (error) {
             console.error("❌ Errore invio reminder:", error);
@@ -275,7 +264,7 @@ class UnifiedNotificationService {
     }
 
     /**
-     * Invia notifiche FCM per reminder eventi
+     * ✅ FIXED: Invia notifiche FCM per reminder eventi (senza icon nel notification)
      */
     async sendReminderFCM(eventDocs) {
         try {
@@ -285,11 +274,12 @@ class UnifiedNotificationService {
                 const eventData = eventDoc.data();
                 const startDate = new Date(eventData.startDate.seconds * 1000);
                 
+                // ✅ FIXED: Payload FCM corretto per reminder
                 const message = {
                     notification: {
                         title: "⏰ Reminder Evento",
-                        body: `"${eventData.title}" è previsto per domani alle ${startDate.toLocaleTimeString('it-IT', {hour: '2-digit', minute: '2-digit'})}`,
-                        icon: '/icon-192x192.png'
+                        body: `"${eventData.title}" è previsto per domani alle ${startDate.toLocaleTimeString('it-IT', {hour: '2-digit', minute: '2-digit'})}`
+                        // ❌ RIMOSSO: icon field non supportato qui
                     },
                     data: {
                         click_action: 'https://familytasktracker-c2dfe.web.app',
@@ -301,7 +291,27 @@ class UnifiedNotificationService {
                         notification: {
                             channelId: 'event-reminders',
                             priority: 'high',
-                            defaultSound: true
+                            defaultSound: true,
+                            // ✅ ICON per Android va qui
+                            icon: 'ic_notification',
+                            color: '#FF9800'
+                        }
+                    },
+                    apns: {
+                        payload: {
+                            aps: {
+                                badge: 1,
+                                sound: 'default'
+                            }
+                        }
+                    },
+                    webpush: {
+                        notification: {
+                            // ✅ ICON per Web va qui
+                            icon: '/icon-192x192.png',
+                            badge: '/badge-72x72.png',
+                            requireInteraction: true,
+                            tag: 'event-reminder'
                         }
                     }
                 };
@@ -315,6 +325,12 @@ class UnifiedNotificationService {
             throw error;
         }
     }
+
+     async initializeEmailService()
+    {
+        emailService.initializeTransporter();
+    }
+
 
     /**
      * Restituisce lo stato del sistema per health check
@@ -332,7 +348,7 @@ class UnifiedNotificationService {
                 database: 'operational',
                 messaging: 'operational',
                 email: await emailService.getEmailStatus(),
-                version: '2.0.0'
+                version: '2.0.1'  // ✅ AGGIORNATO: Version bump per fix
             };
             
             return status;
@@ -344,7 +360,8 @@ class UnifiedNotificationService {
                 database: 'error',
                 messaging: 'error',
                 email: 'error',
-                error: error.message
+                error: error.message,
+                version: '2.0.1'
             };
         }
     }

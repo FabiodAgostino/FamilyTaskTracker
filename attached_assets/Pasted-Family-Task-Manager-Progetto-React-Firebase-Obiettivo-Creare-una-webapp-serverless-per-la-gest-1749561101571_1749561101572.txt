@@ -146,12 +146,13 @@ Firestore Security Rules
 javascriptrules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Shopping items: solo creatore + admin
     match /shopping_items/{document} {
-      allow read, write: if request.auth != null && 
-        (resource.data.createdBy == request.auth.token.username || 
-         request.auth.token.username == 'admin');
-    }
+  allow read: if request.auth != null && 
+    (resource.data.isPublic == true || 
+     resource.data.createdBy == request.auth.token.username ||
+     request.auth.token.username == 'admin');
+  allow write: if request.auth != null;
+}
     
     // Note: pubbliche per tutti, private solo per creatore
     match /notes/{document} {

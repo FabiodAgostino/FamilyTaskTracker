@@ -36,6 +36,7 @@ exports.checkUpdatesUnified = functions
         console.log("🔄 Avvio controllo unificato notifiche famiglia...");
         
         try {
+            await unifiedNotificationService.initializeEmailService();
             await unifiedNotificationService.handleUnifiedCheck();
             console.log("✅ Controllo unificato completato con successo");
         } catch (error) {

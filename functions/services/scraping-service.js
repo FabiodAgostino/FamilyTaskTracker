@@ -156,12 +156,12 @@ class ScrapingService {
             // Prepara i dati di aggiornamento
             const updateData = {
                 // Campi estratti dal scraping
-                name: scrapingResult.nameProduct || existingData.name,
-                brand: scrapingResult.nameBrand || existingData.brand,
-                estimatedPrice: scrapingResult.price || existingData.estimatedPrice,
+                name: scrapingResult.name || existingData.name,
+                brandName: scrapingResult.brandName || existingData.brandName,
+                estimatedPrice: scrapingResult.estimatedPrice || existingData.estimatedPrice,
                 category: scrapingResult.category || existingData.category,
                 imageUrl: scrapingResult.imageUrl || existingData.imageUrl,
-                
+                scrapingText: scrapingResult.scraping,
                 // Metadati scraping
                 scrapingData: {
                     lastScraped: new Date(),
@@ -237,7 +237,7 @@ function createManualFallback(url, scrapingError, deepseekError) {
         
         return {
             ...urlInfo,
-            price: null,
+            estimatedPrice: null,
             url: url,
             imageUrl: '',
             error: {
@@ -252,9 +252,9 @@ function createManualFallback(url, scrapingError, deepseekError) {
         
     } catch (urlError) {
         return {
-            nameProduct: 'Errore completo',
-            nameBrand: '',
-            price: null,
+            name: 'Errore completo',
+            brandName: '',
+            estimatedPrice: null,
             site: 'N/A',
             url: url,
             imageUrl: '',
@@ -272,9 +272,6 @@ function createManualFallback(url, scrapingError, deepseekError) {
     }
 }
 
-/**
- * Post-processing finale del risultato
- */
 function postProcessResult(result, url) {
     // Assicura campi minimi
     if (!result.site && url) {
@@ -288,16 +285,93 @@ function postProcessResult(result, url) {
     }
     
     // Normalizza brand
-    if (result.nameBrand && typeof result.nameBrand === 'string') {
-        result.nameBrand = result.nameBrand.trim();
+    if (result.brandName && typeof result.brandName === 'string') {
+        result.brandName = result.brandName.trim();
+    }
+    
+    // ✅ MIGLIORATO: Rimuovi il brand dal nome del prodotto con strategia multi-approccio
+    if (result.name && result.name && 
+        typeof result.name === 'string' && 
+        typeof result.brandName === 'string') {
+        
+        const brandName = result.brandName.trim();
+        let productName = result.name.trim();
+        
+        if (brandName.length > 0) {
+            console.log(`🔍 Controllo rimozione brand "${brandName}" da "${productName}"`);
+            
+            let cleanedName = productName;
+            
+            // ✅ STRATEGIA 1: Rimozione esatta (case-insensitive) con word boundaries
+            const exactRegex = new RegExp(`\\b${escapeRegExp(brandName)}\\b`, 'gi');
+            let testClean = productName.replace(exactRegex, '').replace(/\s+/g, ' ').trim();
+            
+            if (testClean !== productName && testClean.length > 0) {
+                cleanedName = testClean;
+            } else {
+                // ✅ STRATEGIA 2: Rimozione dall'inizio (es. "Nike Air Max" → "Air Max")
+                const startRegex = new RegExp(`^${escapeRegExp(brandName)}\\s*[\\s\\-\\|\\:]*\\s*`, 'gi');
+                testClean = productName.replace(startRegex, '').trim();
+                
+                if (testClean !== productName && testClean.length > 0) {
+                    cleanedName = testClean;
+                } else {
+                    // ✅ STRATEGIA 3: Rimozione dalla fine (es. "Air Max Nike" → "Air Max")
+                    const endRegex = new RegExp(`\\s*[\\s\\-\\|\\:]*\\s*${escapeRegExp(brandName)}$`, 'gi');
+                    testClean = productName.replace(endRegex, '').trim();
+                    
+                    if (testClean !== productName && testClean.length > 0) {
+                        cleanedName = testClean;
+                    } else {
+                        // ✅ STRATEGIA 4: Prova con variazioni del brand (NIKE, nike, Nike)
+                        const brandVariations = [
+                            brandName.toLowerCase(),
+                            brandName.toUpperCase(),
+                            brandName.charAt(0).toUpperCase() + brandName.slice(1).toLowerCase()
+                        ];
+                        
+                        for (const variation of brandVariations) {
+                            if (variation !== brandName) { // Evita duplicati
+                                const variationRegex = new RegExp(`\\b${escapeRegExp(variation)}\\b`, 'gi');
+                                testClean = productName.replace(variationRegex, '').replace(/\s+/g, ' ').trim();
+                                
+                                if (testClean !== productName && testClean.length > 0) {
+                                    cleanedName = testClean;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // ✅ VALIDAZIONE FINALE: Il risultato deve essere sensato
+            if (cleanedName !== productName && cleanedName.length >= 3 && /[a-zA-Z]/.test(cleanedName)) {
+                // Pulizia finale: rimuovi caratteri strani dall'inizio/fine
+                cleanedName = cleanedName
+                    .replace(/^[\s\-\|:]+/, '')  // Caratteri strani dall'inizio
+                    .replace(/[\s\-\|:]+$/, '')  // Caratteri strani dalla fine
+                    .replace(/\s+/g, ' ')        // Normalizza spazi multipli
+                    .trim();
+                
+                if (cleanedName.length >= 3) {
+                    console.log(`✅ Brand "${brandName}" rimosso dal prodotto. Prima: "${productName}" → Dopo: "${cleanedName}"`);
+                    result.name = cleanedName;
+                } else {
+                    console.log(`⚠️ Rimozione brand scartata: risultato troppo corto ("${cleanedName}")`);
+                }
+            } else {
+                console.log(`ℹ️ Brand "${brandName}" non trovato o già assente in "${productName}"`);
+            }
+        }
     }
     
     // Normalizza prezzo
-    if (result.price && typeof result.price === 'string') {
-        result.price = result.price.trim();
+    if (result.estimatedPrice && typeof result.estimatedPrice === 'string') {
+        result.estimatedPrice = result.estimatedPrice.trim();
         // Se è "null" string, convertilo a null
-        if (result.price.toLowerCase() === 'null' || result.price === 'N/A') {
-            result.price = null;
+        if (result.estimatedPrice.toLowerCase() === 'null' || result.estimatedPrice === 'N/A') {
+            result.estimatedPrice = null;
         }
     }
     
@@ -315,18 +389,25 @@ function postProcessResult(result, url) {
 }
 
 /**
+ * ✅ UTILITY: Escape caratteri speciali per regex
+ */
+function escapeRegExp(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
  * Logging per monitoring e debugging
  */
 function logFinalResult(result, processingTime) {
     const status = result.success ? '✅' : '❌';
     const mode = result.mode || 'unknown';
     const site = result.site || 'unknown';
-    const hasPrice = result.price ? '💰' : '💸';
+    const hasPrice = result.estimatedPrice ? '💰' : '💸';
     
     console.log(`${status} Final result [${mode}] for ${site}:`);
-    console.log(`   Product: ${result.nameProduct}`);
-    console.log(`   Brand: ${result.nameBrand || 'N/A'}`);
-    console.log(`   ${hasPrice} Price: ${result.price || 'N/A'}`);
+    console.log(`   Product: ${result.name}`);
+    console.log(`   Brand: ${result.brandName || 'N/A'}`);
+    console.log(`   ${hasPrice} Price: ${result.estimatedPrice || 'N/A'}`);
     console.log(`   Category: ${result.category}`);
     console.log(`   Processing time: ${processingTime}ms`);
     
@@ -339,7 +420,7 @@ function logFinalResult(result, processingTime) {
         try {
             reportMetric('scraping_success', result.success ? 1 : 0);
             reportMetric('processing_time_ms', processingTime);
-            reportMetric('has_price', result.price ? 1 : 0);
+            reportMetric('has_price', result.estimatedPrice ? 1 : 0);
         } catch (e) {
             // Ignore metric errors
         }

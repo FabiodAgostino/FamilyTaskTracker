@@ -48,6 +48,7 @@ class EmailService {
      * Inizializza il transporter Nodemailer con Gmail
      */
     async initializeTransporter() {
+        const gmailPassword = await this.getGmailPassword();
         // Se il transporter esiste già, non crearne uno nuovo
         if (this.transporter) {
             console.log("✅ Transporter già inizializzato, riutilizzo quello esistente");
@@ -55,9 +56,8 @@ class EmailService {
         }
         
         try {
-            const gmailPassword = await this.getGmailPassword();
             
-            this.transporter = nodemailer.createTransporter({
+            this.transporter = nodemailer.createTransport({
                 service: 'gmail',
                 auth: {
                     user: 'familytrackersite@gmail.com',

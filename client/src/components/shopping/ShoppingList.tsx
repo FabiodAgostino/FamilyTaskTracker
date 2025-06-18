@@ -31,7 +31,7 @@ export function ShoppingList() {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
-  const [visibilityFilter, setVisibilityFilter] = useState('all'); // AGGIUNTO
+  const [visibilityFilter, setVisibilityFilter] = useState('all');
   const [showCompleted, setShowCompleted] = useState(false);
 
   // ✅ Hooks Firebase
@@ -57,7 +57,7 @@ export function ShoppingList() {
       // Filtro ricerca
       if (searchTerm) {
         const searchLower = searchTerm.toLowerCase();
-        const matchesName = item.name.toLowerCase().includes(searchLower);
+        const matchesName = item.name?.toLowerCase().includes(searchLower);
         const matchesNotes = item.notes?.toLowerCase().includes(searchLower);
         const matchesCategory = item.category.toLowerCase().includes(searchLower);
         if (!matchesName && !matchesNotes && !matchesCategory) return false;
@@ -79,38 +79,51 @@ export function ShoppingList() {
 
       return true;
     });
-  }, [items, user, searchTerm, categoryFilter, priorityFilter, visibilityFilter, showCompleted]); // AGGIUNTO: visibilityFilter
+  }, [items, user, searchTerm, categoryFilter, priorityFilter, visibilityFilter, showCompleted]);
 
-  // ✅ NUOVO: Statistiche calcolate + AGGIUNTA: statistiche visibilità
+  // ✅ CORRETTO: Statistiche calcolate PRIMA del filtro completamento
   const stats = useMemo(() => {
+    // Prima filtra solo per visibilità (senza filtro completamento)
     const visibleItems = items?.filter(item => 
       item.isPublic || item.createdBy === user?.username || user?.role === 'admin'
     ) || [];
     
-    const pending = filteredItems.filter(item => !item.completed);
-    const completed = filteredItems.filter(item => item.completed);
-    const highPriority = pending.filter(item => item.priority === 'high').length;
-    const totalCost = pending.reduce((sum, item) => sum + (item.estimatedPrice || 0), 0);
+    // Poi separa pending/completed dai visible items (non dai filtered)
+    const allPending = visibleItems.filter(item => !item.completed);
+    const allCompleted = visibleItems.filter(item => item.completed);
     
-    // AGGIUNTO: Statistiche visibilità
+    // Ma per la visualizzazione usa i filteredItems
+    const displayedPending = filteredItems.filter(item => !item.completed);
+    const displayedCompleted = filteredItems.filter(item => item.completed);
+    
+    const highPriority = allPending.filter(item => item.priority === 'high').length;
+    const totalCost = allPending.reduce((sum, item) => sum + (item.estimatedPrice || 0), 0);
+    
+    // ✅ CORRETTO: Statistiche per badge (da tutti gli elementi visibili)
     const publicItems = visibleItems.filter(item => item.isPublic).length;
     const privateItems = visibleItems.filter(item => !item.isPublic).length;
     const myItems = visibleItems.filter(item => item.createdBy === user?.username).length;
     
     return {
-      pending: pending.length,
-      completed: completed.length,
-      highPriority,
-      totalCost,
-      pendingItems: pending,
-      completedItems: completed,
-      // AGGIUNTO: Statistiche visibilità
+      // Per badge header (conta TUTTI gli elementi visibili)
+      totalPending: allPending.length,
+      totalCompleted: allCompleted.length,
+      totalVisible: visibleItems.length,
       publicItems,
       privateItems,
       myItems,
-      total: visibleItems.length
+      
+      // Per visualizzazione sezioni (conta solo elementi FILTRATI)
+      pending: displayedPending.length,
+      completed: displayedCompleted.length,
+      pendingItems: displayedPending,
+      completedItems: displayedCompleted,
+      
+      // Altri
+      highPriority,
+      totalCost
     };
-  }, [filteredItems, items, user]);
+  }, [items, filteredItems, user]);
 
   // ✅ SEMPLIFICATO: Gestori delle azioni
   const handleOpenModal = (item?: ShoppingItem) => {
@@ -126,7 +139,6 @@ export function ShoppingList() {
   const handleSaveItem = async (itemData: ShoppingItem) => {
     try {
       if (editingItem) {
-        // ✅ MIGLIORATO: Usa updateItem con l'oggetto completo
         await updateItem(editingItem.id, itemData);
         toast({
           title: 'Elemento aggiornato',
@@ -172,7 +184,6 @@ export function ShoppingList() {
       const item = items?.find(i => i.id === id);
       if (!item) return;
 
-      // ✅ CORRETTO: Crea nuovi dati invece di modificare l'oggetto
       const updatedData = {
         ...item,
         completed: !item.completed,
@@ -199,12 +210,12 @@ export function ShoppingList() {
     }
   };
 
-  // ✅ NUOVO: Reset filtri + AGGIUNTO: reset visibilità
+  // ✅ NUOVO: Reset filtri
   const handleClearFilters = () => {
     setSearchTerm('');
     setCategoryFilter('all');
     setPriorityFilter('all');
-    setVisibilityFilter('all'); // AGGIUNTO
+    setVisibilityFilter('all');
     setShowCompleted(false);
   };
 
@@ -212,7 +223,7 @@ export function ShoppingList() {
     searchTerm.length > 0,
     categoryFilter !== 'all',
     priorityFilter !== 'all',
-    visibilityFilter !== 'all', // AGGIUNTO
+    visibilityFilter !== 'all',
     showCompleted
   ].filter(Boolean).length;
 
@@ -230,7 +241,7 @@ export function ShoppingList() {
 
   return (
     <div className="container mx-auto p-6 max-w-7xl">
-      {/* ✅ HEADER con statistiche + AGGIUNTA: statistiche visibilità */}
+      {/* ✅ HEADER con statistiche CORRETTE */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-3">
@@ -238,18 +249,17 @@ export function ShoppingList() {
             <h1 className="text-3xl font-bold text-delft-blue">Lista della Spesa</h1>
           </div>
           
-          {/* ✅ Statistiche visuali + AGGIUNTA: badge visibilità */}
+          {/* ✅ CORRETTO: Badge con statistiche corrette */}
           <div className="flex flex-wrap gap-4">
             <Badge variant="outline" className="text-cambridge-blue border-cambridge-blue">
-              {stats.total} {stats.total === 1 ? 'articolo' : 'articoli'}
+              {stats.totalVisible} {stats.totalVisible === 1 ? 'articolo' : 'articoli'}
             </Badge>
             <Badge variant="outline" className="text-cambridge-blue border-cambridge-blue">
-              {stats.pending} da comprare
+              {stats.totalPending} da comprare
             </Badge>
             <Badge variant="outline" className="text-green-600 border-green-300">
-              {stats.completed} completati
+              {stats.totalCompleted} completati
             </Badge>
-            {/* AGGIUNTO: Badge visibilità */}
             <Badge variant="outline" className="text-blue-600 border-blue-300">
               <Globe className="w-3 h-3 mr-1" />
               {stats.publicItems} pubblici
@@ -258,11 +268,9 @@ export function ShoppingList() {
               <Lock className="w-3 h-3 mr-1" />
               {stats.privateItems} privati
             </Badge>
-            {user?.role === 'admin' && (
-              <Badge variant="outline" className="text-purple-600 border-purple-300">
-                {stats.myItems} miei
-              </Badge>
-            )}
+            <Badge variant="outline" className="text-purple-600 border-purple-300">
+              {stats.myItems} miei
+            </Badge>
             {stats.highPriority > 0 && (
               <Badge variant="destructive" className="bg-red-100 text-red-700">
                 <TrendingUp className="w-3 h-3 mr-1" />
@@ -278,17 +286,17 @@ export function ShoppingList() {
           </div>
         </div>
         
-<Button
-  onClick={() => handleOpenModal()}
-  className="bg-cambridge-blue hover:bg-cambridge-blue/90 text-white dark:text-black shadow-lg"
-  size="lg"
->
-  <Plus className="mr-2 h-5 w-5" />
-  Nuovo elemento
-</Button>
+        <Button
+          onClick={() => handleOpenModal()}
+          className="bg-cambridge-blue hover:bg-cambridge-blue/90 text-white dark:text-black shadow-lg"
+          size="lg"
+        >
+          <Plus className="mr-2 h-5 w-5" />
+          Nuovo elemento
+        </Button>
       </div>
 
-      {/* ✅ FILTRI compatti + AGGIUNTO: filtro visibilità */}
+      {/* ✅ FILTRI compatti */}
       <Card className="mb-6">
         <CardContent className="p-4">
           <div className="flex flex-col lg:flex-row gap-4">
@@ -305,7 +313,7 @@ export function ShoppingList() {
               </div>
             </div>
             
-            {/* Filtri + AGGIUNTO: filtro visibilità */}
+            {/* Filtri */}
             <div className="flex flex-wrap gap-2">
               <Select value={categoryFilter} onValueChange={setCategoryFilter}>
                 <SelectTrigger className="w-48">
@@ -334,7 +342,6 @@ export function ShoppingList() {
                 </SelectContent>
               </Select>
 
-              {/* AGGIUNTO: Filtro visibilità */}
               <Select value={visibilityFilter} onValueChange={setVisibilityFilter}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="Visibilità" />
@@ -392,8 +399,18 @@ export function ShoppingList() {
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {stats.pendingItems
                 .sort((a, b) => {
-                  const priorityOrder = { high: 3, medium: 2, low: 1 };
-                  return priorityOrder[b.priority] - priorityOrder[a.priority];
+                  // ✅ NUOVO: Prima ordina per data (più recenti prima)
+                  const dateA = new Date(a.createdAt).getTime();
+                  const dateB = new Date(b.createdAt).getTime();
+                  const dateDiff = dateB - dateA; // Più recenti prima
+                  
+                  // Se le date sono uguali, ordina per priorità
+                  if (dateDiff === 0) {
+                    const priorityOrder = { high: 3, medium: 2, low: 1 };
+                    return priorityOrder[b.priority] - priorityOrder[a.priority];
+                  }
+                  
+                  return dateDiff;
                 })
                 .map(item => (
                   <ShoppingItemCard
@@ -419,11 +436,25 @@ export function ShoppingList() {
               </Badge>
             </div>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 opacity-75">
-              {stats.completedItems.map(item => (
+              {stats.completedItems
+                .sort((a, b) => {
+                  // ✅ NUOVO: Ordina per data di completamento (più recenti prima)
+                  if (a.completedAt && b.completedAt) {
+                    const dateA = new Date(a.completedAt).getTime();
+                    const dateB = new Date(b.completedAt).getTime();
+                    return dateB - dateA; // Più recenti prima
+                  }
+                  
+                  // Se non hanno completedAt, usa createdAt
+                  const dateA = new Date(a.createdAt).getTime();
+                  const dateB = new Date(b.createdAt).getTime();
+                  return dateB - dateA;
+                })
+                .map(item => (
                 <ShoppingItemCard
                   key={item.id}
                   item={item}
-                  categories={categories || []} // ✅ CORRETTO: Passa le categorie
+                  categories={categories || []}
                   onEdit={() => handleOpenModal(item)}
                   onDelete={handleDeleteItem}
                   onComplete={handleToggleComplete}

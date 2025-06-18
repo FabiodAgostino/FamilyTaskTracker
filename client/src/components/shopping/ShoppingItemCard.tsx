@@ -15,12 +15,15 @@ import {
   StickyNote,
   Globe,
   Lock,
-  Zap
+  Award,
+  Zap,
+  Sparkles
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { it } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -57,6 +60,22 @@ export function ShoppingItemCard({
   const [isCompleting, setIsCompleting] = useState(false);
 
   const canEdit = user?.username === item.createdBy || user?.role === 'admin';
+
+  // ✅ Funzione per troncare il titolo
+  const truncateTitle = (title: string, maxLength: number = 32): { display: string; isTruncated: boolean } => {
+    if (!title || title.length <= maxLength) {
+      return { display: title || 'Prodotto senza nome', isTruncated: false };
+    }
+    return { 
+      display: title.substring(0, maxLength) + '...', 
+      isTruncated: true 
+    };
+  };
+
+  const titleData = truncateTitle(item.name || 'Prodotto senza nome');
+
+  const isAIProcessing = item.scrapingData && item.scrapingData.scrapingSuccess !== true;
+  const hasAIData = item.scrapingData && item.scrapingData.scrapingSuccess === true;
 
   // ✅ Funzione sicura per formattare le date
   const formatSafeDate = (date: Date | undefined): string => {
@@ -106,267 +125,306 @@ export function ShoppingItemCard({
     }
   };
 
-  const getCategoryStyle = (categoryName: string) => {
-    const category = categories.find(c => c.name.toLowerCase() === categoryName.toLowerCase());
-    
-    if (category && category.color) {
-      return {
-        backgroundColor: `${category.color}20`,
-        color: category.color,
-        borderColor: category.color
-      };
+  // ✅ Formattiamo il prezzo in modo sicuro
+  const formatPrice = (price: number | string): string => {
+    if (typeof price === 'string') {
+      return price;
     }
-    
-    const defaultColors: Record<string, { bg: string; text: string; border: string }> = {
-      'groceries': { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-300' },
-      'electronics': { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-300' },
-      'household': { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-300' },
-      'clothing': { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-300' },
-    };
-    
-    const defaultStyle = defaultColors[categoryName.toLowerCase()];
-    return defaultStyle 
-      ? { className: `${defaultStyle.bg} ${defaultStyle.text} ${defaultStyle.border}` }
-      : { className: 'bg-gray-100 text-gray-700 border-gray-300' };
+    return price.toLocaleString('it-IT', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }) + ' €';
   };
 
-  const getPriorityDisplay = (priority: 'low' | 'medium' | 'high') => {
-    const priorityConfig = {
-      low: { 
-        icon: ArrowDown, 
-        label: 'Bassa', 
-        color: 'text-green-600',
-        bgColor: 'bg-green-100' 
-      },
-      medium: { 
-        icon: ArrowRight, 
-        label: 'Media', 
-        color: 'text-yellow-600',
-        bgColor: 'bg-yellow-100' 
-      },
-      high: { 
-        icon: ArrowUp, 
-        label: 'Alta', 
-        color: 'text-red-600',
-        bgColor: 'bg-red-100' 
-      }
-    };
-    
-    return priorityConfig[priority];
+  // ✅ Trova la categoria per styling
+  const categoryData = categories?.find(cat => cat.name === item.category);
+  const categoryStyle = categoryData 
+    ? { backgroundColor: `${categoryData.color}20`, color: categoryData.color, className: 'border-current' }
+    : { className: 'text-gray-600 border-gray-300' };
+
+  // ✅ Configurazione priorità
+  const priorityConfig = {
+    high: { 
+      icon: ArrowUp, 
+      label: 'Alta', 
+      color: 'text-red-600 border-red-300 bg-red-50',
+      className: 'badge-high-priority'
+    },
+    medium: { 
+      icon: ArrowRight, 
+      label: 'Media', 
+      color: 'text-yellow-600 border-yellow-300 bg-yellow-50',
+      className: 'badge-medium-priority'
+    },
+    low: { 
+      icon: ArrowDown, 
+      label: 'Bassa', 
+      color: 'text-green-600 border-green-300 bg-green-50',
+      className: 'badge-low-priority'
+    }
   };
 
-  const formatPrice = (price?: number): string => {
-    if (!price) return '';
-    return new Intl.NumberFormat('it-IT', {
-      style: 'currency',
-      currency: 'EUR'
-    }).format(price);
-  };
-
-  const categoryStyle = getCategoryStyle(item.category);
-  const priorityDisplay = getPriorityDisplay(item.priority);
+  const priorityDisplay = priorityConfig[item.priority];
   const PriorityIcon = priorityDisplay.icon;
-  
-  const categoryData = categories.find(c => c.name.toLowerCase() === item.category.toLowerCase());
 
   return (
-    <Card className={`hover:shadow-lg transition-all duration-200 flex flex-col h-full border border-border ${
-      item.completed ? 'opacity-60' : ''
-    } ${item.priority === 'high' ? 'ring-2 ring-red-400 dark:ring-red-500' : ''}`}>
-      <CardContent className="p-6 flex flex-col flex-1">
-        {/* Header con nome, prezzo e azioni */}
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex-1">
-            {/* Icona visibilità e badge scraping */}
-            <div className="flex items-center mb-2">
+    <TooltipProvider>
+      <Card className={`
+        transition-all duration-300 hover:shadow-lg border h-full flex flex-col
+        ${item.completed ? 'opacity-60' : ''} 
+        ${item.priority === 'high' ? 'ring-2 ring-red-400 dark:ring-red-500' : ''}
+        ${isAIProcessing ? 'ring-2 ring-blue-400' : ''}
+      `}>
+      <CardContent className="p-4 flex flex-col flex-1">
+        {/* ✅ HEADER COMPATTO - Nome + Prezzo + Azioni Inline */}
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex-1 min-w-0">
+            {/* Prima riga: Icona visibilità + Badge AI + Titolo */}
+            <div className="flex items-center mb-1">
+              {/* Icona visibilità compatta */}
               {item.isPublic ? (
-                <Globe className="w-4 h-4 mr-2 text-green-600" />
+                <Globe className="w-3 h-3 mr-1 text-green-600 flex-shrink-0" />
               ) : (
-                <Lock className="w-4 h-4 mr-2 text-orange-600" />
+                <Lock className="w-3 h-3 mr-1 text-orange-600 flex-shrink-0" />
               )}
               
-              {/* ✅ NUOVO: Badge se estratto automaticamente */}
-              {item.scrapingData && (
-                <Badge variant="outline" className="text-blue-600 border-blue-200 mr-2 text-xs">
-                  <Zap className="mr-1 h-3 w-3" />
-                  Auto-estratto
+              {/* Badge AI compatti */}
+              {isAIProcessing && (
+                <Badge variant="outline" className="text-blue-600 border-blue-300 bg-blue-50 mr-1 text-xs px-1 py-0 h-5">
+                  <Sparkles className="mr-1 h-2 w-2 animate-slow-spin" />
+                  AI
                 </Badge>
               )}
               
-              <h3 className={`font-semibold text-card-foreground flex-1 ${item.completed ? 'line-through' : ''}`}>
-                {item.name || 'Prodotto senza nome'}
-              </h3>
-              {item.estimatedPrice && (
-                <div className="flex items-center text-green-600 dark:text-green-400 font-semibold ml-auto">
-                  <Euro className="h-4 w-4 mr-1" />
-                  {formatPrice(item.estimatedPrice)}
-                </div>
+              {hasAIData && (
+                <Badge variant="outline" className="text-purple-600 border-purple-300 bg-purple-50 mr-1 text-xs px-1 py-0 h-5">
+                  <Zap className="mr-1 h-2 w-2" />
+                  AI
+                </Badge>
               )}
             </div>
             
-            {/* Badge categoria e priorità */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <Badge 
-                variant="outline"
-                style={categoryStyle.className ? undefined : categoryStyle}
-                className={categoryStyle.className || 'border'}
-              >
-                {categoryData?.icon && <span className="mr-1">{categoryData.icon}</span>}
-                {item.category}
-              </Badge>
-              
-              <Badge 
-                variant="outline"
-                className={`${priorityDisplay.color} border-current ${
-                  item.priority === 'high' ? 'badge-high-priority' :
-                  item.priority === 'medium' ? 'badge-medium-priority' : 
-                  'badge-low-priority'
-                }`}
-              >
-                <PriorityIcon className="h-3 w-3 mr-1" />
-                {priorityDisplay.label}
-              </Badge>
+            {/* Seconda riga: Titolo del prodotto */}
+            <div className="mb-1">
+              {titleData.isTruncated ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <h3 className={`font-semibold text-card-foreground cursor-help text-sm leading-tight ${item.completed ? 'line-through' : ''}`}>
+                      {titleData.display}
+                    </h3>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="max-w-xs">{item.name}</p>
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <h3 className={`font-semibold text-card-foreground text-sm leading-tight ${item.completed ? 'line-through' : ''}`}>
+                  {titleData.display}
+                </h3>
+              )}
             </div>
+
+            {/* Terza riga: Brand se presente */}
+            {item.brandName && (
+              <div className="flex items-center text-xs text-gray-600 mb-1">
+                <Award className="h-2.5 w-2.5 mr-1 flex-shrink-0" />
+                <span className="font-medium truncate">{item.brandName}</span>
+              </div>
+            )}
           </div>
           
-          {canEdit && (
-            <div className="flex space-x-2 ml-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onEdit(item)}
-                className="text-gray-400 hover:text-cambridge-blue"
-              >
-                <Edit className="h-4 w-4" />
-              </Button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-gray-400 hover:text-red-500"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Conferma eliminazione</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Sei sicuro di voler eliminare "{item.name || 'questo elemento'}"? Questa azione non può essere annullata.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Annulla</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={handleDelete}
-                      className="bg-red-500 hover:bg-red-600"
+          {/* ✅ AZIONI INLINE + PREZZO */}
+          <div className="flex items-start space-x-1 ml-2 flex-shrink-0">
+            {/* Prezzo compatto */}
+            {item.estimatedPrice && (
+              <div className="flex items-center text-green-600 dark:text-green-400 font-semibold text-sm">
+                {formatPrice(item.estimatedPrice)}
+              </div>
+            )}
+            
+            {/* Bottoni azione compatti inline */}
+            {canEdit && (
+              <div className="flex space-x-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onEdit(item)}
+                  className="text-gray-400 hover:text-cambridge-blue h-6 w-6 p-0"
+                >
+                  <Edit className="h-3 w-3" />
+                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-gray-400 hover:text-red-500 h-6 w-6 p-0"
                     >
-                      Elimina
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
-          )}
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Conferma eliminazione</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Sei sicuro di voler eliminare "{item.name || 'questo elemento'}"? Questa azione non può essere annullata.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Annulla</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleDelete}
+                        className="bg-red-500 hover:bg-red-600"
+                      >
+                        Elimina
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {/* ✅ BADGE COMPATTI - Categoria e Priorità inline */}
+        <div className="flex items-center gap-1.5 flex-wrap mb-3">
+          <Badge 
+            variant="outline"
+            style={categoryStyle.className ? undefined : categoryStyle}
+            className={`${categoryStyle.className || 'border'} text-xs px-2 py-0 h-5`}
+          >
+            {categoryData?.icon && <span className="mr-1 text-xs">{categoryData.icon}</span>}
+            {item.category}
+          </Badge>
+          
+          <Badge 
+            variant="outline"
+            className={`${priorityDisplay.color} border-current ${priorityDisplay.className} text-xs px-2 py-0 h-5`}
+          >
+            <PriorityIcon className="h-2.5 w-2.5 mr-1" />
+            {priorityDisplay.label}
+          </Badge>
         </div>
 
-        {/* ✅ NUOVO: Informazioni di scraping se disponibili */}
-        {item.scrapingData && (
-          <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
-            <div className="text-xs text-blue-700 dark:text-blue-300">
-              <div className="flex items-center">
-                <Zap className="h-3 w-3 mr-1" />
-                Estratto automaticamente da: {item.scrapingData.extractedData?.site || 'sito web'}
-              </div>
-              {item.scrapingData.extractedData?.nameBrand && (
-                <div className="mt-1">
-                  Brand: <span className="font-medium">{item.scrapingData.extractedData.nameBrand}</span>
-                </div>
-              )}
-              <div className="mt-1 text-xs opacity-75">
-                Ultimo aggiornamento: {formatSafeDate(item.scrapingData.lastScraped)}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Note se disponibili */}
+        {/* ✅ NOTE COMPATTE - se disponibili */}
         {item.notes && (
-          <div className="mb-3 p-3 bg-muted rounded-lg border border-border">
-            <div className="flex items-start text-sm text-muted-foreground">
-              <StickyNote className="h-4 w-4 mr-2 mt-0.5 text-muted-foreground" />
-              <span className="italic">{item.notes}</span>
+          <div className="mb-3 p-2 bg-gray-50 dark:bg-gray-800 rounded-md flex-grow">
+            <div className="flex items-start">
+              <StickyNote className="h-3 w-3 mr-1.5 text-gray-500 mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-gray-700 dark:text-gray-300 line-clamp-2 leading-relaxed">{item.notes}</p>
             </div>
           </div>
         )}
 
-        <div className="space-y-3 flex-1">
-          <div className="flex items-center text-sm text-muted-foreground">
-            <User className="mr-2 h-4 w-4" />
-            Aggiunto da {item.createdBy}
+        {/* ✅ LINK COMPATTO - se disponibile */}
+        {item.link && (
+          <div className="mb-3">
+            <a
+              href={item.link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center text-xs text-cambridge-blue hover:text-cambridge-blue/80 hover:underline"
+            >
+              <ExternalLink className="h-3 w-3 mr-1" />
+              Vedi prodotto
+            </a>
           </div>
-          <div className="flex items-center text-sm text-muted-foreground">
-            <Clock className="mr-2 h-4 w-4" />
-            {formatSafeDate(item.createdAt)}
+        )}
+
+        {/* ✅ FOOTER COMPATTO con info - Autore + Data inline */}
+        <div className="flex justify-between items-center text-xs text-gray-500 mt-auto pt-2 border-t border-gray-100">
+          <div className="flex items-center min-w-0 flex-1">
+            <User className="h-2.5 w-2.5 mr-1 flex-shrink-0" />
+            <span className="truncate">{item.createdBy}</span>
           </div>
-          
-          {item.link && (
-            <div className="flex items-center text-sm">
-              <ExternalLink className="mr-2 h-4 w-4 text-cambridge-blue" />
-              <a
-                href={item.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-cambridge-blue hover:underline"
-              >
-                Vedi prodotto
-              </a>
-            </div>
-          )}
-          
-          {!item.estimatedPrice && !item.link && (
-            <div className="text-sm text-muted-foreground">
-              Nessun link o prezzo specificato
-            </div>
-          )}
-          
-          <div className="flex-1"></div>
+          <div className="flex items-center ml-2 flex-shrink-0">
+            <Clock className="h-2.5 w-2.5 mr-1" />
+            <span className="truncate">{formatSafeDate(item.createdAt)}</span>
+          </div>
         </div>
 
-        {/* Pulsante completamento */}
-        <div className="mt-auto pt-4 border-t border-border">
-          {item.completed ? (
-            <Button
-              disabled
-              className="w-full bg-muted text-muted-foreground cursor-not-allowed"
-            >
-              <Check className="mr-2 h-4 w-4" />
-              Completato
-              {item.completedAt && isValid(item.completedAt) && (
-                <span className="ml-2 text-xs opacity-75">
-                  ({formatSafeDate(item.completedAt)})
-                </span>
-              )}
-            </Button>
-          ) : (
+        {/* ✅ PULSANTE COMPLETAMENTO COMPATTO - Bottom fixed */}
+        {!item.completed && (
+          <div className="flex justify-center mt-3">
             <Button
               onClick={handleComplete}
               disabled={isCompleting}
-              className="w-full bg-burnt-sienna hover:bg-burnt-sienna/90 text-white transition-colors"
+              variant="outline"
+              size="sm"
+              className="w-full h-8 bg-green-50 hover:bg-green-100 text-green-700 border-green-300 dark:bg-green-950/20 dark:text-green-400 dark:border-green-800 text-xs"
             >
               {isCompleting ? (
                 'Segnando...'
               ) : (
                 <>
-                  <PriorityIcon className="mr-2 h-4 w-4" />
-                  Segna come completato
+                  <Check className="mr-1 h-3 w-3" />
+                  Completato
                 </>
               )}
             </Button>
-          )}
-        </div>
+          </div>
+        )}
       </CardContent>
     </Card>
+    </TooltipProvider>
   );
+}
+
+// ✅ CSS ottimizzato per le animazioni compatte
+const styles = `
+  @keyframes slow-bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-2px); }
+  }
+  
+  @keyframes slow-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  .animate-slow-bounce {
+    animation: slow-bounce 2s ease-in-out infinite;
+  }
+  
+  .animate-slow-spin {
+    animation: slow-spin 3s linear infinite;
+  }
+  
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  /* ✅ Ottimizzazioni per badge compatti */
+  .badge-high-priority {
+    font-size: 10px;
+    padding: 1px 6px;
+  }
+  
+  .badge-medium-priority {
+    font-size: 10px;
+    padding: 1px 6px;
+  }
+  
+  .badge-low-priority {
+    font-size: 10px;
+    padding: 1px 6px;
+  }
+`;
+
+// Inietta gli stili nel documento
+if (typeof document !== 'undefined' && !document.getElementById('shopping-card-styles')) {
+  const styleSheet = document.createElement('style');
+  styleSheet.id = 'shopping-card-styles';
+  styleSheet.textContent = styles;
+  document.head.appendChild(styleSheet);
 }

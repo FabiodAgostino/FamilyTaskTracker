@@ -273,7 +273,7 @@ class ContentExtractor {
       const hostname = urlObj.hostname;
       
       // Estrai nome prodotto dal path
-      let productName = '';
+      let name = '';
       
       // Pattern comuni negli URL e-commerce
       if (pathname.includes('/p/') || pathname.includes('/product/')) {
@@ -281,7 +281,7 @@ class ContentExtractor {
         const productIndex = parts.findIndex(part => part === 'p' || part === 'product');
         
         if (productIndex !== -1 && productIndex + 1 < parts.length) {
-          productName = parts[productIndex + 1]
+          name = parts[productIndex + 1]
             .replace(/-/g, ' ')
             .replace(/_/g, ' ')
             .replace(/\b\w/g, l => l.toUpperCase())
@@ -290,7 +290,7 @@ class ContentExtractor {
         }
       } else {
         // Fallback: ultimo segmento del path
-        productName = pathname.split('/').pop()
+        name = pathname.split('/').pop()
           .replace(/[-_]/g, ' ')
           .replace(/\b\w/g, l => l.toUpperCase())
           .replace(/\.[^.]*$/, '')
@@ -335,8 +335,8 @@ class ContentExtractor {
       }
       
       return {
-        nameProduct: productName || 'Prodotto sconosciuto',
-        nameBrand: brand,
+        name: name || 'Prodotto sconosciuto',
+        brandName: brand,
         site: hostname,
         category: category
       };
@@ -344,8 +344,8 @@ class ContentExtractor {
     } catch (error) {
       console.error('❌ Errore estrazione da URL:', error.message);
       return {
-        nameProduct: 'Errore parsing URL',
-        nameBrand: '',
+        name: 'Errore parsing URL',
+        brandName: '',
         site: 'N/A',
         category: 'Articoli'
       };

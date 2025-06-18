@@ -52,9 +52,9 @@ class DeepSeekClient {
     return `
 Analizza il testo completo di una pagina prodotto e estrai le seguenti informazioni in formato JSON:
 
-- nameProduct (string): il nome/titolo del prodotto (NON informazioni di spedizione o policy)
-- nameBrand (string): il nome del brand con iniziali maiuscole
-- price (string): il prezzo PRINCIPALE del prodotto (ignora costi di spedizione, soglie gratuite, etc.)
+- name (string): il nome/titolo del prodotto (NON informazioni di spedizione, policy o brand)
+- brandName (string): il nome del brand con iniziali maiuscole
+- estimatedPrice (string): il prezzo PRINCIPALE del prodotto (ignora costi di spedizione, soglie gratuite, etc.)
 - site (string): il dominio del sito  
 - imageUrl (string): URL di un'immagine del prodotto se presente
 - category (string): categoria del prodotto
@@ -64,6 +64,7 @@ IMPORTANTE per il prezzo:
 - Ignora frasi come "spedizione gratuita oltre X€", "reso gratuito oltre X€"
 - Se ci sono più prezzi, scegli quello più prominente/principale
 - Se c'è uno sconto, prendi il prezzo scontato
+- Converti il prezzo sempre in €
 - Se non trovi prezzi, imposta come null
 
 IMPORTANTE per le immagini:
@@ -84,9 +85,9 @@ ${data}`;
     return `
 Analizza questo URL di un prodotto e crea un JSON con le seguenti informazioni deducendole dall'URL stesso:
 
-- nameProduct (string): ricava il nome del prodotto dall'URL (Senza nome brand), rimuovendo caratteri speciali e codici
-- nameBrand (string): Il nome del brand con iniziali maiuscole (se riconoscibile dall'URL)
-- price (string): null (non disponibile dall'URL)
+- name (string): ricava il nome del prodotto dall'URL (Con il solo nome del prodotto e non del brand), rimuovendo caratteri speciali e codici
+- brandName (string): Il nome del brand con iniziali maiuscole (se riconoscibile dall'URL)
+- estimatedPrice (string): null (non disponibile dall'URL)
 - site (string): il dominio del sito
 - imageUrl (string): "" (vuoto)
 - category (string): dedici la categoria dal dominio o dal path dell'URL
@@ -200,7 +201,7 @@ URL: ${url}`;
    * Valida il risultato di DeepSeek
    */
   static validateResult(result) {
-    const requiredFields = ['nameProduct', 'nameBrand', 'price', 'site', 'imageUrl', 'category'];
+    const requiredFields = ['name', 'brandName', 'estimatedPrice', 'site', 'imageUrl', 'category'];
     
     for (const field of requiredFields) {
       if (!(field in result)) {
@@ -232,9 +233,9 @@ URL: ${url}`;
    */
   static getDefaultValue(field) {
     const defaults = {
-      nameProduct: 'Prodotto sconosciuto',
-      nameBrand: '',
-      price: null,
+      name: 'Prodotto sconosciuto',
+      brandName: '',
+      estimatedPrice: null,
       site: 'N/A',
       imageUrl: '',
       category: 'Articoli'
@@ -254,9 +255,9 @@ URL: ${url}`;
         const urlObj = new URL(originalUrl);
         
         return {
-          nameProduct: urlObj.pathname.split('/').pop().replace(/[-_]/g, ' ') || 'Prodotto sconosciuto',
-          nameBrand: '',
-          price: null,
+          name: urlObj.pathname.split('/').pop().replace(/[-_]/g, ' ') || 'Prodotto sconosciuto',
+          brandName: '',
+          estimatedPrice: null,
           site: urlObj.hostname,
           url: originalUrl,
           imageUrl: '',
@@ -274,9 +275,9 @@ URL: ${url}`;
     
     // Fallback finale
     return {
-      nameProduct: 'Errore parsing',
-      nameBrand: '',
-      price: null,
+      name: 'Errore parsing',
+      brandName: '',
+      estimatedPrice: null,
       site: 'N/A',
       url: originalUrl || 'N/A',
       imageUrl: '',

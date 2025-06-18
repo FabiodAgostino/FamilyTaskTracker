@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { 
   ShoppingCart, 
@@ -13,7 +13,10 @@ import {
   Globe,
   Lock,
   Zap,
-  AlertCircle
+  AlertCircle,
+  Award,
+  Sparkles,
+  Save
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,13 +42,15 @@ const EMOJI_OPTIONS = [
 interface ShoppingItemFormData {
   name?: string;
   link: string;               
-  category?: string;          
+  category?: string;
+  brandName?: string;
   createdBy: string;
   completed: boolean;
   priority: Priority;
   estimatedPrice?: number;
   notes?: string;
   isPublic: boolean;
+  useAI: boolean;
 }
 
 interface NewCategoryData {
@@ -59,11 +64,10 @@ interface AddItemFormProps {
   isOpen: boolean;
   onClose: () => void;
   onAdd: (item: ShoppingItem) => Promise<void>;
-  onUpdate: (item: ShoppingItem) => Promise<void>; // NUOVO: per aggiornare dopo scraping
   editItem?: ShoppingItem | null;
 }
 
-export function AddItemForm({ isOpen, onClose, onAdd, onUpdate, editItem }: AddItemFormProps) {
+export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormProps) {
   const { user } = useAuthContext();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -71,7 +75,9 @@ export function AddItemForm({ isOpen, onClose, onAdd, onUpdate, editItem }: AddI
   const [showNewCategoryForm, setShowNewCategoryForm] = useState(false);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   
+  // ✅ Hooks Firebase
   const { data: categories, add: addCategory, loading: categoriesLoading } = useFirestore<Category>('categories');
+  const { data: existingItems } = useFirestore<ShoppingItem>('shopping_items');
 
   // URL dell'endpoint di scraping
   const SCRAPING_ENDPOINT = 'https://europe-west1-familytasktracker-c2dfe.cloudfunctions.net/onShoppingItemCreated';
@@ -82,12 +88,14 @@ export function AddItemForm({ isOpen, onClose, onAdd, onUpdate, editItem }: AddI
       name: '',
       link: '',
       category: '',
+      brandName: '',
       createdBy: user?.username || '',
       completed: false,
       priority: 'medium',
       estimatedPrice: undefined,
       notes: '',
       isPublic: true,
+      useAI: true,
     },
   });
 
@@ -99,36 +107,67 @@ export function AddItemForm({ isOpen, onClose, onAdd, onUpdate, editItem }: AddI
     color: '#6B7280'
   });
 
+  // ✅ NUOVO: Controllo URL duplicati
+  const isDuplicateUrl = useMemo(() => {
+    const currentUrl = form.watch('link');
+    if (!currentUrl || !currentUrl.startsWith('http')) return false;
+    
+    // Se stiamo modificando, ignora l'elemento corrente
+    const itemsToCheck = existingItems?.filter(item => 
+      editItem ? item.id !== editItem.id : true
+    ) || [];
+    
+    return itemsToCheck.some(item => item.link === currentUrl);
+  }, [form.watch('link'), existingItems, editItem]);
+
+  // ✅ NUOVO: Messaggio di errore per URL duplicato
+  const duplicateUrlError = useMemo(() => {
+    if (!isDuplicateUrl) return null;
+    
+    const existingItem = existingItems?.find(item => 
+      item.link === form.watch('link') && 
+      (editItem ? item.id !== editItem.id : true)
+    );
+    
+    return existingItem 
+      ? `Questo URL è già stato aggiunto per "${existingItem.name || 'un altro prodotto'}"` 
+      : 'Questo URL è già stato aggiunto';
+  }, [isDuplicateUrl, existingItems, form.watch('link'), editItem]);
+
   useEffect(() => {
     if (editItem) {
       form.reset({
         name: editItem.name,
         link: editItem.link || '',
         category: editItem.category,
+        brandName: editItem.brandName || '',
         createdBy: editItem.createdBy,
         completed: editItem.completed,
         priority: editItem.priority,
         estimatedPrice: editItem.estimatedPrice,
         notes: editItem.notes || '',
         isPublic: editItem.isPublic !== undefined ? editItem.isPublic : true,
+        useAI: false,
       });
     } else {
       form.reset({
         name: '',
         link: '',
         category: '',
+        brandName: '',
         createdBy: user?.username || '',
         completed: false,
         priority: 'medium',
         estimatedPrice: undefined,
         notes: '',
         isPublic: true,
+        useAI: true,
       });
     }
   }, [editItem, form, user]);
 
-  // NUOVO: Funzione per scraping asincrono DOPO il salvataggio
-  const performAsyncScraping = async (url: string, itemId: string) => {
+  // ✅ Funzione per scraping asincrono
+  const performAsyncScraping = async (url: string) => {
     try {
       console.log(`🔗 Avvio scraping asincrono per: ${url}`);
       
@@ -139,7 +178,7 @@ export function AddItemForm({ isOpen, onClose, onAdd, onUpdate, editItem }: AddI
         },
         body: JSON.stringify({ 
           url,
-          updateFirestore: true,  // Aggiorna direttamente Firestore
+          updateFirestore: true,
           collectionName: 'shopping_items'
         })
       });
@@ -153,15 +192,13 @@ export function AddItemForm({ isOpen, onClose, onAdd, onUpdate, editItem }: AddI
       if (result.success && result.data) {
         console.log(`✅ Scraping completato per ${url}:`, result.data);
         
-        // Mostra notifica di successo
+        // ✅ CORRETTO: Controlla se nameProduct esiste prima di usarlo
+        const productName = result.data.nameProduct || result.data.name || 'il prodotto';
+        
         toast({
           title: 'Prodotto aggiornato!',
-          description: `Informazioni estratte automaticamente per "${result.data.nameProduct}"`,
+          description: `Informazioni estratte automaticamente per "${productName}"`,
         });
-        
-        // NOTA: L'aggiornamento in Firestore è già avvenuto nell'endpoint,
-        // quindi il componente si aggiornerà automaticamente tramite useFirestore
-        
       } else {
         console.warn('Scraping parzialmente riuscito:', result);
         toast({
@@ -177,6 +214,14 @@ export function AddItemForm({ isOpen, onClose, onAdd, onUpdate, editItem }: AddI
         description: 'Non è stato possibile estrarre automaticamente i dati del prodotto',
         variant: 'destructive',
       });
+    }
+  };
+
+  const handleCategorySelect = (value: string) => {
+    if (value === 'add_new') {
+      setShowNewCategoryForm(true);
+    } else {
+      form.setValue('category', value);
     }
   };
 
@@ -251,12 +296,26 @@ export function AddItemForm({ isOpen, onClose, onAdd, onUpdate, editItem }: AddI
     }
   };
 
+  // ✅ CORRETTO: Controllo iniziale per evitare submit inutili
   const onSubmit = async (data: ShoppingItemFormData) => {
-    // Validazione URL obbligatorio
+    // ✅ NUOVO: Se non c'è link valido e siamo qui da "Annulla", esci subito
     if (!data.link || !data.link.startsWith('http')) {
+      // Non mostrare errore se il campo è vuoto (probabilmente è un reset)
+      if (data.link && data.link.trim().length > 0) {
+        toast({
+          title: 'URL richiesto',
+          description: 'L\'URL del prodotto è obbligatorio e deve iniziare con http:// o https://',
+          variant: 'destructive',
+        });
+      }
+      return;
+    }
+
+    // ✅ NUOVO: Controllo URL duplicato
+    if (isDuplicateUrl) {
       toast({
-        title: 'URL richiesto',
-        description: 'L\'URL del prodotto è obbligatorio e deve iniziare con http:// o https://',
+        title: 'URL duplicato',
+        description: duplicateUrlError || 'Questo URL è già stato aggiunto',
         variant: 'destructive',
       });
       return;
@@ -268,46 +327,24 @@ export function AddItemForm({ isOpen, onClose, onAdd, onUpdate, editItem }: AddI
       let shoppingItem: ShoppingItem;
       
       if (editItem) {
-        // Modalità modifica
+        // MODALITÀ MODIFICA - Mai scraping
         shoppingItem = editItem;
         try {
           shoppingItem.name = data.name || editItem.name;
           shoppingItem.link = data.link;
           shoppingItem.category = data.category || editItem.category;
+          shoppingItem.brandName = data.brandName || editItem.brandName;
           shoppingItem.priority = data.priority;
           shoppingItem.estimatedPrice = data.estimatedPrice;
           shoppingItem.notes = data.notes;
           shoppingItem.isPublic = data.isPublic;
           shoppingItem.updatedAt = new Date();
           
-          shoppingItem.validate();
+          await onAdd(shoppingItem);
           
-        } catch (validationError) {
-          if (validationError instanceof ValidationError) {
-            toast({
-              title: 'Errore di validazione',
-              description: validationError.errors.join(', '),
-              variant: 'destructive',
-            });
-            return;
-          }
-          throw validationError;
-        }
-      } else {
-        // Modalità creazione - SALVA SUBITO con dati minimi
-        try {
-          shoppingItem = ModelFactory.createShoppingItem({
-            id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            category: data.category || 'Articoli',    // Default se non specificato
-            createdBy: data.createdBy,
-            link: data.link,
-            name: data.name || 'Prodotto',            // Default se non specificato
-            createdAt: new Date(),
-            completed: data.completed,
-            priority: data.priority,
-            estimatedPrice: data.estimatedPrice,
-            notes: data.notes,
-            isPublic: data.isPublic,
+          toast({
+            title: 'Elemento aggiornato',
+            description: 'Le modifiche sono state salvate con successo!',
           });
         } catch (validationError) {
           if (validationError instanceof ValidationError) {
@@ -320,20 +357,66 @@ export function AddItemForm({ isOpen, onClose, onAdd, onUpdate, editItem }: AddI
           }
           throw validationError;
         }
+      } else {
+        // MODALITÀ INSERIMENTO - Scraping basato su switch
+        try {
+          // ✅ Struttura corretta per indicare processing
+          const scrapingData = data.useAI ? {
+            lastScraped: new Date(),
+            scrapingMode: 'pending',
+            scrapingSuccess: false,
+            scrapingText: undefined,
+            errors: undefined
+          } : undefined;
+
+          shoppingItem = ModelFactory.createShoppingItem({
+            id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            category: data.category || 'Articoli',
+            createdBy: data.createdBy,
+            link: data.link,
+            name: data.name,
+            brandName: data.brandName,
+            completed: data.completed,
+            priority: data.priority,
+            estimatedPrice: data.estimatedPrice,
+            notes: data.notes,
+            isPublic: data.isPublic,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            scrapingData: scrapingData
+          });
+
+          await onAdd(shoppingItem);
+          
+          // ✅ Scraping asincrono basato su switch
+          if (data.useAI) {
+            performAsyncScraping(data.link);
+            
+            toast({
+              title: 'Elemento aggiunto!',
+              description: 'Analisi AI in corso...',
+            });
+          } else {
+            toast({
+              title: 'Elemento aggiunto!',
+              description: 'Elemento salvato senza analisi AI.',
+            });
+          }
+          
+        } catch (validationError) {
+          if (validationError instanceof ValidationError) {
+            toast({
+              title: 'Errore di validazione',
+              description: validationError.errors.join(', '),
+              variant: 'destructive',
+            });
+            return;
+          }
+          throw validationError;
+        }
       }
 
-      // 1. SALVA L'ARTICOLO IMMEDIATAMENTE
-      await onAdd(shoppingItem);
-      
-      toast({
-        title: editItem ? 'Articolo aggiornato' : 'Articolo aggiunto',
-        description: editItem 
-          ? 'Articolo aggiornato con successo!' 
-          : 'Articolo aggiunto! Estrazione automatica dei dati in corso...',
-      });
-      
-      // 2. CHIUDI IL DIALOG SUBITO
-      onClose();
+      // Reset form e chiudi modal
       form.reset();
       setNewCategory({
         name: '',
@@ -342,20 +425,13 @@ export function AddItemForm({ isOpen, onClose, onAdd, onUpdate, editItem }: AddI
         color: '#6B7280'
       });
       setShowNewCategoryForm(false);
-      
-      // 3. AVVIA SCRAPING ASINCRONO SOLO PER NUOVI ELEMENTI
-      if (!editItem) {
-        // Non aspettare - vai in background
-        performAsyncScraping(data.link, shoppingItem.id).catch(error => {
-          console.error('Errore scraping asincrono:', error);
-        });
-      }
+      onClose();
       
     } catch (error) {
-      console.error('Errore durante il salvataggio dell\'articolo:', error);
+      console.error('Errore nel salvataggio:', error);
       toast({
         title: 'Errore',
-        description: editItem ? 'Impossibile aggiornare l\'articolo' : 'Impossibile aggiungere l\'articolo',
+        description: 'Impossibile salvare l\'elemento',
         variant: 'destructive',
       });
     } finally {
@@ -363,43 +439,18 @@ export function AddItemForm({ isOpen, onClose, onAdd, onUpdate, editItem }: AddI
     }
   };
 
-  const handleCategorySelect = (value: string) => {
-    if (value === 'new') {
-      setShowNewCategoryForm(true);
-      return;
-    }
-    form.setValue('category', value);
-  };
-
-  const priorityOptions = [
-    { value: 'low' as Priority, label: 'Bassa', color: '#10B981', icon: '⬇️' },
-    { value: 'medium' as Priority, label: 'Media', color: '#F59E0B', icon: '➡️' },
-    { value: 'high' as Priority, label: 'Alta', color: '#EF4444', icon: '⬆️' },
-  ];
-
-  const defaultCategories = [
-    { name:"Tutte le categorie",value: 'all', label: 'Tutte le categorie', icon: '🛍️' },
-  ];
-
-  const colorOptions = [
-    '#EF4444', '#F97316', '#F59E0B', '#EAB308', 
-    '#84CC16', '#22C55E', '#10B981', '#14B8A6',
-    '#06B6D4', '#0EA5E9', '#3B82F6', '#6366F1',
-    '#8B5CF6', '#A855F7', '#D946EF', '#EC4899'
-  ];
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold text-delft-blue flex items-center">
-            <ShoppingCart className="mr-2 h-6 w-6" />
+          <DialogTitle className="flex items-center text-xl text-delft-blue">
+            <ShoppingCart className="mr-3 h-6 w-6" />
             {editItem ? 'Modifica Articolo' : 'Aggiungi Articolo'}
           </DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">  {/* ✅ RIPRISTINATO: onSubmit nel form */}
             
             {/* URL Prodotto (obbligatorio) */}
             <FormField
@@ -430,40 +481,107 @@ export function AddItemForm({ isOpen, onClose, onAdd, onUpdate, editItem }: AddI
               )}
             />
 
-            {/* Alert informativo */}
-            <Alert className="border-blue-200 bg-blue-50">
-              <Zap className="h-4 w-4 text-blue-600" />
-              <AlertDescription className="text-blue-800">
-                <strong>Nuovo!</strong> Dopo il salvataggio, i dati del prodotto verranno estratti automaticamente in background.
-              </AlertDescription>
-            </Alert>
+            {/* ✅ Switch Analisi AI */}
+           {!editItem && (
+  <FormField
+    control={form.control}
+    name="useAI"
+    render={({ field }) => (
+      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-950/30 dark:to-purple-950/30 dark:border-gray-700">
+        <div className="space-y-0.5">
+          <FormLabel className="text-base flex items-center text-gray-900 dark:text-gray-100">
+            {field.value ? (
+              <>
+                <Zap className="mr-2 h-4 w-4 text-blue-600 dark:text-blue-400" />
+                Analisi AI Attiva
+              </>
+            ) : (
+              <>
+                <Save className="mr-2 h-4 w-4 text-gray-600 dark:text-gray-400" />
+                Inserimento Manuale
+              </>
+            )}
+          </FormLabel>
+          <p className="text-xs text-gray-600 dark:text-gray-300">
+            {field.value 
+              ? 'I dati del prodotto verranno estratti automaticamente'
+              : 'Inserimento rapido senza analisi automatica'
+            }
+          </p>
+        </div>
+        <FormControl>
+          <Switch
+            checked={field.value}
+            onCheckedChange={field.onChange}
+          />
+        </FormControl>
+      </FormItem>
+    )}
+  />
+)}
 
-            {/* Nome Prodotto (opzionale) */}
+            {/* Nome Prodotto */}
             <FormField
               control={form.control}
               name="name"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="text-sm font-medium text-delft-blue">
-                    Nome Prodotto (Opzionale)
+                    Nome Prodotto {!editItem && form.watch('useAI') ? '(Opzionale)' : ''}
                   </FormLabel>
                   <FormControl>
                     <Input 
                       {...field} 
-                      placeholder="Inserisci nome prodotto o lascia vuoto per estrazione automatica"
+                      placeholder={
+                        !editItem && form.watch('useAI') 
+                          ? "Lascia vuoto per estrazione automatica"
+                          : "Inserisci nome prodotto"
+                      }
                       maxLength={100}
                       className="text-base"
                     />
                   </FormControl>
                   <p className="text-xs text-gray-500">
-                    {(field.value || '').length}/100 caratteri • Se vuoto, verrà estratto automaticamente
+                    {(field.value || '').length}/100 caratteri
+                    {!editItem && form.watch('useAI') && ' • Se vuoto, verrà estratto automaticamente'}
                   </p>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            {/* Categoria (opzionale) */}
+            {/* Campo Brand */}
+            <FormField
+              control={form.control}
+              name="brandName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium text-delft-blue flex items-center">
+                    <Award className="mr-2 h-4 w-4" />
+                    Brand {!editItem && form.watch('useAI') ? '(Opzionale)' : ''}
+                  </FormLabel>
+                  <FormControl>
+                    <Input 
+                      {...field} 
+                      placeholder={
+                        !editItem && form.watch('useAI')
+                          ? "Lascia vuoto per estrazione automatica"
+                          : "Inserisci il brand del prodotto"
+                      }
+                      maxLength={50}
+                      className="text-base"
+                    />
+                  </FormControl>
+                  <p className="text-xs text-gray-500">
+                    {(field.value || '').length}/50 caratteri
+                    {!editItem && form.watch('useAI') && ' • Se vuoto, verrà estratto automaticamente'}
+                  </p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Categoria */}
             <FormField
               control={form.control}
               name="category"
@@ -471,226 +589,210 @@ export function AddItemForm({ isOpen, onClose, onAdd, onUpdate, editItem }: AddI
                 <FormItem>
                   <FormLabel className="text-sm font-medium text-delft-blue flex items-center">
                     <Tag className="mr-2 h-4 w-4" />
-                    Categoria (Opzionale)
+                    Categoria {!editItem && form.watch('useAI') ? '(Opzionale)' : ''}
                   </FormLabel>
                   
                   <Select onValueChange={handleCategorySelect} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Seleziona categoria o lascia vuoto per estrazione automatica" />
+                        <SelectValue placeholder={
+                          !editItem && form.watch('useAI')
+                            ? "Lascia vuoto per estrazione automatica"
+                            : "Seleziona categoria"
+                        } />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {/* Categorie predefinite */}
-                      {defaultCategories.map((category) => (
-                        <SelectItem key={category.value} value={category.value}>
-                          <div className="flex items-center space-x-2">
-                            <span>{category.icon}</span>
-                            <span>{category.label}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                      
-                      {/* Categorie personalizzate */}
-                      {categories?.filter(cat => !defaultCategories.some(def => def.value === cat.name)).map((category) => (
+                      {categories?.map((category) => (
                         <SelectItem key={category.id} value={category.name}>
-                          <div className="flex items-center space-x-2">
-                            <span>{category.icon || '🏷️'}</span>
+                          <div className="flex items-center">
+                            <span className="mr-2">{category.icon || '🏷️'}</span>
                             <span>{category.name}</span>
+                            <Badge variant="outline" className="ml-2 text-xs">
+                              {category.itemCount}
+                            </Badge>
                           </div>
                         </SelectItem>
                       ))}
                       
-                      {/* Opzione per aggiungere nuova categoria */}
-                      <SelectItem value="new">
-                        <div className="flex items-center space-x-2 text-burnt-sienna font-medium">
-                          <Plus className="h-4 w-4" />
-                          <span>Aggiungi Nuova Categoria</span>
+                      <SelectItem value="add_new">
+                        <div className="flex items-center text-cambridge-blue">
+                          <Plus className="mr-2 h-4 w-4" />
+                          <span>Aggiungi nuova categoria</span>
                         </div>
                       </SelectItem>
                     </SelectContent>
                   </Select>
-
-                  {/* Form per nuova categoria (stesso di prima) */}
-                  {showNewCategoryForm && (
-                    <div className="mt-4 p-4 border rounded-lg bg-gray-50 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-medium text-sm">Nuova Categoria</h4>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setShowNewCategoryForm(false)}
-                        >
-                          ✕
-                        </Button>
-                      </div>
-                      
-                      <div className="space-y-3">
-                        <div>
-                          <label className="text-xs font-medium text-gray-600">Nome *</label>
-                          <Input
-                            value={newCategory.name}
-                            onChange={(e) => setNewCategory(prev => ({ ...prev, name: e.target.value }))}
-                            placeholder="Nome categoria"
-                            maxLength={50}
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-xs font-medium text-gray-600">Icona</label>
-                          <div className="flex items-center space-x-2">
-                            <Popover open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen}>
-                              <PopoverTrigger asChild>
-                                <Button type="button" variant="outline" className="w-12 h-10">
-                                  {newCategory.icon}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-64 p-2">
-                                <div className="grid grid-cols-8 gap-1">
-                                  {EMOJI_OPTIONS.map((emoji) => (
-                                    <Button
-                                      key={emoji}
-                                      type="button"
-                                      variant="ghost"
-                                      className="w-8 h-8 p-0"
-                                      onClick={() => {
-                                        setNewCategory(prev => ({ ...prev, icon: emoji }));
-                                        setEmojiPickerOpen(false);
-                                      }}
-                                    >
-                                      {emoji}
-                                    </Button>
-                                  ))}
-                                </div>
-                              </PopoverContent>
-                            </Popover>
-                            <Input
-                              value={newCategory.icon}
-                              onChange={(e) => setNewCategory(prev => ({ ...prev, icon: e.target.value }))}
-                              placeholder="🏷️"
-                              className="w-20"
-                              maxLength={2}
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="text-xs font-medium text-gray-600">Colore</label>
-                          <div className="flex items-center space-x-2">
-                            <div 
-                              className="w-6 h-6 rounded border"
-                              style={{ backgroundColor: newCategory.color }}
-                            />
-                            <div className="flex space-x-1">
-                              {colorOptions.map((color) => (
-                                <button
-                                  key={color}
-                                  type="button"
-                                  className={`w-5 h-5 rounded-full border-2 ${newCategory.color === color ? 'border-gray-800' : 'border-gray-300'}`}
-                                  style={{ backgroundColor: color }}
-                                  onClick={() => setNewCategory(prev => ({ ...prev, color }))}
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="text-xs font-medium text-gray-600">Descrizione (opzionale)</label>
-                          <Input
-                            value={newCategory.description}
-                            onChange={(e) => setNewCategory(prev => ({ ...prev, description: e.target.value }))}
-                            placeholder="Breve descrizione"
-                            maxLength={100}
-                          />
-                        </div>
-
-                        <Button
-                          type="button"
-                          onClick={handleAddCategory}
-                          disabled={!newCategory.name.trim() || isAddingCategory}
-                          className="w-full"
-                          size="sm"
-                        >
-                          {isAddingCategory ? (
-                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          ) : (
-                            <Plus className="h-4 w-4 mr-2" />
-                          )}
-                          {isAddingCategory ? 'Aggiungendo...' : 'Aggiungi Categoria'}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                  
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            {/* Priorità e Prezzo */}
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="priority"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-medium text-delft-blue">Priorità</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Priorità" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {priorityOptions.map((priority) => (
-                          <SelectItem key={priority.value} value={priority.value}>
-                            <div className="flex items-center space-x-2">
-                              <span>{priority.icon}</span>
-                              <div 
-                                className="w-3 h-3 rounded-full" 
-                                style={{ backgroundColor: priority.color }}
-                              />
-                              <span>{priority.label}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            {/* Form per nuova categoria */}
+            {showNewCategoryForm && (
+              <div className="p-4 border border-cambridge-blue/20 rounded-lg bg-cambridge-blue/5">
+                <h4 className="font-medium text-delft-blue mb-3 flex items-center">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Nuova Categoria
+                </h4>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Nome *</label>
+                    <Input
+                      value={newCategory.name}
+                      onChange={(e) => setNewCategory(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="Nome categoria"
+                      maxLength={50}
+                    />
+                  </div>
 
-              <FormField
-                control={form.control}
-                name="estimatedPrice"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-medium text-delft-blue flex items-center">
-                      <Euro className="mr-2 h-4 w-4" />
-                      Prezzo (€)
-                    </FormLabel>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Icona</label>
+                    <Popover open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen}>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start">
+                          <span className="mr-2">{newCategory.icon}</span>
+                          Seleziona icona
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-64">
+                        <div className="grid grid-cols-8 gap-2">
+                          {EMOJI_OPTIONS.map((emoji) => (
+                            <Button
+                              key={emoji}
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setNewCategory(prev => ({ ...prev, icon: emoji }));
+                                setEmojiPickerOpen(false);
+                              }}
+                              className="h-8 w-8 p-0"
+                            >
+                              {emoji}
+                            </Button>
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="text-sm font-medium text-gray-700">Descrizione</label>
+                    <Input
+                      value={newCategory.description}
+                      onChange={(e) => setNewCategory(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="Descrizione opzionale"
+                      maxLength={100}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">Colore</label>
+                    <Input
+                      type="color"
+                      value={newCategory.color}
+                      onChange={(e) => setNewCategory(prev => ({ ...prev, color: e.target.value }))}
+                      className="h-10"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-2 mt-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowNewCategoryForm(false)}
+                    disabled={isAddingCategory}
+                  >
+                    Annulla
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleAddCategory}
+                    disabled={isAddingCategory || !newCategory.name.trim()}
+                  >
+                    {isAddingCategory ? (
+                      <Loader2 className="animate-spin h-4 w-4 mr-2" />
+                    ) : (
+                      <Check className="h-4 w-4 mr-2" />
+                    )}
+                    {isAddingCategory ? 'Aggiungendo...' : 'Aggiungi'}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Priorità */}
+            <FormField
+              control={form.control}
+              name="priority"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium text-delft-blue">
+                    Priorità
+                  </FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <Input 
-                        {...field}
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="0.00"
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          field.onChange(value ? parseFloat(value) : undefined);
-                        }}
-                        value={field.value || ''}
-                      />
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleziona priorità" />
+                      </SelectTrigger>
                     </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
+                    <SelectContent>
+                      <SelectItem value="low">
+                        <div className="flex items-center">
+                          <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
+                          Bassa
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="medium">
+                        <div className="flex items-center">
+                          <div className="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
+                          Media
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="high">
+                        <div className="flex items-center">
+                          <div className="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
+                          Alta
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Prezzo stimato */}
+            <FormField
+              control={form.control}
+              name="estimatedPrice"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium text-delft-blue flex items-center">
+                    <Euro className="mr-2 h-4 w-4" />
+                    Prezzo Stimato (€) {!editItem && form.watch('useAI') ? '(Opzionale)' : ''}
+                  </FormLabel>
+                  <FormControl>
+                    <Input 
+                      {...field}
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder={
+                        !editItem && form.watch('useAI')
+                          ? "Lascia vuoto per estrazione automatica"
+                          : "0.00"
+                      }
+                      value={field.value || ''}
+                      onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : undefined)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             {/* Note */}
             <FormField
@@ -705,24 +807,27 @@ export function AddItemForm({ isOpen, onClose, onAdd, onUpdate, editItem }: AddI
                   <FormControl>
                     <Textarea 
                       {...field} 
-                      placeholder="Note aggiuntive per l'articolo (es. marca preferita, dimensioni, colore...)"
+                      placeholder="Aggiungi note o dettagli aggiuntivi..."
                       rows={3}
-                      className="resize-none"
+                      maxLength={500}
                     />
                   </FormControl>
+                  <p className="text-xs text-gray-500">
+                    {(field.value || '').length}/500 caratteri
+                  </p>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            {/* Visibilità Pubblica/Privata */}
+            {/* Switch visibilità */}
             <FormField
               control={form.control}
               name="isPublic"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border border-gray-200 p-4 hover:bg-gray-50 transition-colors">
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                   <div className="space-y-0.5">
-                    <FormLabel className="text-sm font-medium text-delft-blue flex items-center cursor-pointer">
+                    <FormLabel className="text-base flex items-center">
                       {field.value ? (
                         <>
                           <Globe className="mr-2 h-4 w-4 text-green-600" />
@@ -752,6 +857,16 @@ export function AddItemForm({ isOpen, onClose, onAdd, onUpdate, editItem }: AddI
               )}
             />
 
+            {/* ✅ NUOVO: Alert URL duplicato */}
+            {isDuplicateUrl && (
+              <Alert className="border-red-200 bg-red-50">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <AlertDescription className="text-red-800">
+                  <strong>URL duplicato!</strong> {duplicateUrlError}
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Alert se manca URL */}
             {!form.watch('link') && (
               <Alert className="border-orange-200 bg-orange-50">
@@ -762,7 +877,7 @@ export function AddItemForm({ isOpen, onClose, onAdd, onUpdate, editItem }: AddI
               </Alert>
             )}
 
-            {/* Pulsanti */}
+            {/* ✅ NUOVO: Un solo pulsante con controllo duplicati */}
             <div className="flex justify-end space-x-2 pt-4">
               <Button 
                 variant="secondary" 
@@ -781,23 +896,35 @@ export function AddItemForm({ isOpen, onClose, onAdd, onUpdate, editItem }: AddI
               >
                 Annulla
               </Button>
+
               <Button 
-                type="submit" 
+                type="submit"
                 disabled={
                   isLoading || 
                   !form.watch('link') || 
-                  !form.watch('link').startsWith('http')
+                  !form.watch('link').startsWith('http') ||
+                  isDuplicateUrl  // ✅ NUOVO: Disabilita se URL duplicato
                 }
-                className="min-w-[120px]"
+                className={`min-w-[140px] ${
+                  !editItem && form.watch('useAI') 
+                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700' 
+                    : ''
+                }`}
               >
                 {isLoading ? (
                   <Loader2 className="animate-spin h-5 w-5 mr-2" />
+                ) : !editItem && form.watch('useAI') ? (
+                  <Zap className="h-5 w-5 mr-2" />
                 ) : (
-                  editItem ? 'Aggiorna' : 'Aggiungi'
+                  <Save className="h-5 w-5 mr-2" />
                 )}
                 {isLoading 
-                  ? (editItem ? 'Aggiornando...' : 'Aggiungendo...') 
-                  : (editItem ? 'Aggiorna' : 'Aggiungi')
+                  ? (editItem ? 'Aggiornando...' : 'Salvando...') 
+                  : editItem 
+                    ? 'Aggiorna' 
+                    : form.watch('useAI') 
+                      ? 'Salva con AI' 
+                      : 'Salva'
                 }
               </Button>
             </div>
