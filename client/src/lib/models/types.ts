@@ -82,19 +82,24 @@ export class ValidationError extends Error {
 export class ShoppingItem implements FirestoreSerializable{
   constructor(
     public id: string,
-    public name: string,
-    public category: string,
-    public createdBy: string,
+    public category: string,        // SPOSTATO: obbligatorio
+    public createdBy: string,       // SPOSTATO: obbligatorio  
+    public link: string,            // SPOSTATO: obbligatorio
+    public name?: string,           // OPZIONALE: può essere estratto dallo scraping
     public createdAt: Date = new Date(),
     public completed: boolean = false,
-    public link?: string,
     public completedBy?: string,
     public completedAt?: Date,
     public priority: "low" | "medium" | "high" = "medium",
     public estimatedPrice?: number,
     public notes?: string,
     public updatedAt: Date = new Date(),
-    public isPublic:boolean = false
+    public isPublic: boolean = true,  // MODIFICATO: default true
+    public scrapingData?: {           // NUOVO: dati dallo scraping
+      lastScraped: Date;
+      extractedData: any;
+      scrapingMode: string;
+    }
   ) {
     // Validazione nel costruttore
     this.validate();
@@ -103,10 +108,6 @@ export class ShoppingItem implements FirestoreSerializable{
   // Metodo di validazione integrato
   validate(): ValidationResult {
     const errors: string[] = [];
-    
-    if (!this.name || this.name.trim().length === 0) {
-      errors.push('Product name is required');
-    }
     
     if (this.name && this.name.length > 100) {
       errors.push('Product name must be less than 100 characters');
@@ -120,8 +121,8 @@ export class ShoppingItem implements FirestoreSerializable{
       errors.push('Created by is required');
     }
     
-    if (this.link && !this.isValidLink()) {
-      errors.push('Invalid URL format');
+    if (!this.link || !this.isValidLink()) {
+      errors.push('Valid URL is required');
     }
     
     if (this.estimatedPrice !== undefined && (this.estimatedPrice <= 0 || isNaN(this.estimatedPrice))) {
@@ -136,23 +137,77 @@ export class ShoppingItem implements FirestoreSerializable{
   }
 
   static fromFirestore(data: any): ShoppingItem {
-    return new ShoppingItem(
-      data.id,
-      data.name,
-      data.category,
-      data.createdBy,
-      data.createdAt?.toDate() || new Date(),
-      data.completed || false,
-      data.link,
-      data.completedBy,
-      data.completedAt?.toDate(),
-      data.priority || "medium",
-      data.estimatedPrice,
-      data.notes,
-      data.updatedAt?.toDate() || new Date(),
-      data.isPublic
-    );
+  try {
+    // Gestione sicura delle date
+    const parseDate = (dateValue: any): Date => {
+      if (!dateValue) return new Date();
+      if (dateValue.toDate && typeof dateValue.toDate === 'function') {
+        return dateValue.toDate();
+      }
+      if (dateValue instanceof Date) return dateValue;
+      if (typeof dateValue === 'string' || typeof dateValue === 'number') {
+        const parsed = new Date(dateValue);
+        return isNaN(parsed.getTime()) ? new Date() : parsed;
+      }
+      return new Date();
+    };
+
+    // Validazione e default per campi obbligatori
+    const category = data.category || 'Articoli';
+    const createdBy = data.createdBy || 'Unknown';
+    const link = data.link || '';
+
+    // Crea l'oggetto senza validazione automatica nel costruttore
+    const item = Object.create(ShoppingItem.prototype);
+    
+    // Assegna i valori manualmente nell'ordine corretto
+    item.id = data.id;
+    item.category = category;
+    item.createdBy = createdBy;
+    item.link = link;
+    item.name = data.name;
+    item.createdAt = parseDate(data.createdAt);
+    item.completed = data.completed || false;
+    item.completedBy = data.completedBy;
+    item.completedAt = data.completedAt ? parseDate(data.completedAt) : undefined;
+    item.priority = data.priority || "medium";
+    item.estimatedPrice = data.estimatedPrice;
+    item.notes = data.notes;
+    item.updatedAt = parseDate(data.updatedAt);
+    item.isPublic = data.isPublic !== undefined ? data.isPublic : true;
+    item.scrapingData = data.scrapingData;
+
+    // Valida solo se i campi essenziali sono presenti
+    if (link && category && createdBy) {
+      try {
+        item.validate();
+      } catch (validationError) {
+        console.warn('Validation warning for existing document:', data.id, validationError);
+        // Non bloccare il caricamento per documenti esistenti
+      }
+    }
+
+    return item;
+    
+  } catch (error) {
+    console.error('Error in fromFirestore for ShoppingItem:', error, data);
+    
+    // Fallback: crea un oggetto minimo valido
+    const fallbackItem = Object.create(ShoppingItem.prototype);
+    fallbackItem.id = data.id || 'unknown';
+    fallbackItem.category = data.category || 'Articoli';
+    fallbackItem.createdBy = data.createdBy || 'Unknown';
+    fallbackItem.link = data.link || 'https://example.com';
+    fallbackItem.name = data.name || 'Prodotto sconosciuto';
+    fallbackItem.createdAt = new Date();
+    fallbackItem.completed = false;
+    fallbackItem.priority = "medium";
+    fallbackItem.updatedAt = new Date();
+    fallbackItem.isPublic = true;
+    
+    return fallbackItem;
   }
+}
 
   toFirestore() {
     const data = {
@@ -169,6 +224,7 @@ export class ShoppingItem implements FirestoreSerializable{
       notes: this.notes,
       updatedAt: this.updatedAt,
       isPublic: this.isPublic,
+      scrapingData: this.scrapingData,
     };
     return removeUndefinedFields(data);
   }
@@ -195,13 +251,39 @@ export class ShoppingItem implements FirestoreSerializable{
   }
 
   isValidLink(): boolean {
-    if (!this.link) return true;
+    if (!this.link) return false;
     try {
       new URL(this.link);
       return true;
     } catch {
       return false;
     }
+  }
+  
+  // NUOVO: metodo per aggiornare con dati di scraping
+  updateWithScrapingData(scrapingData: any): void {
+    if (scrapingData.nameProduct && !this.name) {
+      this.name = scrapingData.nameProduct;
+    }
+    
+    if (scrapingData.category && this.category === 'Articoli') {
+      this.category = scrapingData.category;
+    }
+    
+    if (scrapingData.price && !this.estimatedPrice) {
+      const priceMatch = scrapingData.price.match(/(\d+[.,]\d+|\d+)/);
+      if (priceMatch) {
+        this.estimatedPrice = parseFloat(priceMatch[1].replace(',', '.'));
+      }
+    }
+    
+    this.scrapingData = {
+      lastScraped: new Date(),
+      extractedData: scrapingData,
+      scrapingMode: scrapingData.mode || 'unknown'
+    };
+    
+    this.updatedAt = new Date();
   }
 }
 
@@ -667,29 +749,44 @@ export class ModelFactory {
 
   // Factory con validazione sicura per ShoppingItem
   static createShoppingItem(data: Partial<ShoppingItem>): ShoppingItem {
-    try {
-      return new ShoppingItem(
-        data.id || "",
-        data.name || "",
-        data.category || "",
-        data.createdBy || "",
-        data.createdAt || new Date(),
-        data.completed || false,
-        data.link,
-        data.completedBy,
-        data.completedAt,
-        data.priority || "medium",
-        data.estimatedPrice,
-        data.notes,
-        data.updatedAt || new Date()
-      );
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        throw error;
-      }
-      throw new ValidationError('Failed to create shopping item', ['Unknown validation error']);
+  try {
+    // Validazione dati richiesti
+    if (!data.link || !data.link.startsWith('http')) {
+      throw new ValidationError('Shopping item validation failed', ['Valid URL is required']);
     }
+    
+    if (!data.category || data.category.trim().length === 0) {
+      throw new ValidationError('Shopping item validation failed', ['Category is required']);
+    }
+    
+    if (!data.createdBy || data.createdBy.trim().length === 0) {
+      throw new ValidationError('Shopping item validation failed', ['Created by is required']);
+    }
+    
+    return new ShoppingItem(
+      data.id || `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      data.category,           // obbligatorio
+      data.createdBy,          // obbligatorio
+      data.link,               // obbligatorio
+      data.name,               // opzionale - può essere estratto
+      data.createdAt || new Date(),
+      data.completed || false,
+      data.completedBy,
+      data.completedAt,
+      data.priority || "medium",
+      data.estimatedPrice,
+      data.notes,
+      data.updatedAt || new Date(),
+      data.isPublic !== undefined ? data.isPublic : true,
+      data.scrapingData
+    );
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      throw error;
+    }
+    throw new ValidationError('Failed to create shopping item', ['Unknown validation error']);
   }
+}
 
   
 

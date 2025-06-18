@@ -11,7 +11,9 @@ import {
   Smile,
   Check,
   Globe,
-  Lock
+  Lock,
+  Zap,
+  AlertCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +24,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ShoppingItem, Category, ModelFactory, Priority, ValidationError } from '@/lib/models/types';
 import { useFirestore } from '@/hooks/useFirestore';
 import { useAuthContext } from '@/contexts/AuthContext';
@@ -34,15 +37,15 @@ const EMOJI_OPTIONS = [
 ];
 
 interface ShoppingItemFormData {
-  name: string;
-  link?: string;
-  category: string;
+  name?: string;
+  link: string;               
+  category?: string;          
   createdBy: string;
   completed: boolean;
   priority: Priority;
   estimatedPrice?: number;
   notes?: string;
-  isPublic: boolean;  // AGGIUNTO: campo per visibilità
+  isPublic: boolean;
 }
 
 interface NewCategoryData {
@@ -56,10 +59,11 @@ interface AddItemFormProps {
   isOpen: boolean;
   onClose: () => void;
   onAdd: (item: ShoppingItem) => Promise<void>;
+  onUpdate: (item: ShoppingItem) => Promise<void>; // NUOVO: per aggiornare dopo scraping
   editItem?: ShoppingItem | null;
 }
 
-export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormProps) {
+export function AddItemForm({ isOpen, onClose, onAdd, onUpdate, editItem }: AddItemFormProps) {
   const { user } = useAuthContext();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -68,6 +72,9 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   
   const { data: categories, add: addCategory, loading: categoriesLoading } = useFirestore<Category>('categories');
+
+  // URL dell'endpoint di scraping
+  const SCRAPING_ENDPOINT = 'https://europe-west1-familytasktracker-c2dfe.cloudfunctions.net/onShoppingItemCreated';
 
   // Form per il nuovo elemento
   const form = useForm<ShoppingItemFormData>({
@@ -80,7 +87,7 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
       priority: 'medium',
       estimatedPrice: undefined,
       notes: '',
-      isPublic: true,  // AGGIUNTO: default pubblico
+      isPublic: true,
     },
   });
 
@@ -103,7 +110,7 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
         priority: editItem.priority,
         estimatedPrice: editItem.estimatedPrice,
         notes: editItem.notes || '',
-        isPublic: editItem.isPublic !== undefined ? editItem.isPublic : true,  // AGGIUNTO
+        isPublic: editItem.isPublic !== undefined ? editItem.isPublic : true,
       });
     } else {
       form.reset({
@@ -115,10 +122,63 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
         priority: 'medium',
         estimatedPrice: undefined,
         notes: '',
-        isPublic: true,  // AGGIUNTO
+        isPublic: true,
       });
     }
   }, [editItem, form, user]);
+
+  // NUOVO: Funzione per scraping asincrono DOPO il salvataggio
+  const performAsyncScraping = async (url: string, itemId: string) => {
+    try {
+      console.log(`🔗 Avvio scraping asincrono per: ${url}`);
+      
+      const response = await fetch(SCRAPING_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          url,
+          updateFirestore: true,  // Aggiorna direttamente Firestore
+          collectionName: 'shopping_items'
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Errore HTTP: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        console.log(`✅ Scraping completato per ${url}:`, result.data);
+        
+        // Mostra notifica di successo
+        toast({
+          title: 'Prodotto aggiornato!',
+          description: `Informazioni estratte automaticamente per "${result.data.nameProduct}"`,
+        });
+        
+        // NOTA: L'aggiornamento in Firestore è già avvenuto nell'endpoint,
+        // quindi il componente si aggiornerà automaticamente tramite useFirestore
+        
+      } else {
+        console.warn('Scraping parzialmente riuscito:', result);
+        toast({
+          title: 'Scraping completato',
+          description: 'Alcuni dati potrebbero non essere stati estratti completamente',
+        });
+      }
+      
+    } catch (error) {
+      console.error('Errore durante lo scraping asincrono:', error);
+      toast({
+        title: 'Scraping fallito',
+        description: 'Non è stato possibile estrarre automaticamente i dati del prodotto',
+        variant: 'destructive',
+      });
+    }
+  };
 
   const handleAddCategory = async () => {
     if (!newCategory.name.trim()) {
@@ -130,7 +190,6 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
       return;
     }
 
-    // Verifica se la categoria esiste già
     if (categories?.find(c => c.name.toLowerCase() === newCategory.name.toLowerCase())) {
       toast({
         title: 'Errore',
@@ -157,10 +216,8 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
 
       await addCategory(categoryData);
       
-      // Preseleziona la categoria appena creata
       form.setValue('category', newCategory.name);
       
-      // Reset del form categoria
       setNewCategory({
         name: '',
         icon: '🏷️',
@@ -195,23 +252,34 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
   };
 
   const onSubmit = async (data: ShoppingItemFormData) => {
+    // Validazione URL obbligatorio
+    if (!data.link || !data.link.startsWith('http')) {
+      toast({
+        title: 'URL richiesto',
+        description: 'L\'URL del prodotto è obbligatorio e deve iniziare con http:// o https://',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsLoading(true);
     
     try {
       let shoppingItem: ShoppingItem;
       
       if (editItem) {
+        // Modalità modifica
         shoppingItem = editItem;
         try {
-          console.log(shoppingItem)
-          shoppingItem.name = data.name;
+          shoppingItem.name = data.name || editItem.name;
           shoppingItem.link = data.link;
-          shoppingItem.category = data.category;
+          shoppingItem.category = data.category || editItem.category;
           shoppingItem.priority = data.priority;
           shoppingItem.estimatedPrice = data.estimatedPrice;
           shoppingItem.notes = data.notes;
-          shoppingItem.isPublic = data.isPublic;  // AGGIUNTO
+          shoppingItem.isPublic = data.isPublic;
           shoppingItem.updatedAt = new Date();
+          
           shoppingItem.validate();
           
         } catch (validationError) {
@@ -226,18 +294,20 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
           throw validationError;
         }
       } else {
+        // Modalità creazione - SALVA SUBITO con dati minimi
         try {
           shoppingItem = ModelFactory.createShoppingItem({
             id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            name: data.name,
-            link: data.link,
-            category: data.category,
+            category: data.category || 'Articoli',    // Default se non specificato
             createdBy: data.createdBy,
+            link: data.link,
+            name: data.name || 'Prodotto',            // Default se non specificato
+            createdAt: new Date(),
             completed: data.completed,
             priority: data.priority,
             estimatedPrice: data.estimatedPrice,
             notes: data.notes,
-            isPublic: data.isPublic,  // AGGIUNTO
+            isPublic: data.isPublic,
           });
         } catch (validationError) {
           if (validationError instanceof ValidationError) {
@@ -252,13 +322,17 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
         }
       }
 
+      // 1. SALVA L'ARTICOLO IMMEDIATAMENTE
       await onAdd(shoppingItem);
       
       toast({
         title: editItem ? 'Articolo aggiornato' : 'Articolo aggiunto',
-        description: editItem ? 'Articolo aggiornato con successo!' : 'Articolo aggiunto con successo!',
+        description: editItem 
+          ? 'Articolo aggiornato con successo!' 
+          : 'Articolo aggiunto! Estrazione automatica dei dati in corso...',
       });
       
+      // 2. CHIUDI IL DIALOG SUBITO
       onClose();
       form.reset();
       setNewCategory({
@@ -268,6 +342,15 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
         color: '#6B7280'
       });
       setShowNewCategoryForm(false);
+      
+      // 3. AVVIA SCRAPING ASINCRONO SOLO PER NUOVI ELEMENTI
+      if (!editItem) {
+        // Non aspettare - vai in background
+        performAsyncScraping(data.link, shoppingItem.id).catch(error => {
+          console.error('Errore scraping asincrono:', error);
+        });
+      }
+      
     } catch (error) {
       console.error('Errore durante il salvataggio dell\'articolo:', error);
       toast({
@@ -294,9 +377,9 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
     { value: 'high' as Priority, label: 'Alta', color: '#EF4444', icon: '⬆️' },
   ];
 
-const defaultCategories = [
-  { name:"Tutte le categorie",value: 'all', label: 'Tutte le categorie', icon: '🛍️' },
-];
+  const defaultCategories = [
+    { name:"Tutte le categorie",value: 'all', label: 'Tutte le categorie', icon: '🛍️' },
+  ];
 
   const colorOptions = [
     '#EF4444', '#F97316', '#F59E0B', '#EAB308', 
@@ -317,32 +400,8 @@ const defaultCategories = [
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            {/* Nome Prodotto */}
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-sm font-medium text-delft-blue">
-                    Nome Prodotto *
-                  </FormLabel>
-                  <FormControl>
-                    <Input 
-                      {...field} 
-                      placeholder="Inserisci nome prodotto"
-                      maxLength={100}
-                      className="text-base"
-                    />
-                  </FormControl>
-                  <p className="text-xs text-gray-500">
-                    {field.value.length}/100 caratteri
-                  </p>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Link Prodotto */}
+            
+            {/* URL Prodotto (obbligatorio) */}
             <FormField
               control={form.control}
               name="link"
@@ -350,7 +409,7 @@ const defaultCategories = [
                 <FormItem>
                   <FormLabel className="text-sm font-medium text-delft-blue flex items-center">
                     <LinkIcon className="mr-2 h-4 w-4" />
-                    URL Prodotto (Opzionale)
+                    URL Prodotto *
                   </FormLabel>
                   <FormControl>
                     <Input 
@@ -371,7 +430,40 @@ const defaultCategories = [
               )}
             />
 
-            {/* Categoria con form dinamico */}
+            {/* Alert informativo */}
+            <Alert className="border-blue-200 bg-blue-50">
+              <Zap className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-800">
+                <strong>Nuovo!</strong> Dopo il salvataggio, i dati del prodotto verranno estratti automaticamente in background.
+              </AlertDescription>
+            </Alert>
+
+            {/* Nome Prodotto (opzionale) */}
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium text-delft-blue">
+                    Nome Prodotto (Opzionale)
+                  </FormLabel>
+                  <FormControl>
+                    <Input 
+                      {...field} 
+                      placeholder="Inserisci nome prodotto o lascia vuoto per estrazione automatica"
+                      maxLength={100}
+                      className="text-base"
+                    />
+                  </FormControl>
+                  <p className="text-xs text-gray-500">
+                    {(field.value || '').length}/100 caratteri • Se vuoto, verrà estratto automaticamente
+                  </p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Categoria (opzionale) */}
             <FormField
               control={form.control}
               name="category"
@@ -379,13 +471,13 @@ const defaultCategories = [
                 <FormItem>
                   <FormLabel className="text-sm font-medium text-delft-blue flex items-center">
                     <Tag className="mr-2 h-4 w-4" />
-                    Categoria *
+                    Categoria (Opzionale)
                   </FormLabel>
                   
                   <Select onValueChange={handleCategorySelect} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Seleziona categoria" />
+                        <SelectValue placeholder="Seleziona categoria o lascia vuoto per estrazione automatica" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -419,7 +511,7 @@ const defaultCategories = [
                     </SelectContent>
                   </Select>
 
-                  {/* Form per nuova categoria */}
+                  {/* Form per nuova categoria (stesso di prima) */}
                   {showNewCategoryForm && (
                     <div className="mt-4 p-4 border rounded-lg bg-gray-50 space-y-3">
                       <div className="flex items-center justify-between">
@@ -435,7 +527,6 @@ const defaultCategories = [
                       </div>
                       
                       <div className="space-y-3">
-                        {/* Nome categoria */}
                         <div>
                           <label className="text-xs font-medium text-gray-600">Nome *</label>
                           <Input
@@ -446,7 +537,6 @@ const defaultCategories = [
                           />
                         </div>
 
-                        {/* Icona categoria */}
                         <div>
                           <label className="text-xs font-medium text-gray-600">Icona</label>
                           <div className="flex items-center space-x-2">
@@ -485,7 +575,6 @@ const defaultCategories = [
                           </div>
                         </div>
 
-                        {/* Colore categoria */}
                         <div>
                           <label className="text-xs font-medium text-gray-600">Colore</label>
                           <div className="flex items-center space-x-2">
@@ -507,7 +596,6 @@ const defaultCategories = [
                           </div>
                         </div>
 
-                        {/* Descrizione */}
                         <div>
                           <label className="text-xs font-medium text-gray-600">Descrizione (opzionale)</label>
                           <Input
@@ -518,7 +606,6 @@ const defaultCategories = [
                           />
                         </div>
 
-                        {/* Pulsante Aggiungi */}
                         <Button
                           type="button"
                           onClick={handleAddCategory}
@@ -628,7 +715,7 @@ const defaultCategories = [
               )}
             />
 
-            {/* AGGIUNTO: Visibilità Pubblica/Privata */}
+            {/* Visibilità Pubblica/Privata */}
             <FormField
               control={form.control}
               name="isPublic"
@@ -665,49 +752,18 @@ const defaultCategories = [
               )}
             />
 
-            {/* Anteprima */}
-            {form.watch('priority') && (
-              <div className="bg-gray-50 rounded-lg p-3">
-                <p className="text-sm text-gray-600 mb-2">Anteprima:</p>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-medium">{form.watch('name') || 'Nome prodotto'}</span>
-                    <Badge 
-                      variant="outline" 
-                      className="text-xs"
-                      style={{ 
-                        borderColor: priorityOptions.find(p => p.value === form.watch('priority'))?.color,
-                        color: priorityOptions.find(p => p.value === form.watch('priority'))?.color
-                      }}
-                    >
-                      {priorityOptions.find(p => p.value === form.watch('priority'))?.label}
-                    </Badge>
-                    {/* AGGIUNTO: Badge visibilità nell'anteprima */}
-                    <Badge variant="outline" className={form.watch('isPublic') ? 'text-green-600 border-green-200' : 'text-orange-600 border-orange-200'}>
-                      {form.watch('isPublic') ? (
-                        <>
-                          <Globe className="mr-1 h-3 w-3" />
-                          Pubblico
-                        </>
-                      ) : (
-                        <>
-                          <Lock className="mr-1 h-3 w-3" />
-                          Privato
-                        </>
-                      )}
-                    </Badge>
-                  </div>
-                  {form.watch('estimatedPrice') && (
-                    <span className="text-sm font-medium text-green-600">
-                      €{form.watch('estimatedPrice')?.toFixed(2)}
-                    </span>
-                  )}
-                </div>
-              </div>
+            {/* Alert se manca URL */}
+            {!form.watch('link') && (
+              <Alert className="border-orange-200 bg-orange-50">
+                <AlertCircle className="h-4 w-4 text-orange-600" />
+                <AlertDescription className="text-orange-800">
+                  L'URL del prodotto è <strong>obbligatorio</strong>. Inserisci un link valido per procedere.
+                </AlertDescription>
+              </Alert>
             )}
 
             {/* Pulsanti */}
-            <div className="flex justify-end space-x-2">
+            <div className="flex justify-end space-x-2 pt-4">
               <Button 
                 variant="secondary" 
                 onClick={() => { 
@@ -725,8 +781,24 @@ const defaultCategories = [
               >
                 Annulla
               </Button>
-              <Button type="submit" disabled={isLoading || !form.watch('name') || !form.watch('category')}>
-                {isLoading ? <Loader2 className="animate-spin h-5 w-5 mr-2" /> : (editItem ? 'Aggiorna' : 'Aggiungi')}
+              <Button 
+                type="submit" 
+                disabled={
+                  isLoading || 
+                  !form.watch('link') || 
+                  !form.watch('link').startsWith('http')
+                }
+                className="min-w-[120px]"
+              >
+                {isLoading ? (
+                  <Loader2 className="animate-spin h-5 w-5 mr-2" />
+                ) : (
+                  editItem ? 'Aggiorna' : 'Aggiungi'
+                )}
+                {isLoading 
+                  ? (editItem ? 'Aggiornando...' : 'Aggiungendo...') 
+                  : (editItem ? 'Aggiorna' : 'Aggiungi')
+                }
               </Button>
             </div>
           </form>

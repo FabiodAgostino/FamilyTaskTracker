@@ -14,7 +14,8 @@ import {
   ArrowDown,
   StickyNote,
   Globe,
-  Lock
+  Lock,
+  Zap
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -33,7 +34,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, isValid } from 'date-fns';
 import { ShoppingItem, Category } from '@/lib/models/types';
 
 interface ShoppingItemCardProps {
@@ -51,12 +52,24 @@ export function ShoppingItemCard({
   onDelete, 
   onComplete 
 }: ShoppingItemCardProps) {
-  console.log(item)
   const { user } = useAuthContext();
   const { toast } = useToast();
   const [isCompleting, setIsCompleting] = useState(false);
 
   const canEdit = user?.username === item.createdBy || user?.role === 'admin';
+
+  // ✅ Funzione sicura per formattare le date
+  const formatSafeDate = (date: Date | undefined): string => {
+    if (!date || !isValid(date)) {
+      return 'Data non disponibile';
+    }
+    try {
+      return formatDistanceToNow(date, { addSuffix: true, locale: it });
+    } catch (error) {
+      console.warn('Error formatting date:', error);
+      return 'Data non valida';
+    }
+  };
 
   const handleComplete = async () => {
     setIsCompleting(true);
@@ -164,15 +177,24 @@ export function ShoppingItemCard({
         {/* Header con nome, prezzo e azioni */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1">
-            {/* ✅ NUOVO: Icona visibilità in alto a sinistra */}
+            {/* Icona visibilità e badge scraping */}
             <div className="flex items-center mb-2">
               {item.isPublic ? (
                 <Globe className="w-4 h-4 mr-2 text-green-600" />
               ) : (
                 <Lock className="w-4 h-4 mr-2 text-orange-600" />
               )}
+              
+              {/* ✅ NUOVO: Badge se estratto automaticamente */}
+              {item.scrapingData && (
+                <Badge variant="outline" className="text-blue-600 border-blue-200 mr-2 text-xs">
+                  <Zap className="mr-1 h-3 w-3" />
+                  Auto-estratto
+                </Badge>
+              )}
+              
               <h3 className={`font-semibold text-card-foreground flex-1 ${item.completed ? 'line-through' : ''}`}>
-                {item.name}
+                {item.name || 'Prodotto senza nome'}
               </h3>
               {item.estimatedPrice && (
                 <div className="flex items-center text-green-600 dark:text-green-400 font-semibold ml-auto">
@@ -231,7 +253,7 @@ export function ShoppingItemCard({
                   <AlertDialogHeader>
                     <AlertDialogTitle>Conferma eliminazione</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Sei sicuro di voler eliminare "{item.name}"? Questa azione non può essere annullata.
+                      Sei sicuro di voler eliminare "{item.name || 'questo elemento'}"? Questa azione non può essere annullata.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -248,6 +270,26 @@ export function ShoppingItemCard({
             </div>
           )}
         </div>
+
+        {/* ✅ NUOVO: Informazioni di scraping se disponibili */}
+        {item.scrapingData && (
+          <div className="mb-3 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+            <div className="text-xs text-blue-700 dark:text-blue-300">
+              <div className="flex items-center">
+                <Zap className="h-3 w-3 mr-1" />
+                Estratto automaticamente da: {item.scrapingData.extractedData?.site || 'sito web'}
+              </div>
+              {item.scrapingData.extractedData?.nameBrand && (
+                <div className="mt-1">
+                  Brand: <span className="font-medium">{item.scrapingData.extractedData.nameBrand}</span>
+                </div>
+              )}
+              <div className="mt-1 text-xs opacity-75">
+                Ultimo aggiornamento: {formatSafeDate(item.scrapingData.lastScraped)}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Note se disponibili */}
         {item.notes && (
@@ -266,7 +308,7 @@ export function ShoppingItemCard({
           </div>
           <div className="flex items-center text-sm text-muted-foreground">
             <Clock className="mr-2 h-4 w-4" />
-            {formatDistanceToNow(item.createdAt, { addSuffix: true, locale: it })}
+            {formatSafeDate(item.createdAt)}
           </div>
           
           {item.link && (
@@ -301,9 +343,9 @@ export function ShoppingItemCard({
             >
               <Check className="mr-2 h-4 w-4" />
               Completato
-              {item.completedAt && (
+              {item.completedAt && isValid(item.completedAt) && (
                 <span className="ml-2 text-xs opacity-75">
-                  ({formatDistanceToNow(item.completedAt, { locale: it })})
+                  ({formatSafeDate(item.completedAt)})
                 </span>
               )}
             </Button>
