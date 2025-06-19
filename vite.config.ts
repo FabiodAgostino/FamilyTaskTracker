@@ -15,6 +15,11 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, "docs"), // Output in docs per GitHub Pages
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: undefined,
+      },
+    },
   },
   server: {
     port: 3000,

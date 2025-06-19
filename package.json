@@ -5,11 +5,10 @@
   "license": "MIT",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && cp docs/index.html docs/404.html",
     "preview": "vite preview",
-    "predeploy": "vite build",
-    "deploy": "gh-pages -d dist",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "deploy": "npm run build && gh-pages -d docs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

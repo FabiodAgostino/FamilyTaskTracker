@@ -66,6 +66,9 @@ jobs:
           VITE_APP_VERSION: "1.0.0"
           NODE_ENV: production
       
+      - name: Copy index.html to 404.html for SPA support
+        run: cp docs/index.html docs/404.html
+      
       - name: Debug build output
         run: |
           echo "📁 Contenuto della cartella docs:"
