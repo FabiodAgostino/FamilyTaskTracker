@@ -13,12 +13,12 @@ export default defineConfig({
   },
   root: path.resolve(__dirname, "client"),
   build: {
-    outDir: path.resolve(__dirname, "docs"), // Cambiato da "dist" a "docs"
+    outDir: path.resolve(__dirname, "docs"), // Output in docs per GitHub Pages
     emptyOutDir: true,
   },
   server: {
     port: 3000,
     host: true,
   },
-  base: "/family-task-tracker/",
+  base: "/FamilyTaskTracker/",
 });

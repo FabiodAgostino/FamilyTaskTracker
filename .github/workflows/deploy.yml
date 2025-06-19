@@ -95,7 +95,7 @@ jobs:
               <script>
                   // Gestione routing per SPA
                   const path = window.location.pathname;
-                  const repoName = '/family-task-tracker/'; // Sostituisci con il nome del tuo repo
+                  const repoName = '/FamilyTaskTracker/'; // Nome repository corretto
                   
                   if (path.startsWith(repoName)) {
                       const relativePath = path.substring(repoName.length) || '';
@@ -172,4 +172,4 @@ jobs:
       - name: Deployment completed
         run: |
           echo "🚀 Deploy completato con successo!"
-          echo "🌐 Il tuo sito sarà disponibile a: https://[TUO-USERNAME].github.io/family-task-tracker/"
+          echo "🌐 Il tuo sito sarà disponibile a: https://fabiodagostino.github.io/FamilyTaskTracker/"
