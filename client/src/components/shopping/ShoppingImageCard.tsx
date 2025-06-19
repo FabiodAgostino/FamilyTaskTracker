@@ -1,22 +1,17 @@
 // ShoppingImageCard.tsx - AGGIORNATO con Rigenerazione Immagini
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { 
   Edit, 
   Trash2, 
-  ExternalLink, 
   User, 
   Clock, 
   Check, 
-  Euro,
   ArrowUp,
-  ArrowRight,
-  ArrowDown,
   Globe,
   Lock,
   Award,
   Zap,
   Sparkles,
-  Heart,
   Eye,
   RefreshCw,
   Loader2
@@ -262,31 +257,8 @@ export function ShoppingImageCard({
 
   // Trova la categoria per styling
   const categoryData = categories?.find(cat => cat.name === item.category);
-  
-  // Configurazione priorità
-  const priorityConfig = {
-    high: { 
-      icon: ArrowUp, 
-      label: 'Alta', 
-      color: 'text-red-600',
-      className: 'border-red-200 bg-red-50'
-    },
-    medium: { 
-      icon: ArrowRight, 
-      label: 'Media', 
-      color: 'text-yellow-600',
-      className: 'border-yellow-200 bg-yellow-50'
-    },
-    low: { 
-      icon: ArrowDown, 
-      label: 'Bassa', 
-      color: 'text-green-600',
-      className: 'border-green-200 bg-green-50'
-    }
-  };
 
-  const priorityDisplay = priorityConfig[item.priority];
-  const PriorityIcon = priorityDisplay.icon;
+
 
   // ✅ Controlla se abbiamo un'immagine valida
   const hasValidImage = item.imageUrl && !imageError;

@@ -6,7 +6,6 @@ import React, { useState, useMemo } from 'react';
 import { 
   Plus, 
   Search, 
-  Filter, 
   LayoutGrid, 
   List, 
   ShoppingCart, 
@@ -14,7 +13,6 @@ import {
   Euro,
   Globe,
   Lock,
-  Eye
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

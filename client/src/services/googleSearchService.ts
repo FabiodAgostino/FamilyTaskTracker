@@ -1,6 +1,6 @@
 // src/services/googleSearchService.ts - MIGLIORATO per più immagini
 import { GoogleImageSearchResult, ProcessedImageResult } from '@/lib/models/types';
-import { extractSearchInfoFromUrl, getPathAfterDomain } from '@/lib/utils';
+import { getPathAfterDomain } from '@/lib/utils';
 
 export class GoogleSearchService {
   private readonly apiKey: string;

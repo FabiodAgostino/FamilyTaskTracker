@@ -7,8 +7,6 @@ import {
   User, 
   Clock, 
   Check, 
-  Euro,
-  AlertTriangle,
   ArrowUp,
   ArrowRight,
   ArrowDown,
@@ -55,7 +53,6 @@ export function ShoppingItemCard({
   onEdit, 
   onDelete, 
   onComplete,
-  onUpdate // ✅ NUOVO
 }: ShoppingItemCardProps) {
   
   const { user } = useAuthContext();

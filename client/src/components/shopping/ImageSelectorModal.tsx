@@ -1,7 +1,6 @@
 // src/components/shopping/ImageSelectorModal.tsx
 import React, { useState, useEffect } from 'react';
 import { 
-  X, 
   Check, 
   AlertCircle, 
   Search,
