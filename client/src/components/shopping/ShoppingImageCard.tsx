@@ -1,7 +1,4 @@
-// ==========================================
-// ShoppingImageCard.tsx - CORRETTO con Overlay uniforme e Rigenera Immagine
-// ==========================================
-
+// ShoppingImageCard.tsx - AGGIORNATO con Rigenerazione Immagini
 import React, { useState } from 'react';
 import { 
   Edit, 
@@ -21,7 +18,8 @@ import {
   Sparkles,
   Heart,
   Eye,
-  RefreshCw
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -42,7 +40,11 @@ import { useAuthContext } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow, isValid } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { ShoppingItem, Category } from '@/lib/models/types';
+import { ShoppingItem, Category, ProcessedImageResult } from '@/lib/models/types';
+import { googleSearchService } from '@/services/googleSearchService';
+import { ImageSelectorModal } from './ImageSelectorModal';
+import { doc, updateDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 interface ShoppingImageCardProps {
   item: ShoppingItem;
@@ -50,6 +52,7 @@ interface ShoppingImageCardProps {
   onEdit: (item: ShoppingItem) => void;
   onDelete: (id: string) => void;
   onComplete: (id: string) => void;
+  onUpdate?: (updatedItem: ShoppingItem) => void; // ✅ NUOVO: Callback per aggiornamenti
 }
 
 export function ShoppingImageCard({ 
@@ -57,14 +60,24 @@ export function ShoppingImageCard({
   categories, 
   onEdit, 
   onDelete, 
-  onComplete 
+  onComplete,
+  onUpdate 
 }: ShoppingImageCardProps) {
   const { user } = useAuthContext();
   const { toast } = useToast();
   const [isCompleting, setIsCompleting] = useState(false);
   const [imageError, setImageError] = useState(false);
+  
+  // ✅ NUOVO: Stati per rigenerazione immagine
+  const [isSearchingImages, setIsSearchingImages] = useState(false);
+  const [showImageSelector, setShowImageSelector] = useState(false);
+  const [searchedImages, setSearchedImages] = useState<ProcessedImageResult[]>([]);
+  const [searchError, setSearchError] = useState<string>('');
 
   const canEdit = user?.username === item.createdBy || user?.role === 'admin';
+
+  // ✅ NUOVO: Verifica se l'immagine può essere modificata
+  const canRegenerateImage = canEdit && item.canUpdateImage();
 
   // Funzione per troncare il titolo
   const truncateTitle = (title: string, maxLength: number = 35): { display: string; isTruncated: boolean } => {
@@ -129,12 +142,112 @@ export function ShoppingImageCard({
   };
 
   // ✅ NUOVO: Handler per rigenerare immagine
-  const handleRegenerateImage = () => {
-    console.log('Rigenerando immagine per:', item.name, 'ID:', item.id);
-    toast({
-      title: 'Rigenerazione immagine',
-      description: 'Richiesta di rigenerazione immagine inviata!',
-    });
+  const handleRegenerateImage = async () => {
+    if (!canRegenerateImage) {
+      toast({
+        title: 'Operazione non consentita',
+        description: 'L\'immagine di questo prodotto è stata bloccata e non può essere modificata.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!item.name?.trim()) {
+      toast({
+        title: 'Nome prodotto richiesto',
+        description: 'È necessario specificare un nome per il prodotto per cercare le immagini.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsSearchingImages(true);
+    setSearchError('');
+    setSearchedImages([]);
+
+    try {
+      console.log('🔍 Avvio ricerca immagini per:', item.name, 'Brand:', item.brandName);
+      
+      const images = await googleSearchService.searchProductImages(
+        item.link,
+        10
+      );
+
+      if (images.length === 0) {
+        toast({
+          title: 'Nessuna immagine trovata',
+          description: 'Non sono state trovate immagini per questo prodotto. Prova a modificare il nome.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // ✅ Filtra le immagini valide
+      
+      setSearchedImages(images);
+      setShowImageSelector(true);
+
+      toast({
+        title: 'Ricerca completata',
+        description: `Trovate ${images.length} immagini. Seleziona quella che preferisci.`,
+      });
+
+    } catch (error) {
+      console.error('❌ Errore ricerca immagini:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Errore sconosciuto';
+      setSearchError(errorMessage);
+      
+      toast({
+        title: 'Errore ricerca immagini',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSearchingImages(false);
+    }
+  };
+
+  // ✅ NUOVO: Handler per selezionare l'immagine
+  const handleSelectImage = async (imageUrl: string) => {
+    try {
+      console.log('💾 Aggiornamento immagine per item:', item.id, 'URL:', imageUrl);
+
+      // ✅ Aggiorna Firestore
+      const itemRef = doc(db, 'shopping_items', item.id);
+      await updateDoc(itemRef, {
+        imageUrl: imageUrl,
+        imageUpdated: true, // ✅ Blocca future modifiche
+        updatedAt: new Date()
+      });
+
+      // ✅ Aggiorna l'oggetto locale se il callback è disponibile
+      if (onUpdate) {
+        const updatedItem = Object.assign(Object.create(Object.getPrototypeOf(item)), item, {
+        imageUrl,
+        imageUpdated: true,
+        updatedAt: new Date()
+      });
+        onUpdate(updatedItem);
+      }
+
+      // ✅ Reset stati
+      setShowImageSelector(false);
+      setSearchedImages([]);
+      setSearchError('');
+
+      toast({
+        title: 'Immagine aggiornata',
+        description: 'L\'immagine del prodotto è stata aggiornata con successo!',
+      });
+
+    } catch (error) {
+      console.error('❌ Errore aggiornamento immagine:', error);
+      toast({
+        title: 'Errore aggiornamento',
+        description: 'Impossibile aggiornare l\'immagine del prodotto.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const formatPrice = (price: number | string): string => {
@@ -313,7 +426,7 @@ export function ShoppingImageCard({
               )}
             </div>
 
-            {/* ✅ NUOVO: Bottone Rigenera Immagine in basso a sinistra */}
+            {/* ✅ NUOVO: Bottone Rigenera Immagine con stati */}
             {canEdit && (
               <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                 <Tooltip>
@@ -322,13 +435,31 @@ export function ShoppingImageCard({
                       variant="secondary"
                       size="sm"
                       onClick={handleRegenerateImage}
-                      className="h-8 w-8 p-0 bg-white/90 hover:bg-blue-100 shadow-md text-blue-600"
+                      disabled={isSearchingImages || !canRegenerateImage}
+                      className={`
+                        h-8 w-8 p-0 bg-white/90 shadow-md transition-colors
+                        ${!canRegenerateImage 
+                          ? 'hover:bg-gray-100 text-gray-400 cursor-not-allowed' 
+                          : 'hover:bg-blue-100 text-blue-600'
+                        }
+                      `}
                     >
-                      <RefreshCw className="h-4 w-4" />
+                      {isSearchingImages ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
+                      )}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Rigenera immagine</p>
+                    <p>
+                      {!canRegenerateImage 
+                        ? 'Immagine bloccata' 
+                        : isSearchingImages 
+                          ? 'Ricerca in corso...' 
+                          : 'Rigenera immagine'
+                      }
+                    </p>
                   </TooltipContent>
                 </Tooltip>
               </div>
@@ -357,7 +488,25 @@ export function ShoppingImageCard({
                 AI
               </Badge>
             )}
+
+            {/* ✅ NUOVO: Badge per immagine bloccata */}
+            {item.imageUpdated && (
+              <Badge variant="outline" className="bg-orange-500 text-white border-orange-500 text-xs">
+                <Lock className="h-2 w-2 mr-1" />
+                IMG
+              </Badge>
+            )}
           </div>
+
+          {/* ✅ NUOVO: Overlay di caricamento durante la ricerca */}
+          {isSearchingImages && (
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+              <div className="bg-white rounded-lg p-4 flex items-center gap-3 shadow-lg">
+                <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+                <span className="text-sm font-medium">Ricerca immagini...</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ✅ CONTENUTO CARD */}
@@ -445,8 +594,18 @@ export function ShoppingImageCard({
             )}
           </div>
         </CardContent>
+
+        {/* ✅ NUOVO: Modale per selezione immagini */}
+        <ImageSelectorModal
+          isOpen={showImageSelector}
+          onClose={() => setShowImageSelector(false)}
+          onSelectImage={handleSelectImage}
+          productName={item.name || 'Prodotto'}
+          brandName={item.brandName}
+          images={searchedImages}
+          isLoading={isSearchingImages}
+          error={searchError}
+        />
       </Card>
     </TooltipProvider>
-  );
-}
-
+  )};

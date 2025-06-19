@@ -1,5 +1,5 @@
 // ==========================================
-// ShoppingList.tsx - CORRETTO con Badge Header Completi e Layout
+// ShoppingList.tsx - CORRETTO con Badge Header Completi e Layout + Fix TypeScript
 // ==========================================
 
 import React, { useState, useMemo } from 'react';
@@ -52,8 +52,9 @@ export function ShoppingList() {
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [visibilityFilter, setVisibilityFilter] = useState('all');
   const [showCompleted, setShowCompleted] = useState(false);
+  const [localItems, setLocalItems] = useState<ShoppingItem[]>([]);
 
-  // Hooks Firebase
+  // ✅ FIX 1: Hooks Firebase PRIMA di usare items
   const { 
     data: items, 
     loading: itemsLoading, 
@@ -64,12 +65,26 @@ export function ShoppingList() {
   
   const { data: categories } = useFirestore<Category>('categories');
 
+  // ✅ FIX 2: Callback dopo la dichiarazione di items
+  const handleUpdateItem = React.useCallback((updatedItem: ShoppingItem) => {
+    setLocalItems(prevItems => 
+      prevItems.map(item => 
+        item.id === updatedItem.id ? updatedItem : item
+      )
+    );
+  }, []);
+
+  // ✅ FIX 3: useEffect dopo la dichiarazione di items
+  React.useEffect(() => {
+    setLocalItems(items || []);
+  }, [items]);
+
   // ✅ CORRETTO: Filtri con logica di visibilità
   const { filteredItems, visibleItems } = useMemo(() => {
-    if (!items) return { filteredItems: [], visibleItems: [] };
+    if (!localItems) return { filteredItems: [], visibleItems: [] };
     
     // Prima filtra per visibilità (elementi che l'utente può vedere)
-    const visible = items.filter(item => 
+    const visible = localItems.filter(item => 
       item.isPublic || item.createdBy === user?.username || user?.role === 'admin'
     );
     
@@ -91,7 +106,7 @@ export function ShoppingList() {
     });
 
     return { filteredItems: filtered, visibleItems: visible };
-  }, [items, searchTerm, categoryFilter, priorityFilter, visibilityFilter, showCompleted, user]);
+  }, [localItems, searchTerm, categoryFilter, priorityFilter, visibilityFilter, showCompleted, user]);
 
   // ✅ CORRETTO: Statistiche complete come nel codice originale
   const stats = useMemo(() => {
@@ -213,24 +228,28 @@ export function ShoppingList() {
     }
   };
 
+  // ✅ FIX 4: Corretto il tipo di updatedData usando Object.assign
   const handleToggleComplete = async (id: string) => {
-    const item = items?.find(i => i.id === id);
+    const item = localItems?.find(i => i.id === id);
     if (!item) return;
 
     try {
-      const updatedData = {
-        ...item,
+      // ✅ Crea un nuovo oggetto ShoppingItem corretto
+      const updatedItem = Object.assign(Object.create(Object.getPrototypeOf(item)), item, {
         completed: !item.completed,
         completedBy: !item.completed ? user?.username : undefined,
         completedAt: !item.completed ? new Date() : undefined,
         updatedAt: new Date()
-      };
+      });
 
-      await updateItem(id, updatedData);
+      await updateItem(id, updatedItem);
+      
+      // ✅ Aggiorna anche lo stato locale
+      handleUpdateItem(updatedItem);
       
       toast({
-        title: updatedData.completed ? 'Elemento completato' : 'Elemento ripristinato',
-        description: updatedData.completed 
+        title: updatedItem.completed ? 'Elemento completato' : 'Elemento ripristinato',
+        description: updatedItem.completed 
           ? 'Elemento segnato come completato!' 
           : 'Elemento ripristinato nella lista!',
       });
@@ -262,7 +281,8 @@ export function ShoppingList() {
       categories: categories || [],
       onEdit: () => handleOpenModal(item),
       onDelete: handleDeleteItem,
-      onComplete: handleToggleComplete
+      onComplete: handleToggleComplete,
+      onUpdate: handleUpdateItem // ✅ NUOVO: Aggiungi questo prop
     };
 
     return viewMode === 'images' ? (

@@ -79,10 +79,10 @@ export class ValidationError extends Error {
 export class ShoppingItem implements FirestoreSerializable {
   constructor(
     public id: string,
-    public category: string,        // SPOSTATO: obbligatorio
-    public createdBy: string,       // SPOSTATO: obbligatorio  
-    public link: string,            // SPOSTATO: obbligatorio
-    public name?: string,           // OPZIONALE: può essere estratto dallo scraping
+    public category: string,        
+    public createdBy: string,       
+    public link: string,            
+    public name?: string,           
     public createdAt: Date = new Date(),
     public completed: boolean = false,
     public completedBy?: string,
@@ -91,8 +91,8 @@ export class ShoppingItem implements FirestoreSerializable {
     public estimatedPrice?: number,
     public notes?: string,
     public updatedAt: Date = new Date(),
-    public isPublic: boolean = true,  // MODIFICATO: default true
-    public scrapingData?: {           // ✅ AGGIORNATO: struttura corretta per scraping
+    public isPublic: boolean = true,
+    public scrapingData?: {
       lastScraped: Date;
       scrapingMode: string;
       scrapingSuccess: boolean;
@@ -100,73 +100,73 @@ export class ShoppingItem implements FirestoreSerializable {
       errors?: any;
     },
     public brandName?: string,
-    public imageUrl?: string,         // ✅ NUOVO: URL immagine prodotto
+    public imageUrl?: string,
+    public imageUpdated?: boolean // ✅ NUOVO: Campo per bloccare la modifica dell'immagine
   ) {
-    // Validazione nel costruttore
-    this.validate();
+    if (this.validate) {
+      this.validate();
+    }
+  }
+  canUpdateImage(): boolean {
+    return !this.imageUpdated;
   }
 
   // Metodo di validazione integrato
   validate(): ValidationResult {
     const errors: string[] = [];
-    
-    if (this.name && this.name.length > 100) {
-      errors.push('Product name must be less than 100 characters');
+
+    if (!this.category?.trim()) {
+      errors.push('La categoria è obbligatoria');
     }
-    
-    if (!this.category || this.category.trim().length === 0) {
-      errors.push('Category is required');
+
+    if (!this.createdBy?.trim()) {
+      errors.push('Il creatore è obbligatorio');
     }
-    
-    if (!this.createdBy || this.createdBy.trim().length === 0) {
-      errors.push('Created by is required');
+
+    if (!this.link?.trim()) {
+      errors.push('Il link è obbligatorio');
+    } else {
+      try {
+        new URL(this.link);
+      } catch {
+        errors.push('Il link deve essere un URL valido');
+      }
     }
-    
-    if (!this.link || !this.isValidLink()) {
-      errors.push('Valid URL is required');
+
+    if (this.estimatedPrice !== undefined && this.estimatedPrice < 0) {
+      errors.push('Il prezzo stimato non può essere negativo');
     }
-    
-    if (this.estimatedPrice !== undefined && (this.estimatedPrice <= 0 || isNaN(this.estimatedPrice))) {
-      errors.push('Price must be a positive number');
+
+    const result = {
+      isValid: errors.length === 0,
+      errors
+    };
+
+    if (!result.isValid) {
+      throw new ValidationError(`Validazione fallita: ${errors.join(', ')}`, errors);
     }
-    
-    // ✅ NUOVO: Validazione imageUrl
-    if (this.imageUrl && !this.isValidImageUrl()) {
-      errors.push('Image URL must be a valid URL');
-    }
-    
-    if (errors.length > 0) {
-      throw new ValidationError('Shopping item validation failed', errors);
-    }
-    
-    return { isValid: true, errors: [] };
+
+    return result;
   }
 
   static fromFirestore(data: any): ShoppingItem {
     try {
-      // Gestione sicura delle date
-      const parseDate = (dateValue: any): Date => {
-        if (!dateValue) return new Date();
-        if (dateValue.toDate && typeof dateValue.toDate === 'function') {
-          return dateValue.toDate();
+      const parseDate = (dateField: any): Date => {
+        if (!dateField) return new Date();
+        if (dateField instanceof Date) return dateField;
+        if (typeof dateField === 'object' && dateField.toDate) {
+          return dateField.toDate();
         }
-        if (dateValue instanceof Date) return dateValue;
-        if (typeof dateValue === 'string' || typeof dateValue === 'number') {
-          const parsed = new Date(dateValue);
-          return isNaN(parsed.getTime()) ? new Date() : parsed;
-        }
-        return new Date();
+        const parsed = new Date(dateField);
+        return isNaN(parsed.getTime()) ? new Date() : parsed;
       };
 
-      // Validazione e default per campi obbligatori
       const category = data.category || 'Articoli';
       const createdBy = data.createdBy || 'Unknown';
       const link = data.link || '';
 
-      // Crea l'oggetto senza validazione automatica nel costruttore
       const item = Object.create(ShoppingItem.prototype);
       
-      // Assegna i valori manualmente nell'ordine corretto
       item.id = data.id;
       item.category = category;
       item.createdBy = createdBy;
@@ -183,15 +183,14 @@ export class ShoppingItem implements FirestoreSerializable {
       item.isPublic = data.isPublic !== undefined ? data.isPublic : true;
       item.scrapingData = data.scrapingData;
       item.brandName = data.brandName;
-      item.imageUrl = data.imageUrl;  // ✅ NUOVO: Carica imageUrl da Firestore
-      
-      // Valida solo se i campi essenziali sono presenti
+      item.imageUrl = data.imageUrl;
+      item.imageUpdated = data.imageUpdated || false; // ✅ NUOVO: Carica imageUpdated
+
       if (link && category && createdBy) {
         try {
           item.validate();
         } catch (validationError) {
           console.warn('Validation warning for existing document:', data.id, validationError);
-          // Non bloccare il caricamento per documenti esistenti
         }
       }
 
@@ -200,7 +199,6 @@ export class ShoppingItem implements FirestoreSerializable {
     } catch (error) {
       console.error('Error in fromFirestore for ShoppingItem:', error, data);
       
-      // Fallback: crea un oggetto minimo valido
       const fallbackItem = Object.create(ShoppingItem.prototype);
       fallbackItem.id = data.id || 'unknown';
       fallbackItem.category = data.category || 'Articoli';
@@ -212,31 +210,31 @@ export class ShoppingItem implements FirestoreSerializable {
       fallbackItem.priority = "medium";
       fallbackItem.updatedAt = new Date();
       fallbackItem.isPublic = true;
-      fallbackItem.brandName = data.brandName || "Brand sconosciuto";
-      fallbackItem.imageUrl = data.imageUrl || undefined;  // ✅ NUOVO: Fallback imageUrl
+      fallbackItem.imageUpdated = false; // ✅ NUOVO
       
       return fallbackItem;
     }
   }
 
-  toFirestore() {
+   toFirestore() {
     const data = {
-      name: this.name,
       category: this.category,
       createdBy: this.createdBy,
+      link: this.link,
+      name: this.name,
       createdAt: this.createdAt,
       completed: this.completed,
-      link: this.link,
       completedBy: this.completedBy,
       completedAt: this.completedAt,
       priority: this.priority,
       estimatedPrice: this.estimatedPrice,
       notes: this.notes,
-      updatedAt: this.updatedAt,
+      updatedAt: new Date(),
       isPublic: this.isPublic,
       scrapingData: this.scrapingData,
       brandName: this.brandName,
-      imageUrl: this.imageUrl,  // ✅ NUOVO: Salva imageUrl in Firestore
+      imageUrl: this.imageUrl,
+      imageUpdated: this.imageUpdated // ✅ NUOVO: Salva imageUpdated
     };
     return removeUndefinedFields(data);
   }
@@ -875,4 +873,63 @@ export class ModelFactory {
       throw new ValidationError('Failed to create calendar event', ['Unknown validation error']);
     }
   }
+}
+
+export interface GoogleImageSearchResult {
+  kind: string;
+  url: {
+    type: string;
+    template: string;
+  };
+  queries: {
+    request: Array<{
+      title: string;
+      totalResults: string;
+      searchTerms: string;
+      count: number;
+      startIndex: number;
+      inputEncoding: string;
+      outputEncoding: string;
+      safe: string;
+      cx: string;
+      searchType: string;
+    }>;
+  };
+  searchInformation: {
+    searchTime: number;
+    formattedSearchTime: string;
+    totalResults: string;
+    formattedTotalResults: string;
+  };
+  items?: Array<{
+    kind: string;
+    title: string;
+    htmlTitle: string;
+    link: string;
+    displayLink: string;
+    snippet: string;
+    htmlSnippet: string;
+    mime: string;
+    fileFormat?: string;
+    image: {
+      contextLink: string;
+      height: number;
+      width: number;
+      byteSize: number;
+      thumbnailLink: string;
+      thumbnailHeight: number;
+      thumbnailWidth: number;
+    };
+  }>;
+}
+
+// ✅ NUOVO: Interface per i risultati delle immagini processati
+export interface ProcessedImageResult {
+  id: string;
+  url: string;
+  thumbnailUrl: string;
+  title: string;
+  width: number;
+  height: number;
+  contextLink: string;
 }

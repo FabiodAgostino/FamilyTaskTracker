@@ -46,6 +46,7 @@ interface ShoppingItemCardProps {
   onEdit: (item: ShoppingItem) => void;
   onDelete: (id: string) => void;
   onComplete: (id: string) => void;
+  onUpdate?: (updatedItem: ShoppingItem) => void; // ✅ NUOVO prop opzionale
 }
 
 export function ShoppingItemCard({ 
@@ -53,8 +54,10 @@ export function ShoppingItemCard({
   categories, 
   onEdit, 
   onDelete, 
-  onComplete 
+  onComplete,
+  onUpdate // ✅ NUOVO
 }: ShoppingItemCardProps) {
+  
   const { user } = useAuthContext();
   const { toast } = useToast();
   const [isCompleting, setIsCompleting] = useState(false);

@@ -33,3 +33,117 @@ export function removeUndefinedFields<T extends Record<string, any>>(obj: T): Pa
 export function prepareForFirestore<T extends Record<string, any>>(data: T): Partial<T> {
   return removeUndefinedFields(data);
 }
+
+export function getPathAfterDomain(url:string): string | null {
+  try {
+    const parsedUrl = new URL(url);
+    // Rimuove lo slash iniziale dalla pathname e aggiunge query string e hash se presenti
+    let path = parsedUrl.pathname.startsWith("/") ? parsedUrl.pathname.slice(1) : parsedUrl.pathname;
+    if (parsedUrl.search) {
+      path += parsedUrl.search;
+    }
+    if (parsedUrl.hash) {
+      path += parsedUrl.hash;
+    }
+    return path;
+  } catch (e) {
+    console.error("Invalid URL:", e);
+    return null;
+  }
+}
+
+export function extractMainDomain(url: string): string | null {
+  try {
+    const urlObj = new URL(url);
+    let hostname = urlObj.hostname.toLowerCase();
+    
+    // Rimuovi www. se presente
+    hostname = hostname.replace(/^www\./, '');
+    
+    // Dividi il dominio in parti
+    const parts = hostname.split('.');
+    
+    if (parts.length < 2) {
+      return hostname; // Se non ha punti, restituisci così com'è
+    }
+    
+    // Lista di estensioni di dominio comuni (TLD)
+    const commonTlds = [
+      // Generici
+      'com', 'org', 'net', 'edu', 'gov', 'mil', 'int',
+      // Nazionali
+      'it', 'de', 'fr', 'es', 'uk', 'us', 'ca', 'au', 'jp', 'cn', 'ru', 'br',
+      // Doppi (second-level domains)
+      'co.uk', 'co.jp', 'co.kr', 'com.au', 'com.br', 'com.cn', 'com.mx',
+      'org.uk', 'net.au', 'gov.uk', 'edu.au'
+    ];
+    
+    // Ricostruisci il dominio per confrontare con TLD doppi
+    const lastTwoParts = parts.slice(-2).join('.');
+    const lastThreeParts = parts.length >= 3 ? parts.slice(-3).join('.') : '';
+    
+    // Controlla se ha un TLD doppio (es: .co.uk)
+    if (commonTlds.includes(lastTwoParts)) {
+      // Ha un TLD doppio, prendi la parte prima
+      if (parts.length >= 3) {
+        return parts[parts.length - 3]; // es: shop.example.co.uk → example
+      } else {
+        return parts[0]; // es: example.co.uk → example
+      }
+    }
+    
+    // Controlla TLD semplice
+    const lastPart = parts[parts.length - 1];
+    if (commonTlds.includes(lastPart)) {
+      // TLD semplice, prendi la parte prima dell'ultimo punto
+      return parts[parts.length - 2];
+    }
+    
+    // Se non riconosce il TLD, prendi comunque la penultima parte
+    return parts[parts.length - 2];
+    
+  } catch (error) {
+    console.warn('❌ Errore nell\'estrazione del dominio:', url, error);
+    return null;
+  }
+}
+
+export function extractSearchInfoFromUrl(url: string): {
+  domain: string | null;
+  searchTerms: string[];
+  isEcommerce: boolean;
+} {
+  const domain = extractMainDomain(url);
+  
+  // Parole chiave che indicano siti e-commerce affidabili
+  const ecommerceKeywords = [
+    'shop', 'store', 'buy', 'cart', 'checkout', 'product', 'item',
+    'zalando', 'amazon', 'ebay', 'nike', 'adidas', 'zara', 'hm'
+  ];
+  
+  const urlLower = url.toLowerCase();
+  const isEcommerce = ecommerceKeywords.some(keyword => 
+    urlLower.includes(keyword) || (domain && domain.includes(keyword))
+  );
+  
+  // Crea termini di ricerca basati sul dominio
+  const searchTerms: string[] = [];
+  
+  if (domain) {
+    searchTerms.push(domain);
+    
+    // Aggiungi varianti comuni del nome
+    if (domain.length > 3) {
+      searchTerms.push(`${domain} store`);
+      searchTerms.push(`${domain} shop`);
+      searchTerms.push(`${domain} official`);
+    }
+  }
+  
+  return {
+    domain,
+    searchTerms,
+    isEcommerce
+  };
+}
+
