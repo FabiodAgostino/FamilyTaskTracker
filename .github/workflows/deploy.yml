@@ -1,32 +1,41 @@
-name: Deploy Family Task Tracker to GitHub Pages
+name: Deploy static site to Pages
 
 on:
   push:
-    branches: [ main ]
+    branches: ["main"]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
 jobs:
-  build-and-deploy:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pages: write
-      id-token: write
-    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      
-      - name: Setup Node.js
+        
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: 20
           cache: 'npm'
-      
+          
+      - name: Install dependencies
+        run: npm ci
+        
       - name: Create .env file
         run: |
           cat > client/.env << EOF
-          # Firebase Configuration
           VITE_FIREBASE_API_KEY=${{ secrets.FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN=${{ secrets.FIREBASE_AUTH_DOMAIN }}
           VITE_FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}
@@ -34,22 +43,13 @@ jobs:
           VITE_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID }}
           VITE_FIREBASE_MEASUREMENT_ID=${{ secrets.FIREBASE_MEASUREMENT_ID }}
-
-          # Application Environment
-          NODE_ENV=production
-          VITE_APP_NAME=Family Task Tracker
-          VITE_APP_VERSION=1.0.0
-
-          # Google Search API
           VITE_GOOGLE_SEARCH_API_KEY=${{ secrets.GOOGLE_SEARCH_API_KEY }}
           VITE_GOOGLE_SEARCH_ENGINE_ID=${{ secrets.GOOGLE_SEARCH_ENGINE_ID }}
+          VITE_APP_NAME=Family Task Tracker
+          VITE_APP_VERSION=1.0.0
+          NODE_ENV=production
           EOF
           
-          echo "✅ File .env creato per il build"
-      
-      - name: Install dependencies
-        run: npm ci
-        
       - name: Build
         run: npm run build
         env:
@@ -62,62 +62,15 @@ jobs:
           VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
           VITE_GOOGLE_SEARCH_API_KEY: ${{ secrets.GOOGLE_SEARCH_API_KEY }}
           VITE_GOOGLE_SEARCH_ENGINE_ID: ${{ secrets.GOOGLE_SEARCH_ENGINE_ID }}
-          VITE_APP_NAME: "Family Task Tracker"
-          VITE_APP_VERSION: "1.0.0"
-          NODE_ENV: production
-      
-      - name: Copy index.html to 404.html for SPA support
-        run: cp docs/index.html docs/404.html
-      
-      - name: Debug build output
-        run: |
-          echo "📁 Contenuto della cartella docs:"
-          ls -la docs/
-          echo "----------------"
-          echo "📁 Contenuto di docs/assets:"
-          if [ -d "docs/assets" ]; then
-            ls -la docs/assets/
-            echo "✅ Assets trovati:"
-            echo "CSS files:"
-            find docs/assets -name "*.css" -type f
-            echo "JS files:"
-            find docs/assets -name "*.js" -type f
-          else
-            echo "❌ Cartella docs/assets non trovata!"
-            exit 1
-          fi
-      
-      - name: Create .nojekyll file
-        run: touch docs/.nojekyll
-      
-      - name: Create .htaccess for MIME types (if needed)
-        run: |
-          cat > docs/.htaccess << 'EOL'
-          AddType application/javascript .js
-          AddType text/css .css
-          AddType text/html .html
-          EOL
-      
-      - name: Verify index.html
-        run: |
-          echo "🔍 Verifica del file index.html:"
-          if [ -f "docs/index.html" ]; then
-            echo "✅ index.html trovato"
-            head -20 docs/index.html
-          else
-            echo "❌ index.html non trovato!"
-            exit 1
-          fi
-      
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+          
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+        
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: docs
-          force_orphan: true
-          enable_jekyll: false
-      
-      - name: Deployment completed
-        run: |
-          echo "🚀 Deploy completato con successo!"
-          echo "🌐 Il tuo sito sarà disponibile a: https://fabiodagostino.github.io/FamilyTaskTracker/"
+          path: './docs'
+          
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
