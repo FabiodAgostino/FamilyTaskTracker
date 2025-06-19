@@ -74,80 +74,28 @@ jobs:
           echo "📁 Contenuto della cartella docs:"
           ls -la docs/
           echo "----------------"
+          echo "📁 Contenuto di docs/assets:"
           if [ -d "docs/assets" ]; then
-            echo "📁 Contenuto di docs/assets:"
             ls -la docs/assets/
+            echo "✅ Assets trovati:"
+            echo "CSS files:"
+            find docs/assets -name "*.css" -type f
+            echo "JS files:"
+            find docs/assets -name "*.js" -type f
           else
             echo "❌ Cartella docs/assets non trovata!"
-            mkdir -p docs/assets
-            echo "✅ Cartella docs/assets creata"
+            exit 1
           fi
       
       - name: Create .nojekyll file
         run: touch docs/.nojekyll
       
-      - name: Create 404.html for SPA routing
+      - name: Create .htaccess for MIME types (if needed)
         run: |
-          cat > docs/404.html << 'EOL'
-          <!DOCTYPE html>
-          <html lang="it">
-          <head>
-              <meta charset="UTF-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <title>Reindirizzamento - Family Task Tracker</title>
-              <script>
-                  // Gestione routing per SPA
-                  const path = window.location.pathname;
-                  const repoName = '/FamilyTaskTracker/'; // Nome repository corretto
-                  
-                  if (path.startsWith(repoName)) {
-                      const relativePath = path.substring(repoName.length) || '';
-                      window.location.replace(repoName + '#/' + relativePath + window.location.search + window.location.hash);
-                  } else {
-                      window.location.replace(repoName + '#/' + window.location.search + window.location.hash);
-                  }
-              </script>
-              <style>
-                  body {
-                      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                      display: flex;
-                      justify-content: center;
-                      align-items: center;
-                      height: 100vh;
-                      margin: 0;
-                      background: linear-gradient(135deg, #F4F1DE 0%, #E07A5F 100%);
-                  }
-                  .container {
-                      text-align: center;
-                      padding: 2rem;
-                      border-radius: 12px;
-                      background-color: white;
-                      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-                      color: #3D405B;
-                  }
-                  .spinner {
-                      border: 3px solid #f3f3f3;
-                      border-top: 3px solid #E07A5F;
-                      border-radius: 50%;
-                      width: 30px;
-                      height: 30px;
-                      animation: spin 1s linear infinite;
-                      margin: 0 auto 20px;
-                  }
-                  @keyframes spin {
-                      0% { transform: rotate(0deg); }
-                      100% { transform: rotate(360deg); }
-                  }
-              </style>
-          </head>
-          <body>
-              <div class="container">
-                  <div class="spinner"></div>
-                  <h1>Reindirizzamento in corso...</h1>
-                  <p>Attendere mentre si viene reindirizzati all'applicazione.</p>
-              </div>
-          </body>
-          </html>
+          cat > docs/.htaccess << 'EOL'
+          AddType application/javascript .js
+          AddType text/css .css
+          AddType text/html .html
           EOL
       
       - name: Verify index.html
