@@ -1,6 +1,6 @@
 // ====================================
 // functions/services/email-service.js
-// Gestione completa delle email con template HTML avanzati - VERSIONE SICURA
+// Gestione completa delle email con template HTML avanzati - VERSIONE MIGLIORATA
 // ====================================
 
 const nodemailer = require("nodemailer");
@@ -40,7 +40,7 @@ class EmailService {
             console.error('❌ Errore nel recupero password Gmail:', error.message);
             // Fallback alla password hardcoded se Secret Manager fallisce
             console.log('🔄 Fallback alla password hardcoded...');
-            return 'bcbn yssz culf kamf';
+            return ' ';
         }
     }
 
@@ -78,6 +78,18 @@ class EmailService {
     }
 
     /**
+     * Filtra gli articoli shopping rimuovendo quelli senza nome
+     */
+    filterValidShoppingItems(shoppingData) {
+        if (!shoppingData || !Array.isArray(shoppingData)) return [];
+        
+        return shoppingData.filter(item => {
+            const itemData = item.data();
+            return itemData && itemData.name && itemData.name.trim() !== '';
+        });
+    }
+
+    /**
      * Invia email giornaliera con aggiornamenti famiglia
      */
     async sendDailyEmail(summary, notesData = [], shoppingData = [], eventsData = []) {
@@ -101,11 +113,21 @@ class EmailService {
                 minute: '2-digit'
             });
 
+            // Filtra gli articoli shopping validi
+            const validShoppingData = this.filterValidShoppingItems(shoppingData);
+            console.log(`🛒 Articoli shopping: ${shoppingData.length} totali, ${validShoppingData.length} validi`);
+
+            // Aggiorna il summary per riflettere solo gli articoli validi
+            const updatedSummary = {
+                ...summary,
+                shopping: validShoppingData.length
+            };
+
             // Genera contenuto HTML e testo
-            const htmlContent = this.generateEmailHTML(summary, notesData, shoppingData, eventsData, today, timeString);
-            const textContent = this.generatePlainTextFallback(summary, notesData, shoppingData, eventsData, today, timeString);
+            const htmlContent = this.generateEmailHTML(updatedSummary, notesData, validShoppingData, eventsData, today, timeString);
+            const textContent = this.generatePlainTextFallback(updatedSummary, notesData, validShoppingData, eventsData, today, timeString);
             
-            const totalUpdates = summary.notes + summary.shopping + summary.events;
+            const totalUpdates = updatedSummary.notes + updatedSummary.shopping + updatedSummary.events;
             const subjectLine = totalUpdates === 1 
                 ? `🏠 Family Tracker - 1 nuovo aggiornamento`
                 : `🏠 Family Tracker - ${totalUpdates} nuovi aggiornamenti`;
@@ -215,7 +237,7 @@ class EmailService {
     }
 
     /**
-     * Genera il contenuto HTML dell'email con template avanzato
+     * Genera il contenuto HTML dell'email con template avanzato migliorato
      */
     generateEmailHTML(summary, notesData, shoppingData, eventsData, today, timeString) {
         const totalUpdates = summary.notes + summary.shopping + summary.events;
@@ -229,276 +251,450 @@ class EmailService {
     <meta name="x-apple-disable-message-reformatting">
     <title>HomeTask Family - Aggiornamenti</title>
     <style>
-        /* Reset & Base */
+        /* Reset CSS per compatibilità email */
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        
         body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
             line-height: 1.6;
-            color: #2D3748;
-            background-color: #F7FAFC;
+            color: #1a1a1a;
+            background-color: #f5f7fa;
             -webkit-text-size-adjust: 100%;
             -ms-text-size-adjust: 100%;
         }
         
         /* Container principale */
-        .email-container {
-            width: 100% !important;
-            max-width: 800px;
-            margin: 0 auto;
-            background: #FFFFFF;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        .email-wrapper {
+            width: 100%;
+            background-color: #f5f7fa;
+            padding: 20px 0;
         }
         
-        /* Header */
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Header moderno */
         .header {
-            background: linear-gradient(135deg, #E07A5F 0%, #D16850 100%);
-            color: white;
-            padding: 40px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 32px 24px;
             text-align: center;
+            position: relative;
+        }
+        
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.9), rgba(118, 75, 162, 0.9));
+        }
+        
+        .header-content {
+            position: relative;
+            z-index: 1;
         }
         
         .header h1 {
-            font-size: 32px;
-            font-weight: 800;
-            margin-bottom: 12px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            color: white;
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
         
-        .header .subtitle {
-            font-size: 18px;
-            opacity: 0.95;
+        .header .date {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 16px;
             font-weight: 500;
         }
         
-        /* Summary */
-        .summary {
-            background: linear-gradient(135deg, #F8FAFC 0%, #EDF2F7 100%);
-            padding: 40px 30px;
-            border-bottom: 3px solid #E2E8F0;
+        /* Sezione riassuntiva moderna */
+        .summary-section {
+            padding: 32px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-bottom: 1px solid #e2e8f0;
         }
         
         .summary-title {
             text-align: center;
             font-size: 20px;
-            font-weight: 700;
-            color: #2D3748;
-            margin-bottom: 30px;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 24px;
         }
         
         .summary-grid {
             display: flex;
-            gap: 20px;
+            gap: 16px;
             justify-content: center;
             flex-wrap: wrap;
         }
         
-        .summary-item {
-            background: white;
-            padding: 30px 25px;
+        .summary-card {
+            background: rgba(255, 255, 255, 0.95);
             border-radius: 16px;
+            padding: 20px 16px;
             text-align: center;
-            border-left: 6px solid;
             flex: 1;
-            min-width: 200px;
-            max-width: 250px;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+            min-width: 100px;
+            max-width: 140px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
         }
         
-        .summary-item.notes { border-left-color: #8B5CF6; color: #8B5CF6; }
-        .summary-item.shopping { border-left-color: #10B981; color: #10B981; }
-        .summary-item.events { border-left-color: #F59E0B; color: #F59E0B; }
+        .summary-card:hover {
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2);
+        }
+        
+        .summary-icon {
+            font-size: 28px;
+            margin-bottom: 12px;
+            display: block;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+        }
         
         .summary-number {
-            font-size: 48px;
-            font-weight: 900;
-            color: #1A202C;
-            margin-bottom: 8px;
+            font-size: 36px;
+            font-weight: 800;
+            color: #1e293b;
+            margin-bottom: 6px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         
         .summary-label {
-            font-size: 14px;
-            color: #718096;
+            font-size: 12px;
+            color: #64748b;
             text-transform: uppercase;
             letter-spacing: 1px;
             font-weight: 600;
         }
         
-        /* Content */
+        .summary-card.notes .summary-number { 
+            background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .summary-card.shopping .summary-number { 
+            background: linear-gradient(135deg, #10b981, #059669);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .summary-card.events .summary-number { 
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        /* Contenuto principale */
         .content {
-            padding: 50px 30px;
+            padding: 32px 24px;
         }
         
         .section {
-            margin-bottom: 50px;
-            background: #FAFAFA;
-            border-radius: 20px;
-            padding: 30px;
-            border: 2px solid #E2E8F0;
+            margin-bottom: 32px;
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            border-radius: 12px;
+            padding: 24px;
+            border: 1px solid #475569;
+        }
+        
+        .section:last-child {
+            margin-bottom: 0;
         }
         
         .section-header {
             display: flex;
             align-items: center;
-            gap: 15px;
-            margin-bottom: 25px;
-            padding-bottom: 15px;
-            border-bottom: 3px solid #E2E8F0;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid #475569;
         }
-        
-        .section-icon {
-            font-size: 24px;
-            width: 50px;
-            height: 50px;
-            border-radius: 15px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-        }
-        
-        .section-icon.notes { background: linear-gradient(135deg, #8B5CF6, #7C3AED); }
-        .section-icon.shopping { background: linear-gradient(135deg, #10B981, #059669); }
-        .section-icon.events { background: linear-gradient(135deg, #F59E0B, #D97706); }
         
         .section-title {
-            font-size: 24px;
-            font-weight: 700;
-            color: #1A202C;
             flex: 1;
+            font-size: 20px;
+            font-weight: 600;
+            color: #ffffff;
         }
         
         .section-count {
-            background: linear-gradient(135deg, #E07A5F, #D16850);
+            background: linear-gradient(135deg, #667eea, #764ba2);
             color: white;
             font-size: 14px;
-            padding: 8px 16px;
+            font-weight: 600;
+            padding: 6px 12px;
             border-radius: 20px;
-            font-weight: 700;
+            min-width: 28px;
+            text-align: center;
         }
         
-        /* Items */
+        /* Elementi individuali */
         .item {
-            background: white;
-            border: 2px solid #E2E8F0;
-            border-radius: 16px;
-            padding: 25px;
-            margin-bottom: 20px;
+            background: #2d3748;
+            border: 1px solid #4a5568;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 16px;
+            transition: box-shadow 0.2s ease;
+        }
+        
+        .item:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        .item:last-child {
+            margin-bottom: 0;
         }
         
         .item-title {
-            font-weight: 700;
-            color: #1A202C;
-            font-size: 20px;
-            margin-bottom: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 8px;
         }
         
         .item-content {
-            color: #718096;
-            font-size: 16px;
-            margin: 15px 0;
+            color: #ffffff;
+            font-size: 14px;
+            margin: 8px 0;
+        }
+        
+        .item-meta {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #4a5568;
         }
         
         .item-author {
-            color: #A0AEC0;
-            font-size: 14px;
-            margin-top: 15px;
+            color: #a0aec0;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        
+        .item-price {
+            background: #065f46;
+            color: #10b981;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        
+        .item-category {
+            background: #1e3a8a;
+            color: #60a5fa;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        
+        .item-link {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 13px;
+        }
+        
+        .item-link:hover {
+            text-decoration: underline;
         }
         
         /* Footer */
         .footer {
-            background: linear-gradient(135deg, #F7FAFC 0%, #EDF2F7 100%);
-            padding: 40px 30px;
+            background: #f8fafc;
+            padding: 32px 24px;
             text-align: center;
-            border-top: 3px solid #E2E8F0;
+            border-top: 1px solid #e2e8f0;
         }
         
         .footer-button {
             display: inline-block;
-            background: linear-gradient(135deg, #E07A5F 0%, #D16850 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 18px 36px;
+            padding: 14px 28px;
             text-decoration: none;
-            border-radius: 50px;
-            font-weight: 700;
+            border-radius: 8px;
+            font-weight: 600;
             font-size: 16px;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
+            transition: transform 0.2s ease;
+        }
+        
+        .footer-button:hover {
+            transform: translateY(-1px);
         }
         
         .footer-text {
-            color: #718096;
+            color: #64748b;
             font-size: 14px;
+            line-height: 1.5;
         }
         
         /* Empty state */
         .empty-state {
             text-align: center;
-            padding: 80px 30px;
-            color: #A0AEC0;
+            padding: 64px 24px;
+            color: #64748b;
         }
         
         .empty-state-icon {
-            font-size: 80px;
-            margin-bottom: 25px;
+            font-size: 64px;
+            margin-bottom: 16px;
+            opacity: 0.7;
+        }
+        
+        .empty-state h3 {
+            font-size: 18px;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+        
+        .empty-state p {
+            font-size: 14px;
         }
         
         /* Responsive */
-        @media (max-width: 768px) {
-            .summary-grid { flex-direction: column; }
-            .summary-item { min-width: auto; max-width: none; }
-            .section-header { flex-direction: column; align-items: flex-start; }
+        @media (max-width: 640px) {
+            .email-wrapper { padding: 10px; }
+            .email-container { border-radius: 8px; }
+            .header { padding: 24px 20px; }
+            .summary-section, .content, .footer { padding: 24px 20px; }
+            .summary-grid { 
+                gap: 12px;
+                justify-content: center;
+            }
+            .summary-card { 
+                min-width: 90px;
+                max-width: 110px;
+                padding: 16px 12px;
+            }
+            .summary-icon { font-size: 24px; margin-bottom: 8px; }
+            .summary-number { font-size: 28px; }
+            .summary-label { font-size: 11px; }
+            .section { padding: 20px 16px; margin-bottom: 24px; }
+            .section-header { 
+                flex-direction: row; 
+                align-items: center; 
+                gap: 12px; 
+                margin-bottom: 16px;
+                padding-bottom: 12px;
+            }
+            .section-title { font-size: 18px; }
+            .section-count { 
+                font-size: 12px; 
+                padding: 4px 10px; 
+                min-width: 24px;
+            }
+            .item { 
+                padding: 16px; 
+                margin-bottom: 12px;
+                border-radius: 8px;
+            }
+            .item-title { 
+                font-size: 15px; 
+                line-height: 1.4;
+                margin-bottom: 6px;
+            }
+            .item-content { font-size: 13px; margin: 6px 0; }
+            .item-meta { 
+                flex-direction: column; 
+                align-items: flex-start; 
+                gap: 8px;
+                margin-top: 10px;
+                padding-top: 10px;
+            }
+            .item-author { font-size: 12px; }
+            .item-price, .item-category { 
+                font-size: 12px; 
+                padding: 3px 6px;
+            }
+            .item-link { font-size: 12px; }
+        }
+        
+        /* Dark mode support */
+        @media (prefers-color-scheme: dark) {
+            body { background-color: #0f172a; }
+            .email-wrapper { background-color: #0f172a; }
+            .email-container { background: #1e293b; }
+            .footer { background: #334155; }
         }
     </style>
 </head>
 <body>
-    <div class="email-container">
-        <!-- Header -->
-        <div class="header">
-            <h1>🏠 HomeTask Family</h1>
-            <div class="subtitle">${today} • ${timeString}</div>
-        </div>
-
-        <!-- Summary -->
-        <div class="summary">
-            <div class="summary-title">📊 Riepilogo Aggiornamenti</div>
-            <div class="summary-grid">
-                <div class="summary-item notes">
-                    <div class="summary-number">${summary.notes}</div>
-                    <div class="summary-label">Note</div>
-                </div>
-                <div class="summary-item shopping">
-                    <div class="summary-number">${summary.shopping}</div>
-                    <div class="summary-label">Shopping</div>
-                </div>
-                <div class="summary-item events">
-                    <div class="summary-number">${summary.events}</div>
-                    <div class="summary-label">Eventi</div>
+    <div class="email-wrapper">
+        <div class="email-container">
+            <!-- Header -->
+            <div class="header">
+                <div class="header-content">
+                    <h1>🏠 HomeTask Family</h1>
+                    <div class="date">${today} • ${timeString}</div>
                 </div>
             </div>
-        </div>
 
-        <div class="content">
-            ${this.generateNotesSection(notesData)}
-            ${this.generateShoppingSection(shoppingData)}
-            ${this.generateEventsSection(eventsData)}
-            
-            ${totalUpdates === 0 ? `
-            <div class="empty-state">
-                <div class="empty-state-icon">😴</div>
-                <h3>Tutto tranquillo!</h3>
-                <p>Nessun nuovo aggiornamento in famiglia oggi.</p>
+            <!-- Summary -->
+            <div class="summary-section">
+                <div class="summary-title">📊 Riepilogo Aggiornamenti</div>
+                <div class="summary-grid">
+                    <div class="summary-card notes">
+                        <span class="summary-icon">📝</span>
+                        <div class="summary-number">${summary.notes}</div>
+                        <div class="summary-label">Note</div>
+                    </div>
+                    <div class="summary-card shopping">
+                        <span class="summary-icon">🛒</span>
+                        <div class="summary-number">${summary.shopping}</div>
+                        <div class="summary-label">Shopping</div>
+                    </div>
+                    <div class="summary-card events">
+                        <span class="summary-icon">📅</span>
+                        <div class="summary-number">${summary.events}</div>
+                        <div class="summary-label">Eventi</div>
+                    </div>
+                </div>
             </div>
-            ` : ''}
-        </div>
 
-        <!-- Footer -->
-        <div class="footer">
-            <a href="https://familytasktracker-c2dfe.web.app" class="footer-button">
-                🚀 Apri HomeTask
-            </a>
-            <div class="footer-text">
-                Email automatica dal sistema HomeTask Family Tracker<br>
-                Gestisci le tue preferenze nell'app
+            <!-- Content -->
+            <div class="content">
+                ${this.generateNotesSection(notesData)}
+                ${this.generateShoppingSection(shoppingData)}
+                ${this.generateEventsSection(eventsData)}
+                
+                ${totalUpdates === 0 ? `
+                <div class="empty-state">
+                    <div class="empty-state-icon">😴</div>
+                    <h3>Tutto tranquillo!</h3>
+                    <p>Nessun nuovo aggiornamento in famiglia oggi.</p>
+                </div>
+                ` : ''}
+            </div>
+
+            <!-- Footer -->
+            <div class="footer">
+                <a href="https://familytasktracker-c2dfe.web.app" class="footer-button">
+                    🚀 Apri HomeTask
+                </a>
+                <div class="footer-text">
+                    Email automatica dal sistema HomeTask Family Tracker<br>
+                    Gestisci le tue preferenze nell'app
+                </div>
             </div>
         </div>
     </div>
@@ -514,15 +710,6 @@ class EmailService {
         
         const notesHTML = notesData.map(note => {
             const noteData = note.data();
-            const badges = [];
-            
-            if (noteData.isPinned) badges.push('<span class="meta-badge pinned">📌 Pinnata</span>');
-            if (noteData.isPublic) badges.push('<span class="meta-badge public">🌍 Pubblica</span>');
-            if (noteData.tags && noteData.tags.length > 0) {
-                noteData.tags.slice(0, 3).forEach(tag => {
-                    badges.push(`<span class="meta-badge">#${tag}</span>`);
-                });
-            }
             
             const preview = noteData.content ? 
                 (noteData.content.length > 120 ? noteData.content.substring(0, 120) + '...' : noteData.content) : '';
@@ -531,14 +718,15 @@ class EmailService {
             <div class="item">
                 <div class="item-title">${noteData.title || 'Nota senza titolo'}</div>
                 ${preview ? `<div class="item-content">${preview}</div>` : ''}
-                <div class="item-author">👤 ${noteData.createdBy}</div>
+                <div class="item-meta">
+                    <span class="item-author">👤 ${noteData.createdBy}</span>
+                </div>
             </div>`;
         }).join('');
         
         return `
         <div class="section">
             <div class="section-header">
-                <div class="section-icon notes">📝</div>
                 <div class="section-title">Nuove Note</div>
                 <div class="section-count">${notesData.length}</div>
             </div>
@@ -547,7 +735,7 @@ class EmailService {
     }
 
     /**
-     * Genera sezione HTML per la shopping list
+     * Genera sezione HTML per la shopping list (solo articoli validi)
      */
     generateShoppingSection(shoppingData) {
         if (!shoppingData || shoppingData.length === 0) return '';
@@ -555,21 +743,34 @@ class EmailService {
         const shoppingHTML = shoppingData.map(item => {
             const itemData = item.data();
             
+            const metaItems = [];
+            metaItems.push(`<span class="item-author">👤 ${itemData.createdBy}</span>`);
+            
+            if (itemData.estimatedPrice) {
+                metaItems.push(`<span class="item-price">€${itemData.estimatedPrice}</span>`);
+            }
+            
+            if (itemData.category) {
+                metaItems.push(`<span class="item-category">${itemData.category}</span>`);
+            }
+            
+            if (itemData.link) {
+                metaItems.push(`<a href="${itemData.link}" class="item-link">🔗 Link prodotto</a>`);
+            }
+            
             return `
             <div class="item">
-                <div class="item-title">${itemData.name || 'Articolo senza nome'}</div>
+                <div class="item-title">${itemData.name}</div>
                 ${itemData.notes ? `<div class="item-content">${itemData.notes}</div>` : ''}
-                ${itemData.estimatedPrice ? `<div class="item-content">💰 €${itemData.estimatedPrice}</div>` : ''}
-                ${itemData.category ? `<div class="item-content">🏷️ ${itemData.category}</div>` : ''}
-                ${itemData.link ? `<div class="item-content"><a href="${itemData.link}" style="color: #E07A5F;">🔗 Link prodotto</a></div>` : ''}
-                <div class="item-author">👤 ${itemData.createdBy}</div>
+                <div class="item-meta">
+                    ${metaItems.join('')}
+                </div>
             </div>`;
         }).join('');
         
         return `
         <div class="section">
             <div class="section-header">
-                <div class="section-icon shopping">🛒</div>
                 <div class="section-title">Nuovi Articoli</div>
                 <div class="section-count">${shoppingData.length}</div>
             </div>
@@ -598,14 +799,15 @@ class EmailService {
                 <div class="item-content">📅 ${dateInfo}</div>
                 ${eventData.description ? `<div class="item-content">${eventData.description}</div>` : ''}
                 ${eventData.location ? `<div class="item-content">📍 ${eventData.location}</div>` : ''}
-                <div class="item-author">👤 ${eventData.createdBy}</div>
+                <div class="item-meta">
+                    <span class="item-author">👤 ${eventData.createdBy}</span>
+                </div>
             </div>`;
         }).join('');
         
         return `
         <div class="section">
             <div class="section-header">
-                <div class="section-icon events">📅</div>
                 <div class="section-title">Nuovi Eventi</div>
                 <div class="section-count">${eventsData.length}</div>
             </div>

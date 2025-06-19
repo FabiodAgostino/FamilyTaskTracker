@@ -1,10 +1,20 @@
-import { Home, LogOut, Menu, User, Sun, Moon, ExternalLink } from 'lucide-react';
+import { Home, LogOut, Menu, User, Sun, Moon, ExternalLink, Settings, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Link, useLocation } from 'wouter';
 import { Bell, BellOff } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
+
 interface HeaderProps {
   onMenuToggle: () => void;
 }
@@ -148,6 +158,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
               )}
             </Button>
 
+            {/* Notifiche */}
             {isSupported && (
               <Button
                 variant="ghost"
@@ -164,33 +175,152 @@ export function Header({ onMenuToggle }: HeaderProps) {
               </Button>
             )}
 
-            {/* User info con tema personalizzato */}
-            <div className="hidden sm:flex items-center space-x-2 ml-2">
-              <div 
-                className={`w-8 h-8 ${isTopiniTheme ? '' : 'bg-cambridge-blue'} rounded-full flex items-center justify-center shadow-sm`}
-                style={isTopiniTheme ? { backgroundColor: 'rgb(37, 99, 235)' } : {}}
-              >
-                {isTopiniTheme ? (
-                  <RatIcon className="h-4 w-4 text-white" />
-                ) : (
-                  <User className="h-4 w-4 text-white" />
+            {/* ✅ NUOVO: User Dropdown Menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  className="hidden sm:flex items-center space-x-2 ml-2 h-auto p-2 hover:bg-muted transition-colors rounded-lg"
+                >
+                  <div 
+                    className={`w-8 h-8 ${isTopiniTheme ? '' : 'bg-cambridge-blue'} rounded-full flex items-center justify-center shadow-sm`}
+                    style={isTopiniTheme ? { backgroundColor: 'rgb(37, 99, 235)' } : {}}
+                  >
+                    {isTopiniTheme ? (
+                      <RatIcon className="h-4 w-4 text-white" />
+                    ) : (
+                      <User className="h-4 w-4 text-white" />
+                    )}
+                  </div>
+                  <span className="text-sm font-medium text-delft-blue">
+                    {user?.username}
+                  </span>
+                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                </Button>
+              </DropdownMenuTrigger>
+              
+              <DropdownMenuContent align="end" className="w-56">
+                {/* Header del dropdown */}
+                <DropdownMenuLabel className="flex items-center space-x-2">
+                  <div 
+                    className={`w-6 h-6 ${isTopiniTheme ? '' : 'bg-cambridge-blue'} rounded-full flex items-center justify-center`}
+                    style={isTopiniTheme ? { backgroundColor: 'rgb(37, 99, 235)' } : {}}
+                  >
+                    {isTopiniTheme ? (
+                      <RatIcon className="h-3 w-3 text-white" />
+                    ) : (
+                      <User className="h-3 w-3 text-white" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="font-medium">{user?.username}</div>
+                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Badge variant="outline" className="px-1 py-0 text-xs">
+                        {user?.role}
+                      </Badge>
+                      {isTopiniTheme && <span>🐭</span>}
+                    </div>
+                  </div>
+                </DropdownMenuLabel>
+                
+                <DropdownMenuSeparator />
+                
+                {/* Menu Items */}
+                <DropdownMenuItem asChild>
+                  <Link href="/settings" className="flex items-center cursor-pointer">
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Impostazioni</span>
+                  </Link>
+                </DropdownMenuItem>
+                
+                {/* Azioni tema (opzionale) */}
+                <DropdownMenuItem onClick={toggleTheme} className="flex items-center cursor-pointer">
+                  {theme === 'light' ? (
+                    <Moon className="mr-2 h-4 w-4" />
+                  ) : (
+                    <Sun className="mr-2 h-4 w-4" />
+                  )}
+                  <span>{theme === 'light' ? 'Tema Scuro' : 'Tema Chiaro'}</span>
+                </DropdownMenuItem>
+
+                {/* Notifiche nel menu */}
+                {isSupported && (
+                  <DropdownMenuItem onClick={requestPermission} className="flex items-center cursor-pointer">
+                    {permission === 'granted' ? (
+                      <Bell className="mr-2 h-4 w-4" />
+                    ) : (
+                      <BellOff className="mr-2 h-4 w-4" />
+                    )}
+                    <span>
+                      {permission === 'granted' ? 'Notifiche Attive' : 'Attiva Notifiche'}
+                    </span>
+                  </DropdownMenuItem>
                 )}
-              </div>
-              <span className="text-sm font-medium text-delft-blue">
-                {isTopiniTheme ? `${user?.username}` : user?.username}
-              </span>
+                
+                <DropdownMenuSeparator />
+                
+                {/* Logout */}
+                <DropdownMenuItem 
+                  onClick={logout} 
+                  className="flex items-center cursor-pointer text-destructive focus:text-destructive"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Esci</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* ✅ Mobile user icon (senza dropdown, solo per spazi stretti) */}
+            <div className="sm:hidden">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className="w-9 h-9 rounded-full text-muted-foreground hover:text-delft-blue hover:bg-muted transition-colors"
+                  >
+                    <div 
+                      className={`w-6 h-6 ${isTopiniTheme ? '' : 'bg-cambridge-blue'} rounded-full flex items-center justify-center`}
+                      style={isTopiniTheme ? { backgroundColor: 'rgb(37, 99, 235)' } : {}}
+                    >
+                      {isTopiniTheme ? (
+                        <RatIcon className="h-3 w-3 text-white" />
+                      ) : (
+                        <User className="h-3 w-3 text-white" />
+                      )}
+                    </div>
+                  </Button>
+                </DropdownMenuTrigger>
+                
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuLabel>
+                    <div className="font-medium">{user?.username}</div>
+                    <div className="text-xs text-muted-foreground">{user?.role}</div>
+                  </DropdownMenuLabel>
+                  
+                  <DropdownMenuSeparator />
+                  
+                  <DropdownMenuItem asChild>
+                    <Link href="/settings" className="flex items-center cursor-pointer">
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Impostazioni</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuSeparator />
+                  
+                  <DropdownMenuItem 
+                    onClick={logout} 
+                    className="flex items-center cursor-pointer text-destructive focus:text-destructive"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Esci</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             
-            {/* Logout */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={logout}
-              className="w-9 h-9 rounded-full text-muted-foreground hover:text-destructive hover:bg-muted transition-colors"
-              title="Esci"
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
+            {/* ✅ RIMOSSO: Logout diretto - ora è nel dropdown */}
           </div>
         </div>
       </div>

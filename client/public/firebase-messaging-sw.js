@@ -17,8 +17,6 @@ const messaging = firebase.messaging();
 
 // Handler per notifiche in background
 messaging.onBackgroundMessage((payload) => {
-  console.log('📱 Background message received:', payload);
-  
   const notificationTitle = payload.notification?.title || '🏠 Family Task';
   const notificationOptions = {
     body: payload.notification?.body || 'Nuovi aggiornamenti disponibili',

@@ -23,8 +23,7 @@ export function removeUndefinedFields<T extends Record<string, any>>(obj: T): Pa
       }
     }
   }
-  console.log(cleaned);
-  return cleaned;
+    return cleaned;
 }
 
 /**

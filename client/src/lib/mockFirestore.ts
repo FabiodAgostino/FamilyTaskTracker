@@ -84,8 +84,7 @@ class MockFirestore {
 
   async updateDoc(docRef: any, updates: any) {
     try {
-      console.log('MockFirestore: Updating document', docRef.id, 'in', docRef.collectionName);
-      
+            
       const { collectionName, id } = docRef;
       const collection = this.data[collectionName as keyof MockData] as any[];
       const index = collection.findIndex((item: any) => item.id === id);
@@ -100,8 +99,7 @@ class MockFirestore {
           updatedAt: new Date(),
         };
         this.notifyListeners(collectionName);
-        console.log('MockFirestore: Document updated successfully');
-      } else {
+              } else {
         console.warn('MockFirestore: Document not found for update:', id);
       }
     } catch (error) {
@@ -112,8 +110,7 @@ class MockFirestore {
 
   async deleteDoc(docRef: any) {
     try {
-      console.log('MockFirestore: Deleting document', docRef.id, 'from', docRef.collectionName);
-      
+            
       const { collectionName, id } = docRef;
       const collection = this.data[collectionName as keyof MockData] as any[];
       const index = collection.findIndex((item: any) => item.id === id);
@@ -121,8 +118,7 @@ class MockFirestore {
       if (index !== -1) {
         collection.splice(index, 1);
         this.notifyListeners(collectionName);
-        console.log('MockFirestore: Document deleted successfully');
-      } else {
+              } else {
         console.warn('MockFirestore: Document not found for deletion:', id);
       }
     } catch (error) {

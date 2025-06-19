@@ -17,8 +17,7 @@ export function useNotifications() {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/firebase-messaging-sw.js')
         .then((registration) => {
-          console.log('✅ Service Worker registered:', registration);
-        })
+                  })
         .catch((error) => {
           console.error('❌ Service Worker registration failed:', error);
         });
@@ -56,15 +55,13 @@ export function useNotifications() {
       
       if (currentToken) {
         setToken(currentToken);
-        console.log('FCM Token:', currentToken);
-        
+                
         // TODO: Salva token nel database per l'utente
         await subscribeToTopic(currentToken);
         
         // Handler per messaggi in foreground
         onMessage(messaging, (payload) => {
-          console.log('Foreground message:', payload);
-          toast({
+                    toast({
             title: payload.notification?.title || 'Nuovo aggiornamento',
             description: payload.notification?.body || 'Controlla l\'app'
           });
@@ -77,8 +74,7 @@ export function useNotifications() {
 
   const subscribeToTopic = async (token: string) => {
     // TODO: Chiamata API per iscrivere al topic 'family-updates'
-    console.log('TODO: Subscribe to topic family-updates');
-  };
+      };
 
   return {
     permission,

@@ -31,8 +31,7 @@ export class GoogleSearchService {
       let searchQuery = getPathAfterDomain(url);
       if(searchQuery === null)
         throw "searchQuery null";
-      console.log('🔍 Ricerca immagini per:', searchQuery);
-      const params = new URLSearchParams({
+            const params = new URLSearchParams({
         key: this.apiKey,
         cx: this.searchEngineId,
         q: searchQuery,
@@ -68,8 +67,7 @@ export class GoogleSearchService {
         contextLink: item.image.contextLink,
       }));
 
-      console.log('✅ Trovate', processedResults.length, 'immagini totali');
-      return processedResults;
+            return processedResults;
 
     } catch (error) {
       console.error('❌ Errore durante la ricerca immagini:', error);

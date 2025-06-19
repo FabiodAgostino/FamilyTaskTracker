@@ -161,8 +161,6 @@ export function ShoppingImageCard({
     setSearchedImages([]);
 
     try {
-      console.log('🔍 Avvio ricerca immagini per:', item.name, 'Brand:', item.brandName);
-      
       const images = await googleSearchService.searchProductImages(
         item.link,
         10
@@ -205,8 +203,6 @@ export function ShoppingImageCard({
   // ✅ NUOVO: Handler per selezionare l'immagine
   const handleSelectImage = async (imageUrl: string) => {
     try {
-      console.log('💾 Aggiornamento immagine per item:', item.id, 'URL:', imageUrl);
-
       // ✅ Aggiorna Firestore
       const itemRef = doc(db, 'shopping_items', item.id);
       await updateDoc(itemRef, {
@@ -330,7 +326,7 @@ export function ShoppingImageCard({
                       asChild
                     >
                       <a href={item.link} target="_blank" rel="noopener noreferrer">
-                        <Eye className="h-4 w-4" />
+                        <Eye className="h-4 w-4 text-gray-500 dark:text-black-300" />
                       </a>
                     </Button>
                   </TooltipTrigger>
@@ -351,7 +347,7 @@ export function ShoppingImageCard({
                         onClick={() => onEdit(item)}
                         className="h-8 w-8 p-0 bg-white/90 hover:bg-white shadow-md"
                       >
-                        <Edit className="h-4 w-4" />
+                       <Edit className="h-4 w-4 text-gray-500 dark:text-black-300" />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
@@ -368,7 +364,7 @@ export function ShoppingImageCard({
                             size="sm"
                             className="h-8 w-8 p-0 bg-white/90 hover:bg-red-100 shadow-md text-red-600"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-4 w-4 text-gray-500 dark:text-black-300" />
                           </Button>
                         </AlertDialogTrigger>
                       </TooltipTrigger>

@@ -1,5 +1,6 @@
 // ==========================================
-// ShoppingList.tsx - CORRETTO con Badge Header Completi e Layout + Fix TypeScript
+// ShoppingList.tsx - AGGIORNATO con Preferenze Persistenti
+// Partendo dal codice originale dell'utente
 // ==========================================
 
 import React, { useState, useMemo } from 'react';
@@ -35,22 +36,44 @@ import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/hooks/useFirestore';
 import { ShoppingItem, Category } from '@/lib/models/types';
 
+// ✅ NUOVO: Import hook per preferenze persistenti
+import { useUserPreferences } from '@/contexts/UserPreferencesContext';
+
 export function ShoppingList() {
   const { user } = useAuthContext();
   const { toast } = useToast();
   
-  // ✅ State per la visualizzazione
-  const [viewMode, setViewMode] = useState<'compact' | 'images'>('compact');
+  // ✅ NUOVO: Usa preferenze persistenti invece di useState locale
+  const { 
+    preferences, 
+    updatePreference 
+  } = useUserPreferences();
   
-  // Modal e filtri
+  // ✅ SOSTITUITO: viewMode ora viene dalle preferenze salvate
+  // const [viewMode, setViewMode] = useState<'compact' | 'images'>('compact');
+  const viewMode = preferences.viewMode;
+  const setViewMode = (mode: 'compact' | 'images') => {
+    updatePreference('viewMode', mode);
+  };
+  
+  // Modal e filtri (questi rimangono locali, non persistenti)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ShoppingItem | null>(null);
+  
+  // ✅ AGGIORNATO: Filtri con valori iniziali dalle preferenze salvate
   const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('all');
-  const [priorityFilter, setPriorityFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState(preferences.defaultCategory);
+  const [priorityFilter, setPriorityFilter] = useState(preferences.defaultPriority);
   const [visibilityFilter, setVisibilityFilter] = useState('all');
-  const [showCompleted, setShowCompleted] = useState(false);
+  const [showCompleted, setShowCompleted] = useState(preferences.showCompleted);
   const [localItems, setLocalItems] = useState<ShoppingItem[]>([]);
+
+  // ✅ Sincronizza filtri con preferenze quando cambiano
+  React.useEffect(() => {
+    setCategoryFilter(preferences.defaultCategory);
+    setPriorityFilter(preferences.defaultPriority);
+    setShowCompleted(preferences.showCompleted);
+  }, [preferences.defaultCategory, preferences.defaultPriority, preferences.showCompleted]);
 
   // ✅ FIX 1: Hooks Firebase PRIMA di usare items
   const { 
@@ -155,13 +178,18 @@ export function ShoppingList() {
     };
   }, [visibleItems, filteredItems, user]);
 
-  // ✅ Reset filtri
+  // ✅ AGGIORNATO: Reset filtri + salva preferenze
   const handleClearFilters = () => {
     setSearchTerm('');
     setCategoryFilter('all');
     setPriorityFilter('all');
     setVisibilityFilter('all');
     setShowCompleted(false);
+    
+    // ✅ NUOVO: Aggiorna anche le preferenze salvate
+    updatePreference('defaultCategory', 'all');
+    updatePreference('defaultPriority', 'all');
+    updatePreference('showCompleted', false);
   };
 
   const activeFiltersCount = [
@@ -274,7 +302,6 @@ export function ShoppingList() {
   // ✅ Funzione per renderizzare la card giusta
   const renderShoppingCard = (item: ShoppingItem) => {
     const commonProps = {
-      key: item.id,
       item,
       categories: categories || [],
       onEdit: () => handleOpenModal(item),
@@ -284,10 +311,28 @@ export function ShoppingList() {
     };
 
     return viewMode === 'images' ? (
-      <ShoppingImageCard {...commonProps} />
+      <ShoppingImageCard key={item.id} {...commonProps} />
     ) : (
-      <ShoppingItemCard {...commonProps} />
+      <ShoppingItemCard key={item.id} {...commonProps} />
     );
+  };
+
+  // ✅ NUOVO: Handler per cambio categoria con salvataggio preferenze
+  const handleCategoryFilterChange = (value: string) => {
+    setCategoryFilter(value);
+    updatePreference('defaultCategory', value);
+  };
+
+  // ✅ NUOVO: Handler per cambio priorità con salvataggio preferenze
+  const handlePriorityFilterChange = (value: string) => {
+    setPriorityFilter(value);
+    updatePreference('defaultPriority', value);
+  };
+
+  // ✅ NUOVO: Handler per cambio completati con salvataggio preferenze
+  const handleShowCompletedChange = (checked: boolean) => {
+    setShowCompleted(checked);
+    updatePreference('showCompleted', checked);
   };
 
   // Loading state
@@ -346,20 +391,25 @@ export function ShoppingList() {
                 €{stats.totalCost.toFixed(2)} stimati
               </Badge>
             )}
+            {/* ✅ NUOVO: Badge indicatore preferenze salvate */}
+            <Badge variant="outline" className="text-indigo-600 border-indigo-300 bg-indigo-50">
+              💾 {viewMode === 'images' ? 'Immagini' : 'Compatta'} (salvata)
+            </Badge>
           </div>
         </div>
         
-        {/* ✅ SWITCH VISUALIZZAZIONE + BOTTONE AGGIUNGI */}
+        {/* ✅ AGGIORNATO: SWITCH VISUALIZZAZIONE con preferenze persistenti */}
         <div className="flex items-center gap-4">
-          <div className="flex items-center space-x-2">
-            <List className="h-4 w-4 text-gray-500" />
+          <div className="flex items-center space-x-2 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+            <List className={`h-4 w-4 ${viewMode === 'compact' ? 'text-cambridge-blue' : 'text-gray-400'}`} />
             <Switch
               id="view-mode"
               checked={viewMode === 'images'}
               onCheckedChange={(checked) => setViewMode(checked ? 'images' : 'compact')}
+              className="data-[state=checked]:bg-cambridge-blue"
             />
-            <LayoutGrid className="h-4 w-4 text-gray-500" />
-            <Label htmlFor="view-mode" className="text-sm font-medium">
+            <LayoutGrid className={`h-4 w-4 ${viewMode === 'images' ? 'text-cambridge-blue' : 'text-gray-400'}`} />
+            <Label htmlFor="view-mode" className="text-sm font-medium cursor-pointer">
               {viewMode === 'images' ? 'Vista Immagini' : 'Vista Compatta'}
             </Label>
           </div>
@@ -374,7 +424,7 @@ export function ShoppingList() {
         </div>
       </div>
 
-      {/* ✅ FILTRI COMPLETI come nel codice originale */}
+      {/* ✅ AGGIORNATO: FILTRI con salvataggio preferenze */}
       <Card className="mb-8">
         <CardContent className="p-6">
           <div className="flex flex-col md:flex-row gap-4">
@@ -391,7 +441,8 @@ export function ShoppingList() {
             </div>
 
             <div className="flex gap-2 flex-wrap">
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              {/* ✅ AGGIORNATO: Select categoria con salvataggio */}
+              <Select value={categoryFilter} onValueChange={handleCategoryFilterChange}>
                 <SelectTrigger className="w-[140px]">
                   <SelectValue placeholder="Categoria" />
                 </SelectTrigger>
@@ -405,7 +456,8 @@ export function ShoppingList() {
                 </SelectContent>
               </Select>
 
-              <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+              {/* ✅ AGGIORNATO: Select priorità con salvataggio */}
+              <Select value={priorityFilter} onValueChange={handlePriorityFilterChange}>
                 <SelectTrigger className="w-[120px]">
                   <SelectValue placeholder="Priorità" />
                 </SelectTrigger>
@@ -428,9 +480,10 @@ export function ShoppingList() {
                 </SelectContent>
               </Select>
 
+              {/* ✅ AGGIORNATO: Button completati con salvataggio */}
               <Button
                 variant={showCompleted ? "default" : "outline"}
-                onClick={() => setShowCompleted(!showCompleted)}
+                onClick={() => handleShowCompletedChange(!showCompleted)}
                 size="sm"
               >
                 {showCompleted ? '✅' : '⬜'} Completati
@@ -539,6 +592,7 @@ export function ShoppingList() {
         onAdd={handleSaveItem}
         editItem={editingItem}
       />
+      
     </div>
   );
 }

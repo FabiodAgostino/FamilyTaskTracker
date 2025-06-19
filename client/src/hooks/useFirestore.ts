@@ -190,8 +190,7 @@ export function useFirestore<T>(collectionName: string) {
       (item.isPublic === true) || 
       user?.role === 'admin'
     );
-    console.log(d);
-    return d;
+        return d;
   };
 
   // Metodi di utilità aggiuntivi

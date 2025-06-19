@@ -169,8 +169,6 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
   // ✅ Funzione per scraping asincrono
   const performAsyncScraping = async (url: string) => {
     try {
-      console.log(`🔗 Avvio scraping asincrono per: ${url}`);
-      
       const response = await fetch(SCRAPING_ENDPOINT, {
         method: 'POST',
         headers: {
@@ -190,8 +188,6 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
       const result = await response.json();
       
       if (result.success && result.data) {
-        console.log(`✅ Scraping completato per ${url}:`, result.data);
-        
         // ✅ CORRETTO: Controlla se nameProduct esiste prima di usarlo
         const productName = result.data.nameProduct || result.data.name || 'il prodotto';
         

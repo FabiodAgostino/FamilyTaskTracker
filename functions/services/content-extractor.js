@@ -272,7 +272,7 @@ class ContentExtractor {
     let imageSection = '';
     if (allImages.length > 0) {
       // Prendi le migliori 5 immagini per non esagerare con la lunghezza
-      const topImages = allImages.slice(0, 5);
+      const topImages = allImages.slice(0, 2);
       imageSection = `IMMAGINI PRODOTTO: ${topImages.join(' | ')} | `;
       console.log(`🖼️ ${topImages.length} immagini aggiunte come prioritarie`);
     }
