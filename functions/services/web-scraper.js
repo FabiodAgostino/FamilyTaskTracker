@@ -181,7 +181,7 @@ class WebScraper {
     } catch (error) {
       console.error('❌ Errore estrazione contenuto:', error.message);
       return {
-        text: html.substring(0, 10000), // Fallback: primi 10k caratteri
+        text: html.substring(0, 20000), // Fallback: primi 10k caratteri
         aggressivePrice: null,
         length: html.length,
         error: error.message

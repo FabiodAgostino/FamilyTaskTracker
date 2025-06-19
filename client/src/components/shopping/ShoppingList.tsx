@@ -1,10 +1,27 @@
-// src/components/shopping/ShoppingList.tsx
-import { useState, useMemo } from 'react';
-import { Plus, Search, Filter, ShoppingCart, TrendingUp, Euro, Globe, Lock } from 'lucide-react';
+// ==========================================
+// ShoppingList.tsx - CORRETTO con Badge Header Completi e Layout
+// ==========================================
+
+import React, { useState, useMemo } from 'react';
+import { 
+  Plus, 
+  Search, 
+  Filter, 
+  LayoutGrid, 
+  List, 
+  ShoppingCart, 
+  TrendingUp, 
+  Euro,
+  Globe,
+  Lock,
+  Eye
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -13,6 +30,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ShoppingItemCard } from './ShoppingItemCard';
+import { ShoppingImageCard } from './ShoppingImageCard';
 import { AddItemForm } from './AddItemForm';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -23,21 +41,22 @@ export function ShoppingList() {
   const { user } = useAuthContext();
   const { toast } = useToast();
   
-  // ✅ SEMPLIFICATO: Un solo modal per add/edit
+  // ✅ State per la visualizzazione
+  const [viewMode, setViewMode] = useState<'compact' | 'images'>('compact');
+  
+  // Modal e filtri
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ShoppingItem | null>(null);
-  
-  // ✅ Filtri semplificati + AGGIUNTO: filtro visibilità
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [visibilityFilter, setVisibilityFilter] = useState('all');
   const [showCompleted, setShowCompleted] = useState(false);
 
-  // ✅ Hooks Firebase
+  // Hooks Firebase
   const { 
     data: items, 
-    loading, 
+    loading: itemsLoading, 
     add: addItem, 
     update: updateItem, 
     remove: deleteItem 
@@ -45,87 +64,102 @@ export function ShoppingList() {
   
   const { data: categories } = useFirestore<Category>('categories');
 
-  // ✅ MIGLIORATO: Filtri con useMemo per performance + AGGIUNTA: logica visibilità
-  const filteredItems = useMemo(() => {
-    if (!items) return [];
+  // ✅ CORRETTO: Filtri con logica di visibilità
+  const { filteredItems, visibleItems } = useMemo(() => {
+    if (!items) return { filteredItems: [], visibleItems: [] };
     
-    return items.filter(item => {
-      // AGGIUNTO: Filtro visibilità (pubblici per tutti, privati solo per creatore + admin)
-      const canView = item.isPublic || item.createdBy === user?.username || user?.role === 'admin';
-      if (!canView) return false;
-
-      // Filtro ricerca
-      if (searchTerm) {
-        const searchLower = searchTerm.toLowerCase();
-        const matchesName = item.name?.toLowerCase().includes(searchLower);
-        const matchesNotes = item.notes?.toLowerCase().includes(searchLower);
-        const matchesCategory = item.category.toLowerCase().includes(searchLower);
-        if (!matchesName && !matchesNotes && !matchesCategory) return false;
-      }
-
-      // Filtro categoria
-      if (categoryFilter !== 'all' && item.category !== categoryFilter) return false;
-
-      // Filtro priorità
-      if (priorityFilter !== 'all' && item.priority !== priorityFilter) return false;
-
-      // AGGIUNTO: Filtro visibilità
-      if (visibilityFilter === 'public' && !item.isPublic) return false;
-      if (visibilityFilter === 'private' && item.isPublic) return false;
-      if (visibilityFilter === 'mine' && item.createdBy !== user?.username) return false;
-
-      // Filtro completamento
-      if (!showCompleted && item.completed) return false;
-
-      return true;
-    });
-  }, [items, user, searchTerm, categoryFilter, priorityFilter, visibilityFilter, showCompleted]);
-
-  // ✅ CORRETTO: Statistiche calcolate PRIMA del filtro completamento
-  const stats = useMemo(() => {
-    // Prima filtra solo per visibilità (senza filtro completamento)
-    const visibleItems = items?.filter(item => 
+    // Prima filtra per visibilità (elementi che l'utente può vedere)
+    const visible = items.filter(item => 
       item.isPublic || item.createdBy === user?.username || user?.role === 'admin'
-    ) || [];
+    );
     
-    // Poi separa pending/completed dai visible items (non dai filtered)
+    // Poi applica i filtri di ricerca sui visibili
+    const filtered = visible.filter(item => {
+      const matchesSearch = !searchTerm || 
+        item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.brandName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.notes?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter;
+      const matchesPriority = priorityFilter === 'all' || item.priority === priorityFilter;
+      const matchesVisibility = visibilityFilter === 'all' || 
+        (visibilityFilter === 'public' && item.isPublic) ||
+        (visibilityFilter === 'private' && !item.isPublic);
+      const matchesCompleted = showCompleted ? item.completed : !item.completed;
+      
+      return matchesSearch && matchesCategory && matchesPriority && matchesVisibility && matchesCompleted;
+    });
+
+    return { filteredItems: filtered, visibleItems: visible };
+  }, [items, searchTerm, categoryFilter, priorityFilter, visibilityFilter, showCompleted, user]);
+
+  // ✅ CORRETTO: Statistiche complete come nel codice originale
+  const stats = useMemo(() => {
+    if (!visibleItems || !filteredItems) {
+      return {
+        // Per badge header (tutti gli elementi visibili)
+        totalPending: 0,
+        totalCompleted: 0,
+        totalVisible: 0,
+        publicItems: 0,
+        privateItems: 0,
+        myItems: 0,
+        highPriority: 0,
+        totalCost: 0,
+        
+        // Per visualizzazione sezioni (elementi filtrati)
+        pending: 0,
+        completed: 0,
+        pendingItems: [],
+        completedItems: []
+      };
+    }
+    
+    // Statistiche per badge (da TUTTI gli elementi visibili)
     const allPending = visibleItems.filter(item => !item.completed);
     const allCompleted = visibleItems.filter(item => item.completed);
     
-    // Ma per la visualizzazione usa i filteredItems
+    // Statistiche per visualizzazione (da elementi FILTRATI)
     const displayedPending = filteredItems.filter(item => !item.completed);
     const displayedCompleted = filteredItems.filter(item => item.completed);
-    
-    const highPriority = allPending.filter(item => item.priority === 'high').length;
-    const totalCost = allPending.reduce((sum, item) => sum + (item.estimatedPrice || 0), 0);
-    
-    // ✅ CORRETTO: Statistiche per badge (da tutti gli elementi visibili)
-    const publicItems = visibleItems.filter(item => item.isPublic).length;
-    const privateItems = visibleItems.filter(item => !item.isPublic).length;
-    const myItems = visibleItems.filter(item => item.createdBy === user?.username).length;
     
     return {
       // Per badge header (conta TUTTI gli elementi visibili)
       totalPending: allPending.length,
       totalCompleted: allCompleted.length,
       totalVisible: visibleItems.length,
-      publicItems,
-      privateItems,
-      myItems,
+      publicItems: visibleItems.filter(item => item.isPublic).length,
+      privateItems: visibleItems.filter(item => !item.isPublic).length,
+      myItems: visibleItems.filter(item => item.createdBy === user?.username).length,
+      highPriority: allPending.filter(item => item.priority === 'high').length,
+      totalCost: allPending.reduce((sum, item) => sum + (item.estimatedPrice || 0), 0),
       
       // Per visualizzazione sezioni (conta solo elementi FILTRATI)
       pending: displayedPending.length,
       completed: displayedCompleted.length,
       pendingItems: displayedPending,
-      completedItems: displayedCompleted,
-      
-      // Altri
-      highPriority,
-      totalCost
+      completedItems: displayedCompleted
     };
-  }, [items, filteredItems, user]);
+  }, [visibleItems, filteredItems, user]);
 
-  // ✅ SEMPLIFICATO: Gestori delle azioni
+  // ✅ Reset filtri
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setCategoryFilter('all');
+    setPriorityFilter('all');
+    setVisibilityFilter('all');
+    setShowCompleted(false);
+  };
+
+  const activeFiltersCount = [
+    searchTerm.length > 0,
+    categoryFilter !== 'all',
+    priorityFilter !== 'all',
+    visibilityFilter !== 'all',
+    showCompleted
+  ].filter(Boolean).length;
+
+  // Handlers
   const handleOpenModal = (item?: ShoppingItem) => {
     setEditingItem(item || null);
     setIsModalOpen(true);
@@ -180,10 +214,10 @@ export function ShoppingList() {
   };
 
   const handleToggleComplete = async (id: string) => {
-    try {
-      const item = items?.find(i => i.id === id);
-      if (!item) return;
+    const item = items?.find(i => i.id === id);
+    if (!item) return;
 
+    try {
       const updatedData = {
         ...item,
         completed: !item.completed,
@@ -210,25 +244,36 @@ export function ShoppingList() {
     }
   };
 
-  // ✅ NUOVO: Reset filtri
-  const handleClearFilters = () => {
-    setSearchTerm('');
-    setCategoryFilter('all');
-    setPriorityFilter('all');
-    setVisibilityFilter('all');
-    setShowCompleted(false);
+  // ✅ CORRETTO: Grid class ottimizzata per entrambe le visualizzazioni
+  const getGridClass = () => {
+    if (viewMode === 'images') {
+      // Grid per immagini stile Zalando: meno colonne, card più grandi
+      return "grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5";
+    }
+    // Grid compatta originale
+    return "grid gap-4 md:grid-cols-2 lg:grid-cols-3";
   };
 
-  const activeFiltersCount = [
-    searchTerm.length > 0,
-    categoryFilter !== 'all',
-    priorityFilter !== 'all',
-    visibilityFilter !== 'all',
-    showCompleted
-  ].filter(Boolean).length;
+  // ✅ Funzione per renderizzare la card giusta
+  const renderShoppingCard = (item: ShoppingItem) => {
+    const commonProps = {
+      key: item.id,
+      item,
+      categories: categories || [],
+      onEdit: () => handleOpenModal(item),
+      onDelete: handleDeleteItem,
+      onComplete: handleToggleComplete
+    };
 
-  // ✅ LOADING STATE
-  if (loading) {
+    return viewMode === 'images' ? (
+      <ShoppingImageCard {...commonProps} />
+    ) : (
+      <ShoppingItemCard {...commonProps} />
+    );
+  };
+
+  // Loading state
+  if (itemsLoading) {
     return (
       <div className="container mx-auto p-6 max-w-7xl">
         <div className="flex justify-center items-center py-20">
@@ -241,7 +286,7 @@ export function ShoppingList() {
 
   return (
     <div className="container mx-auto p-6 max-w-7xl">
-      {/* ✅ HEADER con statistiche CORRETTE */}
+      {/* ✅ HEADER COMPLETO con tutti i badge come nel codice originale */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-3">
@@ -249,7 +294,7 @@ export function ShoppingList() {
             <h1 className="text-3xl font-bold text-delft-blue">Lista della Spesa</h1>
           </div>
           
-          {/* ✅ CORRETTO: Badge con statistiche corrette */}
+          {/* ✅ TUTTI I BADGE STATISTICI come nel codice originale */}
           <div className="flex flex-wrap gap-4">
             <Badge variant="outline" className="text-cambridge-blue border-cambridge-blue">
               {stats.totalVisible} {stats.totalVisible === 1 ? 'articolo' : 'articoli'}
@@ -286,81 +331,82 @@ export function ShoppingList() {
           </div>
         </div>
         
-        <Button
-          onClick={() => handleOpenModal()}
-          className="bg-cambridge-blue hover:bg-cambridge-blue/90 text-white dark:text-black shadow-lg"
-          size="lg"
-        >
-          <Plus className="mr-2 h-5 w-5" />
-          Nuovo elemento
-        </Button>
+        {/* ✅ SWITCH VISUALIZZAZIONE + BOTTONE AGGIUNGI */}
+        <div className="flex items-center gap-4">
+          <div className="flex items-center space-x-2">
+            <List className="h-4 w-4 text-gray-500" />
+            <Switch
+              id="view-mode"
+              checked={viewMode === 'images'}
+              onCheckedChange={(checked) => setViewMode(checked ? 'images' : 'compact')}
+            />
+            <LayoutGrid className="h-4 w-4 text-gray-500" />
+            <Label htmlFor="view-mode" className="text-sm font-medium">
+              {viewMode === 'images' ? 'Vista Immagini' : 'Vista Compatta'}
+            </Label>
+          </div>
+
+          <Button
+            onClick={() => handleOpenModal()}
+            className="bg-cambridge-blue hover:bg-cambridge-blue/90 text-white"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Aggiungi Articolo
+          </Button>
+        </div>
       </div>
 
-      {/* ✅ FILTRI compatti */}
-      <Card className="mb-6">
-        <CardContent className="p-4">
-          <div className="flex flex-col lg:flex-row gap-4">
-            {/* Ricerca */}
+      {/* ✅ FILTRI COMPLETI come nel codice originale */}
+      <Card className="mb-8">
+        <CardContent className="p-6">
+          <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
-                  placeholder="Cerca elementi..."
+                  placeholder="Cerca articoli, brand, note..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
                 />
               </div>
             </div>
-            
-            {/* Filtri */}
-            <div className="flex flex-wrap gap-2">
+
+            <div className="flex gap-2 flex-wrap">
               <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="w-48">
-                  <Filter className="mr-2 h-4 w-4" />
+                <SelectTrigger className="w-[140px]">
                   <SelectValue placeholder="Categoria" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">🛍️ Tutte le categorie</SelectItem>
+                  <SelectItem value="all">Tutte</SelectItem>
                   {categories?.map((category) => (
                     <SelectItem key={category.id} value={category.name}>
-                      {category.icon || '🏷️'} {category.name}
+                      {category.icon} {category.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
 
               <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-[120px]">
                   <SelectValue placeholder="Priorità" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tutte</SelectItem>
-                  <SelectItem value="high">🔴 Alta</SelectItem>
-                  <SelectItem value="medium">🟡 Media</SelectItem>
-                  <SelectItem value="low">🟢 Bassa</SelectItem>
+                  <SelectItem value="high">Alta</SelectItem>
+                  <SelectItem value="medium">Media</SelectItem>
+                  <SelectItem value="low">Bassa</SelectItem>
                 </SelectContent>
               </Select>
 
               <Select value={visibilityFilter} onValueChange={setVisibilityFilter}>
-                <SelectTrigger className="w-40">
+                <SelectTrigger className="w-[120px]">
                   <SelectValue placeholder="Visibilità" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Tutti</SelectItem>
-                  <SelectItem value="public">
-                    <div className="flex items-center">
-                      <Globe className="w-4 h-4 mr-2 text-green-600" />
-                      Pubblici
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="private">
-                    <div className="flex items-center">
-                      <Lock className="w-4 h-4 mr-2 text-orange-600" />
-                      Privati
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="mine">I Miei</SelectItem>
+                  <SelectItem value="all">Tutte</SelectItem>
+                  <SelectItem value="public">Pubbliche</SelectItem>
+                  <SelectItem value="private">Private</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -387,7 +433,7 @@ export function ShoppingList() {
         </CardContent>
       </Card>
 
-      {/* ✅ LISTA ELEMENTI */}
+      {/* ✅ LISTA ELEMENTI con grid corretta */}
       <div className="space-y-8">
         {/* Elementi da comprare */}
         {stats.pendingItems.length > 0 && (
@@ -396,13 +442,13 @@ export function ShoppingList() {
               <h2 className="text-xl font-semibold text-delft-blue">Da Comprare</h2>
               <Badge variant="secondary">{stats.pending}</Badge>
             </div>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className={getGridClass()}>
               {stats.pendingItems
                 .sort((a, b) => {
-                  // ✅ NUOVO: Prima ordina per data (più recenti prima)
+                  // Prima ordina per data (più recenti prima)
                   const dateA = new Date(a.createdAt).getTime();
                   const dateB = new Date(b.createdAt).getTime();
-                  const dateDiff = dateB - dateA; // Più recenti prima
+                  const dateDiff = dateB - dateA;
                   
                   // Se le date sono uguali, ordina per priorità
                   if (dateDiff === 0) {
@@ -412,16 +458,7 @@ export function ShoppingList() {
                   
                   return dateDiff;
                 })
-                .map(item => (
-                  <ShoppingItemCard
-                    key={item.id}
-                    item={item}
-                    categories={categories || []}
-                    onEdit={() => handleOpenModal(item)}
-                    onDelete={handleDeleteItem}
-                    onComplete={handleToggleComplete}
-                  />
-                ))}
+                .map(renderShoppingCard)}
             </div>
           </div>
         )}
@@ -435,65 +472,49 @@ export function ShoppingList() {
                 {stats.completed}
               </Badge>
             </div>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 opacity-75">
+            <div className={`${getGridClass()} opacity-75`}>
               {stats.completedItems
                 .sort((a, b) => {
-                  // ✅ NUOVO: Ordina per data di completamento (più recenti prima)
-                  if (a.completedAt && b.completedAt) {
-                    const dateA = new Date(a.completedAt).getTime();
-                    const dateB = new Date(b.completedAt).getTime();
-                    return dateB - dateA; // Più recenti prima
-                  }
-                  
-                  // Se non hanno completedAt, usa createdAt
-                  const dateA = new Date(a.createdAt).getTime();
-                  const dateB = new Date(b.createdAt).getTime();
+                  // Ordina per data di completamento (più recenti prima)
+                  const dateA = a.completedAt ? new Date(a.completedAt).getTime() : 0;
+                  const dateB = b.completedAt ? new Date(b.completedAt).getTime() : 0;
                   return dateB - dateA;
                 })
-                .map(item => (
-                <ShoppingItemCard
-                  key={item.id}
-                  item={item}
-                  categories={categories || []}
-                  onEdit={() => handleOpenModal(item)}
-                  onDelete={handleDeleteItem}
-                  onComplete={handleToggleComplete}
-                />
-              ))}
+                .map(renderShoppingCard)}
             </div>
           </div>
         )}
 
-        {/* ✅ STATO VUOTO migliorato */}
-        {filteredItems.length === 0 && (
+        {/* Stato vuoto */}
+        {stats.pendingItems.length === 0 && stats.completedItems.length === 0 && (
           <Card className="text-center py-16">
             <CardContent>
               <ShoppingCart className="mx-auto h-16 w-16 text-gray-300 mb-4" />
               <h3 className="text-xl font-medium text-gray-600 mb-2">
-                {activeFiltersCount > 0 
-                  ? 'Nessun elemento trovato'
-                  : 'Lista vuota'
-                }
+                Nessun elemento trovato
               </h3>
-              <p className="text-gray-500 mb-6">
-                {activeFiltersCount > 0
-                  ? 'Prova a modificare i filtri di ricerca'
-                  : 'Inizia aggiungendo il tuo primo elemento alla lista'
+              <p className="text-gray-500 mb-4">
+                {activeFiltersCount > 0 
+                  ? "Prova a modificare i filtri di ricerca."
+                  : "Inizia aggiungendo il tuo primo articolo alla lista della spesa."
                 }
               </p>
-              <Button
-                onClick={() => handleOpenModal()}
-                className="bg-cambridge-blue hover:bg-cambridge-blue/90"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Aggiungi elemento
-              </Button>
+              {activeFiltersCount > 0 ? (
+                <Button onClick={handleClearFilters} variant="outline">
+                  Pulisci Filtri
+                </Button>
+              ) : (
+                <Button onClick={() => handleOpenModal()}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Aggiungi Primo Articolo
+                </Button>
+              )}
             </CardContent>
           </Card>
         )}
       </div>
 
-      {/* ✅ MODAL UNIFICATO */}
+      {/* Modal */}
       <AddItemForm
         isOpen={isModalOpen}
         onClose={handleCloseModal}

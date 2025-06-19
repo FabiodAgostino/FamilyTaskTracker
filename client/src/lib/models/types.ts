@@ -100,6 +100,7 @@ export class ShoppingItem implements FirestoreSerializable {
       errors?: any;
     },
     public brandName?: string,
+    public imageUrl?: string,         // ✅ NUOVO: URL immagine prodotto
   ) {
     // Validazione nel costruttore
     this.validate();
@@ -127,6 +128,11 @@ export class ShoppingItem implements FirestoreSerializable {
     
     if (this.estimatedPrice !== undefined && (this.estimatedPrice <= 0 || isNaN(this.estimatedPrice))) {
       errors.push('Price must be a positive number');
+    }
+    
+    // ✅ NUOVO: Validazione imageUrl
+    if (this.imageUrl && !this.isValidImageUrl()) {
+      errors.push('Image URL must be a valid URL');
     }
     
     if (errors.length > 0) {
@@ -177,6 +183,7 @@ export class ShoppingItem implements FirestoreSerializable {
       item.isPublic = data.isPublic !== undefined ? data.isPublic : true;
       item.scrapingData = data.scrapingData;
       item.brandName = data.brandName;
+      item.imageUrl = data.imageUrl;  // ✅ NUOVO: Carica imageUrl da Firestore
       
       // Valida solo se i campi essenziali sono presenti
       if (link && category && createdBy) {
@@ -206,6 +213,7 @@ export class ShoppingItem implements FirestoreSerializable {
       fallbackItem.updatedAt = new Date();
       fallbackItem.isPublic = true;
       fallbackItem.brandName = data.brandName || "Brand sconosciuto";
+      fallbackItem.imageUrl = data.imageUrl || undefined;  // ✅ NUOVO: Fallback imageUrl
       
       return fallbackItem;
     }
@@ -228,6 +236,7 @@ export class ShoppingItem implements FirestoreSerializable {
       isPublic: this.isPublic,
       scrapingData: this.scrapingData,
       brandName: this.brandName,
+      imageUrl: this.imageUrl,  // ✅ NUOVO: Salva imageUrl in Firestore
     };
     return removeUndefinedFields(data);
   }
@@ -263,7 +272,19 @@ export class ShoppingItem implements FirestoreSerializable {
     }
   }
   
-  // ✅ AGGIORNATO: metodo per aggiornare con dati di scraping
+  // ✅ NUOVO: Validazione URL immagine
+  isValidImageUrl(): boolean {
+    if (!this.imageUrl) return true; // È opzionale, quindi null/undefined è valido
+    try {
+      const url = new URL(this.imageUrl);
+      // Controlla che sia http/https
+      return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }
+  
+  // ✅ AGGIORNATO: metodo per aggiornare con dati di scraping (inclusa immagine)
   updateWithScrapingData(scrapingData: any): void {
     if (scrapingData.nameProduct && !this.name) {
       this.name = scrapingData.nameProduct;
@@ -284,6 +305,11 @@ export class ShoppingItem implements FirestoreSerializable {
       }
     }
     
+    // ✅ NUOVO: Aggiorna imageUrl se estratta dallo scraping
+    if (scrapingData.imageUrl && !this.imageUrl) {
+      this.imageUrl = scrapingData.imageUrl;
+    }
+    
     // ✅ AGGIORNATO: struttura corretta
     this.scrapingData = {
       lastScraped: new Date(),
@@ -294,6 +320,17 @@ export class ShoppingItem implements FirestoreSerializable {
     };
     
     this.updatedAt = new Date();
+    
+    // ✅ Ri-valida dopo l'aggiornamento (inclusa la nuova imageUrl)
+    try {
+      this.validate();
+    } catch (validationError) {
+      console.warn('Validation warning after scraping update:', validationError);
+      // Se l'imageUrl non è valida, rimuovila
+      if (this.imageUrl && !this.isValidImageUrl()) {
+        this.imageUrl = undefined;
+      }
+    }
   }
 }
 
@@ -757,7 +794,7 @@ export class ModelFactory {
     }
   }
 
-  // Factory con validazione sicura per ShoppingItem
+  // ✅ AGGIORNATO: Factory con validazione sicura per ShoppingItem (inclusa imageUrl)
   static createShoppingItem(data: Partial<ShoppingItem>): ShoppingItem {
     try {
       // Validazione dati richiesti
@@ -771,6 +808,18 @@ export class ModelFactory {
       
       if (!data.createdBy || data.createdBy.trim().length === 0) {
         throw new ValidationError('Shopping item validation failed', ['Created by is required']);
+      }
+      
+      // ✅ NUOVO: Validazione imageUrl se presente
+      if (data.imageUrl && data.imageUrl.trim().length > 0) {
+        try {
+          const url = new URL(data.imageUrl);
+          if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+            throw new ValidationError('Shopping item validation failed', ['Image URL must use http or https protocol']);
+          }
+        } catch {
+          throw new ValidationError('Shopping item validation failed', ['Invalid image URL format']);
+        }
       }
       
       return new ShoppingItem(
@@ -789,7 +838,8 @@ export class ModelFactory {
         data.updatedAt || new Date(),
         data.isPublic !== undefined ? data.isPublic : true,
         data.scrapingData,
-        data.brandName
+        data.brandName,
+        data.imageUrl            // ✅ NUOVO: Include imageUrl nel factory
       );
     } catch (error) {
       if (error instanceof ValidationError) {

@@ -63,39 +63,258 @@ class ContentExtractor {
   }
 
   /**
-   * Estrae tutto il testo visibile con ricerca prezzi nei JSON
+   * ✅ NUOVO: Estrae tutti i link immagine dall'HTML
+   */
+  static extractAllImageUrls(html) {
+    console.log('🖼️ Estraendo tutti i link immagine...');
+    
+    const imageUrls = new Set(); // Usa Set per evitare duplicati
+    
+    // Pattern per diverse fonti di immagini
+    const imagePatterns = [
+      // 1. Tag img con src
+      /<img[^>]+src=["']([^"']+)["'][^>]*>/gi,
+      
+      // 2. Tag img con data-src (lazy loading)
+      /<img[^>]+data-src=["']([^"']+)["'][^>]*>/gi,
+      
+      // 3. Background-image in style
+      /background-image:\s*url\(["']?([^"')]+)["']?\)/gi,
+      
+      // 4. Data attributes per immagini
+      /data-[^=]*image[^=]*=["']([^"']+)["']/gi,
+      /data-[^=]*photo[^=]*=["']([^"']+)["']/gi,
+      /data-[^=]*picture[^=]*=["']([^"']+)["']/gi,
+      
+      // 5. Srcset per immagini responsive
+      /srcset=["']([^"']+)["']/gi,
+      
+      // 6. JSON con URL immagini
+      /"image":\s*"([^"]+)"/gi,
+      /"imageUrl":\s*"([^"]+)"/gi,
+      /"photo":\s*"([^"]+)"/gi,
+      /"picture":\s*"([^"]+)"/gi,
+      /"thumbnail":\s*"([^"]+)"/gi,
+      
+      // 7. Attributi specifici e-commerce
+      /data-product-image=["']([^"']+)["']/gi,
+      /data-zoom-image=["']([^"']+)["']/gi,
+      /data-large-image=["']([^"']+)["']/gi,
+      
+      // 8. Pattern per CDN comuni
+      /https?:\/\/[^"\s]*(?:cdn|images?|media|static)[^"\s]*\.(?:jpg|jpeg|png|webp|gif)/gi,
+      
+      // 9. Pattern generici per URL immagini
+      /https?:\/\/[^"\s]*\.(?:jpg|jpeg|png|webp|gif)/gi
+    ];
+    
+    imagePatterns.forEach(pattern => {
+      let match;
+      while ((match = pattern.exec(html)) !== null) {
+        let imageUrl = match[1];
+        
+        // ✅ FIXED: Controllo sicurezza prima di fare split
+        if (!imageUrl || typeof imageUrl !== 'string') {
+          continue; // Salta questo match se l'URL non è valido
+        }
+        
+        // Pulisci l'URL
+        imageUrl = imageUrl.split(',')[0].split(' ')[0].trim(); // Per srcset multipli
+        
+        // Filtra URL validi
+        if (this.isValidImageUrl(imageUrl)) {
+          imageUrls.add(imageUrl);
+        }
+      }
+    });
+    
+    // Converti in array e ordina per rilevanza
+    const sortedImages = Array.from(imageUrls).sort((a, b) => {
+      return this.calculateImageRelevanceScore(b) - this.calculateImageRelevanceScore(a);
+    });
+    
+    console.log(`🖼️ Trovati ${sortedImages.length} link immagine`);
+    if (sortedImages.length > 0) {
+      console.log(`🏆 Top 3 immagini: ${sortedImages.slice(0, 3).join(', ')}`);
+    }
+    
+    return sortedImages;
+  }
+
+  /**
+   * ✅ FIXED: Valida se un URL è una immagine valida
+   */
+  static isValidImageUrl(url) {
+    if (!url || typeof url !== 'string' || url.length === 0) return false;
+    
+    // Deve essere un URL valido
+    try {
+      const urlObj = new URL(url, 'https://example.com'); // Permetti URL relativi
+      
+      // Filtra immagini non desiderate
+      const unwantedPatterns = [
+        /favicon/i,
+        /logo/i,
+        /icon/i,
+        /sprite/i,
+        /placeholder/i,
+        /1x1\.gif/i,
+        /loading\.gif/i,
+        /\.svg$/i,  // Spesso loghi
+        /data:image/i, // Data URLs troppo lunghi
+        /base64/i
+      ];
+      
+      if (unwantedPatterns.some(pattern => pattern.test(url))) {
+        return false;
+      }
+      
+      // Deve avere estensione immagine o essere da CDN
+      const hasImageExt = /\.(jpg|jpeg|png|webp|gif)(\?|$)/i.test(url);
+      const isCDN = /cdn|images?|media|static|assets/i.test(url);
+      
+      return hasImageExt || isCDN;
+      
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * ✅ NUOVO: Calcola score di rilevanza per un'immagine
+   */
+  static calculateImageRelevanceScore(url) {
+    let score = 0;
+    
+    // Bonus per parole chiave indicative di immagini prodotto
+    const productKeywords = [
+      /product/i, /item/i, /detail/i, /main/i, /primary/i,
+      /large/i, /big/i, /zoom/i, /full/i, /hero/i,
+      /gallery/i, /photo/i, /picture/i
+    ];
+    
+    productKeywords.forEach(keyword => {
+      if (keyword.test(url)) score += 10;
+    });
+    
+    // Bonus per CDN di qualità
+    const qualityCDNs = [
+      /amazonaws\.com/i, /cloudfront/i, /akamai/i,
+      /fastly/i, /cloudflare/i, /imgix/i
+    ];
+    
+    qualityCDNs.forEach(cdn => {
+      if (cdn.test(url)) score += 5;
+    });
+    
+    // Malus per parole che indicano immagini secondarie
+    const secondaryKeywords = [
+      /thumb/i, /small/i, /mini/i, /avatar/i,
+      /badge/i, /tag/i, /label/i
+    ];
+    
+    secondaryKeywords.forEach(keyword => {
+      if (keyword.test(url)) score -= 5;
+    });
+    
+    // Bonus per dimensioni nell'URL (indicano immagini grandi)
+    const sizeMatch = url.match(/(\d{3,4})[x×](\d{3,4})/);
+    if (sizeMatch) {
+      const width = parseInt(sizeMatch[1]);
+      const height = parseInt(sizeMatch[2]);
+      if (width >= 500 && height >= 500) score += 15;
+      else if (width >= 300 && height >= 300) score += 10;
+    }
+    
+    return score;
+  }
+
+  /**
+   * ✅ FIXED: Estrae tutto il testo con limite 1500 caratteri e immagini prioritarie
    */
   static extractAllText(html) {
-    console.log('📝 Estraendo tutto il testo dalla pagina...');
+    console.log('📝 Estraendo testo (max 1500 chars) con immagini prioritarie...');
     
-    // Prima controlla se ci sono indicatori di prezzi nascosti in JSON
-    const jsonPriceData = this.extractPriceFromJSON(html);
+    // ✅ PRIMO: Estrai tutte le immagini DALL'HTML ORIGINALE con error handling
+    let allImages = [];
+    try {
+      allImages = this.extractAllImageUrls(html);
+    } catch (imageError) {
+      console.error('❌ Errore estrazione immagini:', imageError.message);
+      allImages = []; // Continua senza immagini
+    }
     
-    // Rimuovi solo script, style e commenti (mantieni tutto il resto)
-    let textOnly = html
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
-      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
-      .replace(/<!--[\s\S]*?-->/g, ' ')
-      .replace(/<[^>]*>/g, ' ')  // Rimuovi tutti i tag HTML
-      .replace(/\s+/g, ' ')      // Normalizza spazi multipli
-      .trim();
+    // ✅ SECONDO: Estrai prezzi JSON DALL'HTML ORIGINALE con error handling  
+    let jsonPriceData = null;
+    try {
+      jsonPriceData = this.extractPriceFromJSON(html);
+    } catch (priceError) {
+      console.error('❌ Errore estrazione prezzi JSON:', priceError.message);
+      jsonPriceData = null; // Continua senza prezzi JSON
+    }
     
-    // Se abbiamo trovato prezzi nei JSON, aggiungili al testo
+    // ✅ TERZO: Pulisci completamente l'HTML per ottenere solo testo
+    let textOnly = '';
+    try {
+      textOnly = html
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
+        .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
+        .replace(/<!--[\s\S]*?-->/g, ' ')
+        .replace(/<[^>]*>/g, ' ')  // Rimuovi TUTTI i tag HTML
+        .replace(/\s+/g, ' ')      // Normalizza spazi multipli
+        .trim();
+    } catch (textError) {
+      console.error('❌ Errore pulizia HTML:', textError.message);
+      textOnly = 'Errore nella pulizia del testo HTML';
+    }
+    
+    // ✅ QUARTO: Costruisci le sezioni prioritarie
+    let imageSection = '';
+    if (allImages.length > 0) {
+      // Prendi le migliori 5 immagini per non esagerare con la lunghezza
+      const topImages = allImages.slice(0, 5);
+      imageSection = `IMMAGINI PRODOTTO: ${topImages.join(' | ')} | `;
+      console.log(`🖼️ ${topImages.length} immagini aggiunte come prioritarie`);
+    }
+    
+    let priceSection = '';
     if (jsonPriceData) {
-      textOnly = `PREZZI TROVATI NEI DATI JSON: ${jsonPriceData} | ` + textOnly;
+      priceSection = `PREZZI JSON: ${jsonPriceData} | `;
       console.log(`💰 Prezzi estratti da JSON: ${jsonPriceData}`);
     }
     
-    // Limita la lunghezza per evitare token limit (circa 15-20k caratteri)
-    if (textOnly.length > 20000) {
-      console.log(`⚠️ Testo troppo lungo (${textOnly.length} chars), troncando...`);
-      textOnly = textOnly.substring(0, 20000) + '...';
+    // ✅ QUINTO: Calcola spazio disponibile per il testo pulito
+    const priorityContent = imageSection + priceSection;
+    const maxTextLength = 1500 - priorityContent.length;
+    
+    console.log(`📊 Spazi allocati:`);
+    console.log(`   - Immagini: ${imageSection.length} chars`);
+    console.log(`   - Prezzi: ${priceSection.length} chars`);
+    console.log(`   - Spazio per testo pulito: ${maxTextLength} chars`);
+    console.log(`   - Testo originale: ${textOnly.length} chars`);
+    
+    // ✅ SESTO: Tronca il testo pulito se necessario
+    if (maxTextLength > 0 && textOnly.length > maxTextLength) {
+      console.log(`⚠️ Testo pulito troppo lungo (${textOnly.length} chars), troncando a ${maxTextLength}...`);
+      textOnly = textOnly.substring(0, maxTextLength) + '...';
+    } else if (maxTextLength <= 0) {
+      console.log(`⚠️ Nessuno spazio rimasto per il testo (priorità = ${priorityContent.length} chars)`);
+      textOnly = ''; // Nessuno spazio per il testo
     }
     
-    console.log(`✅ Testo estratto: ${textOnly.length} caratteri`);
-    console.log(`📋 Preview: ${textOnly.substring(0, 300)}...`);
+    // ✅ SETTIMO: Componi risultato finale SOLO CON TESTO PULITO E IMMAGINI
+    const finalText = priorityContent + textOnly;
     
-    return textOnly;
+    console.log(`✅ Testo finale PULITO: ${finalText.length}/1500 caratteri`);
+    console.log(`📋 Preview: ${finalText.substring(0, 200)}...`);
+    
+    // ✅ Controllo finale sicurezza
+    if (finalText.length > 1500) {
+      console.log(`⚠️ ATTENZIONE: Testo supera 1500 caratteri (${finalText.length}), troncando...`);
+      return finalText.substring(0, 1500);
+    }
+    
+    return finalText;
   }
 
   /**
