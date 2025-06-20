@@ -8,14 +8,52 @@ export interface FirestoreSerializable {
   updatedAt?: Date;
 }
 
+export class ValidationError extends Error {
+  constructor(message: string, public errors: string[]) {
+    super(message);
+    this.name = 'ValidationError';
+  }
+}
+
+
+export interface ValidationResult {
+  isValid: boolean;
+  errors: string[];
+}
 export class UserLogin {
   constructor(
     public username: string,
     public role: "admin" | "user" = "user",
+    public email: string,  // ← Campo email obbligatorio
     public password: string
   ) {}
+
+  // Metodo helper per verificare se è admin
+  isAdmin(): boolean {
+    return this.role === "admin";
+  }
+
+  // Metodo per ottenere una versione sicura (senza password)
+  toSafeUser(): { username: string; role: "admin" | "user"; email: string; isAdmin(): boolean } {
+    return {
+      username: this.username,
+      role: this.role,
+      email: this.email,
+      isAdmin: () => this.isAdmin()
+    };
+  }
 }
 
+// Interfaccia per dati di validazione utente
+export interface UserLoginData {
+  username: string;
+  role: "admin" | "user";
+  email: string;
+  password: string;
+  displayName?: string;
+}
+
+// Classe User più completa per Firestore
 export class User implements FirestoreSerializable {
   constructor(
     public id: string,
@@ -27,6 +65,10 @@ export class User implements FirestoreSerializable {
     public createdAt: Date = new Date(),
     public lastLoginAt?: Date,
     public updatedAt?: Date,
+    public isActive: boolean = true,
+    // Campi per password cifrata
+    public passwordEncrypted?: string,
+    public passwordIV?: string
   ) {}
 
   static fromFirestore(data: any): User {
@@ -38,7 +80,11 @@ export class User implements FirestoreSerializable {
       data.displayName,
       data.photoURL,
       data.createdAt?.toDate() || new Date(),
-      data.lastLoginAt?.toDate()
+      data.lastLoginAt?.toDate(),
+      data.updatedAt?.toDate(),
+      data.isActive !== undefined ? data.isActive : true,
+      data.passwordEncrypted,
+      data.passwordIV
     );
   }
 
@@ -51,6 +97,10 @@ export class User implements FirestoreSerializable {
       photoURL: this.photoURL,
       createdAt: this.createdAt,
       lastLoginAt: this.lastLoginAt,
+      updatedAt: this.updatedAt || new Date(),
+      isActive: this.isActive,
+      passwordEncrypted: this.passwordEncrypted,
+      passwordIV: this.passwordIV
     };
     return removeUndefinedFields(data);
   }
@@ -58,20 +108,57 @@ export class User implements FirestoreSerializable {
   isAdmin(): boolean {
     return this.role === "admin";
   }
-}
 
-// ===== VALIDATION UTILITIES =====
-
-export interface ValidationResult {
-  isValid: boolean;
-  errors: string[];
-}
-
-export class ValidationError extends Error {
-  constructor(message: string, public errors: string[]) {
-    super(message);
-    this.name = 'ValidationError';
+  // Converte User in UserLogin per compatibilità
+  toUserLogin(password: string = ''): UserLogin {
+    return new UserLogin(
+      this.username,
+      this.role,
+      this.email || `${this.username}@familytasktracker.local`,
+      password
+    );
   }
+}
+
+// ===== VALIDATION FUNCTIONS =====
+
+export function validateUserLogin(data: Partial<UserLoginData>): string[] {
+  const errors: string[] = [];
+  
+  if (!data.username || data.username.trim().length === 0) {
+    errors.push("Username è obbligatorio");
+  }
+  
+  if (data.username && (data.username.length < 3 || data.username.length > 20)) {
+    errors.push("Username deve essere tra 3 e 20 caratteri");
+  }
+  
+  if (data.username && !/^[a-zA-Z0-9_-]+$/.test(data.username)) {
+    errors.push("Username può contenere solo lettere, numeri, _ e -");
+  }
+  
+  if (!data.email || !isValidEmail(data.email)) {
+    errors.push("Email valida è obbligatoria");
+  }
+  
+  if (!data.password || data.password.length < 6) {
+    errors.push("Password deve essere almeno 6 caratteri");
+  }
+  
+  if (data.role && !["admin", "user"].includes(data.role)) {
+    errors.push("Ruolo deve essere 'admin' o 'user'");
+  }
+  
+  if (data.displayName && (data.displayName.length < 2 || data.displayName.length > 50)) {
+    errors.push("Nome display deve essere tra 2 e 50 caratteri");
+  }
+  
+  return errors;
+}
+
+function isValidEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
 }
 
 // ===== SHOPPING ITEM MODELS =====

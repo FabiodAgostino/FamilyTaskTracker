@@ -1,7 +1,7 @@
 // 🔥 Generated Service Worker - DO NOT EDIT MANUALLY
-// Generated at: 2025-06-20T12:31:53.285Z
+// Generated at: 2025-06-20T13:25:11.081Z
 // Environment: development
-// Version: 1.0.0-test
+// Version: 1.0.0
 
 // client/public/firebase-messaging-sw.template.js
 // 🔥 Template Service Worker - I placeholder verranno sostituiti durante il build
@@ -12,21 +12,21 @@ importScripts('https://www.gstatic.com/firebasejs/11.9.1/firebase-messaging-comp
 
 // 🔧 Configurazione Firebase da variabili d'ambiente (placeholder)
 const firebaseConfig = {
-  apiKey: "test-api-key-replace-with-real-one",
-  authDomain: "familytasktracker-c2dfe.firebaseapp.com",
-  projectId: "familytasktracker-c2dfe",
-  storageBucket: "familytasktracker-c2dfe.firebasestorage.app",
-  messagingSenderId: "984085570940",
-  appId: "1:984085570940:web:ddc61b61702341939130f9",
-  measurementId: "G-2TFQZKTN8G"
+  apiKey: "",
+  authDomain: "",
+  projectId: "",
+  storageBucket: "",
+  messagingSenderId: "",
+  appId: "",
+  measurementId: ""
 };
 
 // 🔧 Configurazioni da variabili d'ambiente
 const APP_CONFIG = {
   appName: "Family Task Tracker",
-  baseUrl: "./",
-  environment: "local",
-  version: "1.0.0-test"
+  baseUrl: "/FamilyTaskTracker/",
+  environment: "development",
+  version: "1.0.0"
 };
 
 // 🍎 Try-catch per iOS Safari compatibility
