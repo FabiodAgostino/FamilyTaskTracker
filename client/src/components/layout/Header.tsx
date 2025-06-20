@@ -1,4 +1,4 @@
-import { Home, LogOut, Menu, User, Sun, Moon, ExternalLink, Settings, ChevronDown } from 'lucide-react';
+import { Home, LogOut, Menu, User, Sun, Moon, ExternalLink, Settings, ChevronDown, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -43,6 +43,8 @@ export function Header({ onMenuToggle }: HeaderProps) {
 
   // ✅ NUOVO: Logica per il tema personalizzato
   const isTopiniTheme = user?.username === 'Fabio' || user?.username === 'Ludovica';
+  // ✅ FIX: Controllo admin senza usare isAdmin()
+  const isAdmin = user?.role === 'admin';
   
   const appConfig = isTopiniTheme 
     ? {
@@ -95,7 +97,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
             </div>
           </div>
 
-          {/* Navigazione - FIXATO: tutto insieme */}
+          {/* Navigazione - tutto insieme */}
           <nav className="hidden md:flex space-x-8">
             {navItems.map((item) => (
               <Link key={item.name} href={item.path}>
@@ -109,73 +111,17 @@ export function Header({ onMenuToggle }: HeaderProps) {
               </Link>
             ))}
             
-            {/* ✅ FIXATO: Link TripTaste adesso è dentro la nav */}
-            <a 
-              href="https://fabiodagostino.github.io/TripTaste/#/" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="font-medium px-1 pb-4 border-b-2 transition-colors cursor-pointer block text-muted-foreground hover:text-delft-blue border-transparent hover:border-muted flex items-center gap-1"
-            >
-              TripTaste
-              <ExternalLink className="h-3 w-3" />
-            </a>
           </nav>
 
           {/* Menu utente e controls */}
           <div className="flex items-center space-x-2">
-            {/* Link TripTaste per mobile (visibile solo su mobile) */}
-            <div className="md:hidden">
-              <Button
-                variant="ghost"
-                size="sm"
-                asChild
-                className="text-muted-foreground hover:text-delft-blue w-9 h-9 rounded-full"
-              >
-                <a 
-                  href="https://fabiodagostino.github.io/TripTaste/#/" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center"
-                  title="TripTaste"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                </a>
-              </Button>
-            </div>
+            {/* ✅ RIMOSSO: Link TripTaste per mobile */}
 
-            {/* ✅ MANTENUTO: Dark Mode Toggle */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={toggleTheme}
-              className="w-9 h-9 rounded-full text-muted-foreground hover:text-delft-blue hover:bg-muted transition-colors"
-              title={theme === 'light' ? 'Attiva modalità scura' : 'Attiva modalità chiara'}
-            >
-              {theme === 'light' ? (
-                <Moon className="h-4 w-4" />
-              ) : (
-                <Sun className="h-4 w-4" />
-              )}
-            </Button>
+            {/* ✅ RIMOSSO: Dark Mode Toggle - ora solo nel dropdown */}
 
-            {/* Notifiche */}
-            {isSupported && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={requestPermission}
-                className="w-9 h-9 rounded-full text-muted-foreground hover:text-delft-blue hover:bg-muted transition-colors"
-                title={permission === 'granted' ? 'Notifiche attive' : 'Attiva notifiche'}
-              >
-                {permission === 'granted' ? (
-                  <Bell className="h-4 w-4" />
-                ) : (
-                  <BellOff className="h-4 w-4" />
-                )}
-              </Button>
-            )}
+            {/* ✅ RIMOSSO: Notifiche - ora solo nel dropdown */}
 
-            {/* ✅ NUOVO: User Dropdown Menu */}
+            {/* ✅ User Dropdown Menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button 
@@ -225,15 +171,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
                 
                 <DropdownMenuSeparator />
                 
-                {/* Menu Items */}
-                <DropdownMenuItem asChild>
-                  <Link href="/settings" className="flex items-center cursor-pointer">
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Impostazioni</span>
-                  </Link>
-                </DropdownMenuItem>
-                
-                {/* Azioni tema (opzionale) */}
+                {/* ✅ AGGIUNTO: Toggle tema nel dropdown */}
                 <DropdownMenuItem onClick={toggleTheme} className="flex items-center cursor-pointer">
                   {theme === 'light' ? (
                     <Moon className="mr-2 h-4 w-4" />
@@ -243,7 +181,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
                   <span>{theme === 'light' ? 'Tema Scuro' : 'Tema Chiaro'}</span>
                 </DropdownMenuItem>
 
-                {/* Notifiche nel menu */}
+                {/* ✅ AGGIUNTO: Notifiche nel dropdown */}
                 {isSupported && (
                   <DropdownMenuItem onClick={requestPermission} className="flex items-center cursor-pointer">
                     {permission === 'granted' ? (
@@ -254,6 +192,26 @@ export function Header({ onMenuToggle }: HeaderProps) {
                     <span>
                       {permission === 'granted' ? 'Notifiche Attive' : 'Attiva Notifiche'}
                     </span>
+                  </DropdownMenuItem>
+                )}
+
+                <DropdownMenuSeparator />
+                
+                {/* Menu Items */}
+                <DropdownMenuItem asChild>
+                  <Link href="/settings" className="flex items-center cursor-pointer">
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Impostazioni</span>
+                  </Link>
+                </DropdownMenuItem>
+                
+                {/* ✅ AGGIUNTO: Menu amministrazione solo per admin */}
+                {isAdmin && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin/users" className="flex items-center cursor-pointer">
+                      <Users className="mr-2 h-4 w-4" />
+                      <span>Gestione Utenti</span>
+                    </Link>
                   </DropdownMenuItem>
                 )}
                 
@@ -307,6 +265,16 @@ export function Header({ onMenuToggle }: HeaderProps) {
                     </Link>
                   </DropdownMenuItem>
                   
+                  {/* ✅ AGGIUNTO: Gestione utenti anche su mobile per admin */}
+                  {isAdmin && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin/users" className="flex items-center cursor-pointer">
+                        <Users className="mr-2 h-4 w-4" />
+                        <span>Gestione Utenti</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                  
                   <DropdownMenuSeparator />
                   
                   <DropdownMenuItem 
@@ -319,8 +287,6 @@ export function Header({ onMenuToggle }: HeaderProps) {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
-            
-            {/* ✅ RIMOSSO: Logout diretto - ora è nel dropdown */}
           </div>
         </div>
       </div>

@@ -50,27 +50,44 @@ export function LoginForm() {
   });
 
   // Carica la lista degli utenti disponibili al mount
-  useEffect(() => {
-    const loadUsers = async () => {
-      try {
-        setIsLoadingUsers(true);
-        const users = await AuthService.getAvailableUsers();
-        setAvailableUsers(users);
-      } catch (error) {
-        console.error('Errore nel caricamento utenti:', error);
-        // Fallback per utenti hardcoded se Firestore non funziona
-        setAvailableUsers([
-          { username: 'admin', displayName: 'Amministratore', role: 'admin' },
-          { username: 'Fabio', displayName: 'Fabio (Membro della famiglia)', role: 'user' },
-          { username: 'Ludovica', displayName: 'Ludovica (Membro della famiglia)', role: 'user' },
-        ]);
-      } finally {
-        setIsLoadingUsers(false);
-      }
-    };
+useEffect(() => {
+  const loadUsers = async () => {
+    try {
+      setIsLoadingUsers(true);
+      const users = await AuthService.getAvailableUsers();
+      setAvailableUsers(users);
+    } catch (error) {
+      console.error('Errore nel caricamento utenti:', error);
+      
+      const generateDisplayName = (username: string, role: string) => {
+        if (role === 'admin') {
+          return `${username} (Amministratore)`;
+        }
+        
+        const capitalized = username.charAt(0).toUpperCase() + username.slice(1);
+        return `${capitalized} (Membro della famiglia)`;
+      };
+      
+      const fallbackUsers = ['admin', 'Fabio', 'Ludovica'];
+      
+      const fallbackData = fallbackUsers.map(username => {
+        const role = username === 'admin' ? 'admin' : 'user';
+        return {
+          username,
+          displayName: generateDisplayName(username, role),
+          role
+        };
+      });
+      
+      setAvailableUsers(fallbackData);
+      
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  };
 
-    loadUsers();
-  }, []);
+  loadUsers();
+}, []);
 
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);

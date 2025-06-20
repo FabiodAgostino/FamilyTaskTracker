@@ -1,7 +1,7 @@
 // client/src/components/admin/UserManagement.tsx
 
 import { useState, useEffect } from 'react';
-import { Users, Plus, Edit, Trash2, Shield, Mail, Calendar, Key, Copy, Check } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, Shield, Mail, Calendar, Key, Copy, Check, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -16,10 +16,10 @@ import { z } from 'zod';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useFirestore } from '@/hooks/useFirestore';
 import { User } from '@/lib/models/types';
-import { UserCredentialGenerator } from '@/lib/auth';
+import { PasswordCrypto } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
 
-// Schema per creazione utente
+// Schema per creazione utente con password personalizzata
 const createUserSchema = z.object({
   username: z.string()
     .min(3, 'Username deve essere almeno 3 caratteri')
@@ -31,6 +31,9 @@ const createUserSchema = z.object({
   displayName: z.string()
     .min(2, 'Nome display troppo corto')
     .max(50, 'Nome display troppo lungo'),
+  password: z.string()
+    .min(6, 'Password deve essere almeno 6 caratteri')
+    .max(50, 'Password troppo lunga'),
   role: z.enum(['admin', 'user'], {
     required_error: 'Seleziona un ruolo'
   })
@@ -55,6 +58,7 @@ export function UserManagement() {
   const [isCreating, setIsCreating] = useState(false);
   const [generatedCredentials, setGeneratedCredentials] = useState<GeneratedCredentials | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<CreateUserData>({
     resolver: zodResolver(createUserSchema),
@@ -62,12 +66,13 @@ export function UserManagement() {
       username: '',
       email: '',
       displayName: '',
+      password: '',
       role: 'user'
     }
   });
 
   // Solo gli admin possono accedere
-  if (!currentUser?.isAdmin()) {
+  if (currentUser?.role !== "admin") {
     return (
       <div className="p-6">
         <Card>
@@ -92,40 +97,35 @@ export function UserManagement() {
         throw new Error('Username già esistente');
       }
 
-      // Genera credenziali sicure
-      const credentials = await UserCredentialGenerator.generateUserCredentials(
-        data.username,
-        data.role,
-        data.email,
-        data.displayName
-      );
+      // Cifra la password inserita dall'utente
+      const { encrypted, iv } = await PasswordCrypto.encryptPassword(data.password);
 
       // Prepara dati per Firestore
       const userData = new User(
         '', // ID verrà generato da Firestore
-        credentials.username,
-        credentials.role,
-        credentials.email,
-        credentials.displayName,
+        data.username,
+        data.role,
+        data.email,
+        data.displayName,
         undefined, // photoURL
         new Date(), // createdAt
         undefined, // lastLoginAt
         new Date(), // updatedAt
         true, // isActive
-        credentials.encryptedData.passwordEncrypted,
-        credentials.encryptedData.passwordIV
+        encrypted, // passwordEncrypted
+        iv // passwordIV
       );
 
       // Salva in Firestore
       await add(userData);
 
-      // Mostra credenziali generate
+      // Mostra credenziali create
       setGeneratedCredentials({
-        username: credentials.username,
-        password: credentials.password,
-        email: credentials.email,
-        displayName: credentials.displayName,
-        role: credentials.role
+        username: data.username,
+        password: data.password,
+        email: data.email,
+        displayName: data.displayName,
+        role: data.role
       });
 
       // Reset form
@@ -133,7 +133,7 @@ export function UserManagement() {
       
       toast({
         title: 'Utente creato con successo!',
-        description: `L'utente ${credentials.username} è stato creato. Salva la password generata.`
+        description: `L'utente ${data.username} è stato creato.`
       });
 
     } catch (error) {
@@ -229,13 +229,13 @@ export function UserManagement() {
             </DialogHeader>
             
             {generatedCredentials ? (
-              // Mostra credenziali generate
+              // Mostra credenziali create
               <div className="space-y-4">
                 <Alert>
                   <Key className="h-4 w-4" />
                   <AlertDescription>
                     <strong>Utente creato con successo!</strong><br />
-                    Salva queste credenziali - la password non verrà più mostrata.
+                    Ecco le credenziali dell'utente:
                   </AlertDescription>
                 </Alert>
 
@@ -257,7 +257,7 @@ export function UserManagement() {
                   <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
                     <div>
                       <label className="text-sm font-medium text-gray-600">Password</label>
-                      <p className="font-mono text-red-600 font-semibold">{generatedCredentials.password}</p>
+                      <p className="font-mono text-blue-600 font-semibold">{generatedCredentials.password}</p>
                     </div>
                     <Button
                       variant="outline"
@@ -342,6 +342,39 @@ export function UserManagement() {
                         <FormLabel>Nome Completo</FormLabel>
                         <FormControl>
                           <Input placeholder="Marco Rossi" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Password</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Input 
+                              type={showPassword ? "text" : "password"}
+                              placeholder="Inserisci una password sicura" 
+                              {...field} 
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                              onClick={() => setShowPassword(!showPassword)}
+                            >
+                              {showPassword ? (
+                                <EyeOff className="h-4 w-4" />
+                              ) : (
+                                <Eye className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>

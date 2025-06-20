@@ -1,4 +1,4 @@
-import { ShoppingCart, StickyNote, Calendar, User, Clock } from 'lucide-react';
+import { ShoppingCart, StickyNote, Calendar, User, Clock, ExternalLink } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
@@ -146,6 +146,24 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 </Link>
               );
             })}
+
+            {/* ✅ AGGIUNTO: Separatore */}
+            <div className="border-t border-border my-4"></div>
+
+            {/* ✅ AGGIUNTO: Link a TripTaste */}
+            <a 
+              href="https://fabiodagostino.github.io/TripTaste/#/" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="group flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200 cursor-pointer text-muted-foreground hover:bg-muted hover:text-card-foreground border border-transparent"
+              onClick={() => window.innerWidth < 1024 && onClose()}
+            >
+              <ExternalLink className="mr-3 h-5 w-5 transition-colors text-muted-foreground group-hover:text-card-foreground" />
+              <span className="flex-1">TripTaste</span>
+              <span className="text-xs px-2 py-1 rounded-full font-medium transition-colors bg-muted text-muted-foreground group-hover:bg-muted-foreground/10">
+                🌍
+              </span>
+            </a>
           </nav>
           
           {/* ✅ MIGLIORATO: Footer statistiche con dati reali */}

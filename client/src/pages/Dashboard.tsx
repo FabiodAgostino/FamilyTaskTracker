@@ -1,18 +1,27 @@
-// client/src/pages/Dashboard.tsx - RIPRISTINO originale
+// client/src/pages/Dashboard.tsx - Con User Management
 import { Route, Switch, Redirect } from 'wouter';
 import { Layout } from '@/components/layout/Layout';
 import { ShoppingList } from '@/components/shopping/ShoppingList';
 import { NotesList } from '@/components/notes/NotesList';
 import { Calendar } from '@/components/calendar/Calendar';
+import { UserManagement } from '@/components/admin/UserManagement';
+import { useAuthContext } from '@/contexts/AuthContext';
 
 export default function Dashboard() {
+  const { user } = useAuthContext();
+  
   return (
     <Layout>
-      {/* 🔄 RIPRISTINO: Hash routing originale con redirect */}
       <Switch>
         <Route path="/shopping" component={ShoppingList} />
         <Route path="/notes" component={NotesList} />
         <Route path="/calendar" component={Calendar} />
+        
+        {/* Route per gestione utenti - solo per admin */}
+        {user?.role === 'admin' && (
+          <Route path="/admin/users" component={UserManagement} />
+        )}
+        
         <Route path="/">
           <Redirect to="/shopping" />
         </Route>

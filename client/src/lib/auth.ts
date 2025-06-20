@@ -36,7 +36,7 @@ const AUTH_CONFIG = {
 /**
  * Manager per cifratura sicura delle password
  */
-class PasswordCrypto {
+export class PasswordCrypto {
   private static readonly ENCRYPTION_KEY = import.meta.env.VITE_PASSWORD_ENCRYPTION_KEY;
   
   /**
