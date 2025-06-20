@@ -12,10 +12,15 @@ export default defineConfig({
     },
   },
   root: path.resolve(__dirname, "client"),
+  
   build: {
-    // 🔧 Output nella cartella docs per GitHub Pages
+    // 🔧 Output corretta per GitHub Pages
     outDir: path.resolve(__dirname, "docs"),
     emptyOutDir: true,
+    
+    // 🍎 Configurazioni per iOS Safari
+    target: ['es2015', 'safari11'],
+    
     rollupOptions: {
       output: {
         manualChunks: {
@@ -24,23 +29,36 @@ export default defineConfig({
         }
       }
     },
-    // 🍎 Ottimizzazioni specifiche per iOS Safari
-    target: ['es2015', 'safari11'], // Compatibilità Safari iOS
-    cssCodeSplit: false, // Evita problemi CSS splitting su iOS
+    
+    // 🚀 Ottimizzazioni iOS
+    cssCodeSplit: false,
+    minify: 'esbuild',  // ✅ Esbuild è default e più veloce
+    sourcemap: false
   },
+  
   server: {
     port: 3000,
     host: true,
   },
-  // 🔧 Base path per GitHub Pages - usa il nome del tuo repository
-  base: process.env.NODE_ENV === 'production' ? '/FamilyTaskTracker/' : './',
+  
+  // 🌐 Base path per GitHub Pages
+  base: '/FamilyTaskTracker/',
+  
+  // 🍎 Definizioni globali per iOS
   define: {
-    __VUE_PROD_DEVTOOLS__: false,
-    __VUE_OPTIONS_API__: true,
-    __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: false
+    global: 'globalThis',
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
   },
-  // 🍎 Headers specifici per iOS
+  
+  // 🔧 Ottimizzazioni dependency
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'firebase/app', 'firebase/auth', 'firebase/firestore']
+  },
+  
+  // 📱 Headers preview
   preview: {
+    port: 4173,
+    host: true,
     headers: {
       'Cache-Control': 'no-cache, no-store, must-revalidate',
       'Pragma': 'no-cache',
