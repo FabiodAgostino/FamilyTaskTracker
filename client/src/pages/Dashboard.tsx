@@ -1,7 +1,7 @@
-// Dashboard.tsx
+// client/src/pages/Dashboard.tsx
 import { Route, Switch, Redirect } from 'wouter';
 import { Layout } from '@/components/layout/Layout';
-import { ShoppingList } from '@/components/shopping/ShoppingList'; // ✅ Ora funziona!
+import { ShoppingList } from '@/components/shopping/ShoppingList';
 import { NotesList } from '@/components/notes/NotesList';
 import { Calendar } from '@/components/calendar/Calendar';
 

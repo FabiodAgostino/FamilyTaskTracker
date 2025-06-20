@@ -1,4 +1,4 @@
-import { Switch, Route, Router } from "wouter";
+import { Switch, Route } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
@@ -8,35 +8,16 @@ import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { UserPreferencesProvider } from "./contexts/UserPreferencesContext";
-// ✅ NUOVO: Import UserSettings
 import UserSettings from "@/components/settings/UserSettings";
-import { useCallback, useEffect, useState } from "react";
-
-// ✅ SPOSTATO FUORI: Hook personalizzato per GitHub Pages routing
-function useHashLocation(): [string, (path: string) => void] {
-  const [hash, setHash] = useState(window.location.hash.slice(1) || '/');
-  
-  useEffect(() => {
-    const handler = () => setHash(window.location.hash.slice(1) || '/');
-    window.addEventListener('hashchange', handler);
-    return () => window.removeEventListener('hashchange', handler);
-  }, []);
-
-  const navigate = useCallback((to: string) => {
-    window.location.hash = to;
-  }, []);
-
-  return [hash, navigate];
-}
 
 function AppContent() {
   const { user, isLoading } = useAuthContext();
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-eggshell flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-burnt-sienna"></div>
-        <span className="ml-3 text-delft-blue font-medium">Loading...</span>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <span className="ml-3 text-foreground font-medium">Loading...</span>
       </div>
     );
   }
@@ -45,19 +26,17 @@ function AppContent() {
     return <Login />;
   }
 
-  // ✅ NUOVO: Router con rotta Settings
+  // 🔥 NORMAL ROUTING - come TripTaste
   return (
     <Switch>
-      {/* ✅ Rotta Settings */}
       <Route path="/settings">
-        <div className="min-h-screen bg-eggshell dark:bg-delft-blue">
+        <div className="min-h-screen bg-background">
           <div className="container mx-auto p-6">
             <UserSettings />
           </div>
         </div>
       </Route>
       
-      {/* Dashboard principale (default) */}
       <Route>
         <Dashboard />
       </Route>
@@ -72,10 +51,9 @@ function App() {
         <TooltipProvider>
           <AuthProvider>
             <UserPreferencesProvider>
-              {/* ✅ CORRETTO: useHashLocation ora è accessibile */}
-              <Router hook={useHashLocation}>
-                <AppContent />
-              </Router>
+              {/* 🔥 RIMUOVO: Router con useHashLocation custom hook */}
+              {/* 🔥 USO: Normal wouter routing (come TripTaste) */}
+              <AppContent />
             </UserPreferencesProvider>
           </AuthProvider>
         </TooltipProvider>
