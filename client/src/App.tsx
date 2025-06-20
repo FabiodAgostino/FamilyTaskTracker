@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Router } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
@@ -9,6 +9,35 @@ import Dashboard from "@/pages/Dashboard";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { UserPreferencesProvider } from "./contexts/UserPreferencesContext";
 import UserSettings from "@/components/settings/UserSettings";
+import { useCallback, useEffect, useState } from "react";
+
+// 🔄 RIPRISTINO: Hook hash routing originale (ma con fix iPhone)
+function useHashLocation(): [string, (path: string) => void] {
+  const [hash, setHash] = useState(() => {
+    const currentHash = window.location.hash.slice(1) || '/';
+    return currentHash;
+  });
+  
+  useEffect(() => {
+    const handler = () => {
+      const newHash = window.location.hash.slice(1) || '/';
+      setHash(newHash);
+    };
+    
+    window.addEventListener('hashchange', handler);
+    return () => window.removeEventListener('hashchange', handler);
+  }, []);
+
+  const navigate = useCallback((to: string) => {
+    try {
+      window.location.hash = to;
+    } catch (error) {
+      console.error('Navigation error:', error);
+    }
+  }, []);
+
+  return [hash, navigate];
+}
 
 function AppContent() {
   const { user, isLoading } = useAuthContext();
@@ -26,7 +55,7 @@ function AppContent() {
     return <Login />;
   }
 
-  // 🔥 NORMAL ROUTING - come TripTaste
+  // 🔄 RIPRISTINO: Switch routing come prima
   return (
     <Switch>
       <Route path="/settings">
@@ -51,9 +80,10 @@ function App() {
         <TooltipProvider>
           <AuthProvider>
             <UserPreferencesProvider>
-              {/* 🔥 RIMUOVO: Router con useHashLocation custom hook */}
-              {/* 🔥 USO: Normal wouter routing (come TripTaste) */}
-              <AppContent />
+              {/* 🔄 RIPRISTINO: Router con useHashLocation */}
+              <Router hook={useHashLocation}>
+                <AppContent />
+              </Router>
             </UserPreferencesProvider>
           </AuthProvider>
         </TooltipProvider>

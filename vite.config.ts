@@ -32,7 +32,7 @@ export default defineConfig({
     
     // 🚀 Ottimizzazioni iOS
     cssCodeSplit: false,
-    minify: 'esbuild',  // ✅ Esbuild è default e più veloce
+    minify: 'esbuild',
     sourcemap: false
   },
   
