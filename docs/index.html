@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <title>Family Task Manager</title>
+    <meta name="description" content="Manage your family's shopping lists, notes, and calendar events all in one place.">
+    
+    <!-- 🔥 I 3 TAG ESSENZIALI per iOS PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <link rel="manifest" href="/FamilyTaskTracker/manifest.json">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    
+    <!-- 🎨 Theme color -->
+    <meta name="theme-color" content="#E07A5F">
+    
+    <!-- 🔧 Fix cache iOS (per il tuo bug specifico) -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    
+    <!-- 🎨 Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script type="module" crossorigin src="/FamilyTaskTracker/assets/index-CSoqdCM0.js"></script>
+    <link rel="modulepreload" crossorigin href="/FamilyTaskTracker/assets/vendor--uqtI3XV.js">
+    <link rel="modulepreload" crossorigin href="/FamilyTaskTracker/assets/firebase-BNNddIYC.js">
+    <link rel="stylesheet" crossorigin href="/FamilyTaskTracker/assets/style-gDDN2b_Q.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    
+    <!-- 🔧 Fix schermata bianca iOS -->
+    <script>
+      // Forza refresh se schermata bianca dopo 3 secondi
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          const root = document.getElementById('root');
+          if (root && root.children.length === 0) {
+            console.log('🔄 Blank screen detected, reloading...');
+            window.location.reload();
+          }
+        }, 3000);
+      });
+    </script>
+  </body>
+</html>

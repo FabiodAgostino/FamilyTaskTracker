@@ -46,12 +46,12 @@ jobs:
           VITE_GOOGLE_SEARCH_ENGINE_ID=${{ secrets.GOOGLE_SEARCH_ENGINE_ID }}
           VITE_APP_NAME=Family Task Tracker
           VITE_APP_VERSION=1.0.0
-          NODE_ENV=production
           EOF
           
       - name: Build
         run: npm run build
         env:
+          NODE_ENV: production
           VITE_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
           VITE_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}

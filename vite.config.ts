@@ -13,9 +13,9 @@ export default defineConfig({
   },
   root: path.resolve(__dirname, "client"),
   build: {
-    outDir: path.resolve(__dirname, "dist"),
+    // 🔧 Output nella cartella docs per GitHub Pages
+    outDir: path.resolve(__dirname, "docs"),
     emptyOutDir: true,
-    // 🔧 Fix per iOS: assicura che i file siano serviti correttamente
     rollupOptions: {
       output: {
         manualChunks: {
@@ -32,8 +32,8 @@ export default defineConfig({
     port: 3000,
     host: true,
   },
-  // 🔧 PWA e iOS fixes
-  base: './', // Path relativo per GitHub Pages
+  // 🔧 Base path per GitHub Pages - usa il nome del tuo repository
+  base: process.env.NODE_ENV === 'production' ? '/FamilyTaskTracker/' : './',
   define: {
     __VUE_PROD_DEVTOOLS__: false,
     __VUE_OPTIONS_API__: true,
