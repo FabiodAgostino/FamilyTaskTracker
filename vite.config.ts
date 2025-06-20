@@ -13,17 +13,38 @@ export default defineConfig({
   },
   root: path.resolve(__dirname, "client"),
   build: {
-    outDir: path.resolve(__dirname, "docs"), // Output in docs per GitHub Pages
+    outDir: path.resolve(__dirname, "dist"),
     emptyOutDir: true,
+    // 🔧 Fix per iOS: assicura che i file siano serviti correttamente
     rollupOptions: {
       output: {
-        manualChunks: undefined,
-      },
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore']
+        }
+      }
     },
+    // 🍎 Ottimizzazioni specifiche per iOS Safari
+    target: ['es2015', 'safari11'], // Compatibilità Safari iOS
+    cssCodeSplit: false, // Evita problemi CSS splitting su iOS
   },
   server: {
     port: 3000,
     host: true,
   },
-  base: "./",
+  // 🔧 PWA e iOS fixes
+  base: './', // Path relativo per GitHub Pages
+  define: {
+    __VUE_PROD_DEVTOOLS__: false,
+    __VUE_OPTIONS_API__: true,
+    __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: false
+  },
+  // 🍎 Headers specifici per iOS
+  preview: {
+    headers: {
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    }
+  }
 });

@@ -1,16 +1,42 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="it">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
     <title>Family Task Manager</title>
-    <meta name="description" content="Manage your family's shopping lists, notes, and calendar events all in one place. Simple and efficient family task management.">
+    <meta name="description" content="Manage your family's shopping lists, notes, and calendar events all in one place.">
+    
+    <!-- 🔥 I 3 TAG ESSENZIALI per iOS PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    
+    <!-- 🎨 Theme color -->
+    <meta name="theme-color" content="#E07A5F">
+    
+    <!-- 🔧 Fix cache iOS (per il tuo bug specifico) -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    
+    <!-- 🎨 Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <!-- This is a replit script which adds a banner on the top of the page when opened in development mode outside the replit environment -->
-    <script type="text/javascript" src="https://replit.com/public/js/replit-dev-banner.js"></script>
+    
+    <!-- 🔧 Fix schermata bianca iOS -->
+    <script>
+      // Forza refresh se schermata bianca dopo 3 secondi
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          const root = document.getElementById('root');
+          if (root && root.children.length === 0) {
+            console.log('🔄 Blank screen detected, reloading...');
+            window.location.reload();
+          }
+        }, 3000);
+      });
+    </script>
   </body>
 </html>

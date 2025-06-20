@@ -61,10 +61,8 @@ exports.onShoppingItemCreated = functions
     
     // ✅ CORS CONFIGURABILE PER AMBIENTE
     const allowedOrigins = [
-      'http://localhost:3000',                           // Sviluppo
-      'http://localhost:5173',                           // Vite dev server
-      'https://familytasktracker-c2dfe.web.app',        // Firebase Hosting
-      'https://familytasktracker-c2dfe.firebaseapp.com' // Firebase Hosting alternativo
+      'http://localhost:3000',
+      'https://fabiodagostino.github.io',                         
     ];
 
     const origin = req.get('Origin');
