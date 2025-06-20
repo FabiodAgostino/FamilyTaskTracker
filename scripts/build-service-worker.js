@@ -16,9 +16,25 @@ function buildServiceWorker() {
   try {
     console.log('🔄 Generando service worker...');
 
-    // Percorsi file
-    const templatePath = path.join(__dirname, '../client/public/firebase-messaging-sw.template.js');
-    const outputPath = path.join(__dirname, '../client/public/firebase-messaging-sw.js');
+    // Determina i percorsi corretti in base alla directory di esecuzione
+    const currentDir = process.cwd();
+    const isRunningFromClient = currentDir.endsWith('client');
+    
+    let templatePath, outputPath;
+    
+    if (isRunningFromClient) {
+      // Eseguito da client/
+      templatePath = path.join(__dirname, '../public/firebase-messaging-sw.template.js');
+      outputPath = path.join(__dirname, '../public/firebase-messaging-sw.js');
+    } else {
+      // Eseguito dalla root
+      templatePath = path.join(__dirname, '../client/public/firebase-messaging-sw.template.js');
+      outputPath = path.join(__dirname, '../client/public/firebase-messaging-sw.js');
+    }
+
+    console.log(`📁 Current directory: ${currentDir}`);
+    console.log(`📄 Template path: ${templatePath}`);
+    console.log(`📄 Output path: ${outputPath}`);
 
     // Verifica che il template esista
     if (!fs.existsSync(templatePath)) {
@@ -114,7 +130,16 @@ function buildServiceWorker() {
  * Pulisce il service worker generato (per cleanup)
  */
 function cleanServiceWorker() {
-  const outputPath = path.join(__dirname, '../client/public/firebase-messaging-sw.js');
+  const currentDir = process.cwd();
+  const isRunningFromClient = currentDir.endsWith('client');
+  
+  let outputPath;
+  
+  if (isRunningFromClient) {
+    outputPath = path.join(__dirname, '../public/firebase-messaging-sw.js');
+  } else {
+    outputPath = path.join(__dirname, '../client/public/firebase-messaging-sw.js');
+  }
   
   if (fs.existsSync(outputPath)) {
     fs.unlinkSync(outputPath);

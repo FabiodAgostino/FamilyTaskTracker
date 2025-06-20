@@ -91,25 +91,19 @@ jobs:
           
       - name: 🔧 Generate Service Worker
         run: |
-          cd client
-          echo "🔄 Creating scripts directory..."
-          mkdir -p scripts
-          
-          echo "🔄 Copying build scripts..."
-          cp ../scripts/build-service-worker.js scripts/
-          cp ../scripts/verify-build.js scripts/
-          
           echo "🔄 Generating service worker with environment variables..."
           node scripts/build-service-worker.js build
           
           echo "🔍 Verifying service worker was generated..."
-          if [ ! -f "public/firebase-messaging-sw.js" ]; then
+          if [ ! -f "client/public/firebase-messaging-sw.js" ]; then
             echo "❌ Service worker not generated!"
+            ls -la client/public/
+            echo "Template exists: $(ls -la client/public/firebase-messaging-sw.template.js 2>/dev/null || echo 'NO')"
             exit 1
           fi
           
           echo "✅ Service worker generated successfully"
-          echo "📊 Service worker size: $(wc -c < public/firebase-messaging-sw.js) bytes"
+          echo "📊 Service worker size: $(wc -c < client/public/firebase-messaging-sw.js) bytes"
         env:
           # Pass all environment variables to the build script
           VITE_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
@@ -153,7 +147,6 @@ jobs:
         
       - name: 🏗️ Build Application
         run: |
-          cd client
           npm run build
         env:
           NODE_ENV: production
@@ -173,12 +166,11 @@ jobs:
           
       - name: 📋 Copy Service Worker to Docs
         run: |
-          cd client
           echo "📋 Copying service worker to docs folder..."
-          cp public/firebase-messaging-sw.js ../docs/
+          cp client/public/firebase-messaging-sw.js docs/
           
           echo "🔍 Verifying service worker in docs..."
-          if [ ! -f "../docs/firebase-messaging-sw.js" ]; then
+          if [ ! -f "docs/firebase-messaging-sw.js" ]; then
             echo "❌ Service worker not found in docs!"
             exit 1
           fi
@@ -187,14 +179,13 @@ jobs:
           
       - name: 🔍 Final Build Verification
         run: |
-          cd client
           echo "🔍 Running final build verification..."
           node scripts/verify-build.js
           
           echo "📊 Build statistics:"
-          echo "  - Docs folder size: $(du -sh ../docs | cut -f1)"
-          echo "  - Service worker size: $(wc -c < ../docs/firebase-messaging-sw.js) bytes"
-          echo "  - Total files in docs: $(find ../docs -type f | wc -l)"
+          echo "  - Docs folder size: $(du -sh docs | cut -f1)"
+          echo "  - Service worker size: $(wc -c < docs/firebase-messaging-sw.js) bytes"
+          echo "  - Total files in docs: $(find docs -type f | wc -l)"
         
       - name: 📤 Setup GitHub Pages
         uses: actions/configure-pages@v5
