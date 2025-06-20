@@ -1,4 +1,4 @@
-// src/hooks/useNotifications.ts
+// src/hooks/useNotifications.ts - FIX iOS Safari
 import { useEffect, useState } from 'react';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 import { useToast } from './use-toast';
@@ -12,6 +12,29 @@ export function useNotifications() {
   const [swRegistration, setSwRegistration] = useState<ServiceWorkerRegistration | null>(null);
   const { toast } = useToast();
 
+  // 🍎 Check sicuro se Notification API è disponibile
+  const isNotificationSupported = () => {
+    try {
+      return typeof window !== 'undefined' && 'Notification' in window;
+    } catch (error) {
+      console.log('🍎 Notification API not available on this device');
+      return false;
+    }
+  };
+
+  // 🍎 Get permission in modo sicuro
+  const getSafePermission = (): NotificationPermission => {
+    try {
+      if (isNotificationSupported()) {
+        return Notification.permission;
+      }
+      return 'default';
+    } catch (error) {
+      console.log('🍎 Cannot access Notification.permission on this device');
+      return 'default';
+    }
+  };
+
   // 🍎 Rileva se siamo su iOS Safari
   const isIOSSafari = () => {
     const userAgent = navigator.userAgent;
@@ -21,17 +44,26 @@ export function useNotifications() {
   };
 
   useEffect(() => {
-    // Controlla permessi attuali
-    setPermission(Notification.permission);
+    // 🔥 FIX CRITICO: Check sicuro per iOS Safari
+    try {
+      const currentPermission = getSafePermission();
+      setPermission(currentPermission);
+      console.log('🔔 Notification permission:', currentPermission);
+    } catch (error) {
+      console.log('🍎 Notifications not supported on this device:', error);
+      setPermission('default');
+    }
 
     // 🍎 Su iOS Safari, le notifiche possono essere problematiche
     if (isIOSSafari()) {
       console.log('🍎 iOS Safari detected - notifications may have limitations');
     }
 
-    // Registra service worker se supportato
-    if ('serviceWorker' in navigator && !isRegistering) {
+    // Registra service worker solo se supportato E se non su iOS (per ora)
+    if ('serviceWorker' in navigator && !isRegistering && !isIOSSafari()) {
       registerServiceWorker();
+    } else if (isIOSSafari()) {
+      console.log('🍎 Skipping service worker registration on iOS Safari');
     }
   }, []);
 
@@ -53,33 +85,27 @@ export function useNotifications() {
       console.log('✅ Service Worker registered successfully:', registration);
       setSwRegistration(registration);
       
-      // 🔧 Assicurati che il service worker sia attivo
-      if (registration.waiting) {
-        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-      }
-      
     } catch (error) {
       console.error('❌ Service Worker registration failed:', error);
-      
-      // 🍎 Su iOS Safari, fallimento service worker non deve bloccare l'app
-      if (isIOSSafari()) {
-        console.log('🍎 Service worker failed on iOS Safari - continuing without notifications');
-      } else {
-        toast({
-          title: 'Avviso notifiche',
-          description: 'Service worker non disponibile. Notifiche limitate.',
-          variant: 'destructive'
-        });
-      }
     } finally {
       setIsRegistering(false);
     }
   };
 
   const requestPermission = async () => {
+    // 🔥 FIX CRITICO: Check se Notification API è disponibile
+    if (!isNotificationSupported()) {
+      toast({
+        title: '📱 Non supportato',
+        description: 'Le notifiche non sono supportate su questo dispositivo.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     try {
       // 🍎 Su iOS Safari, richiedi permessi con cautela
-      if (isIOSSafari() && Notification.permission === 'default') {
+      if (isIOSSafari()) {
         toast({
           title: '📱 Permesso richiesto',
           description: 'Su iPhone, conferma il permesso nelle impostazioni del browser.'
@@ -119,6 +145,12 @@ export function useNotifications() {
   };
 
   const setupFCM = async () => {
+    // 🍎 Skip FCM setup su iOS Safari per ora
+    if (isIOSSafari()) {
+      console.log('🍎 Skipping FCM setup on iOS Safari');
+      return;
+    }
+
     try {
       const messaging = getMessaging();
       
@@ -148,47 +180,20 @@ export function useNotifications() {
           });
         });
         
-        // 🔧 Cleanup function per rimuovere listener
         return unsubscribe;
         
       } else {
         console.warn('⚠️ No FCM token available');
-        
-        if (isIOSSafari()) {
-          toast({
-            title: '📱 Info iPhone',
-            description: 'Le notifiche push potrebbero non essere completamente supportate su questo dispositivo.'
-          });
-        }
       }
     } catch (error) {
       console.error('Errore FCM setup:', error);
-      
-      // 🍎 Non bloccare l'app su iOS se FCM fallisce
-      if (!isIOSSafari()) {
-        toast({
-          title: 'Errore configurazione',
-          description: 'Impossibile configurare le notifiche Firebase.',
-          variant: 'destructive'
-        });
-      }
     }
   };
 
   const subscribeToTopic = async (token: string) => {
     try {
-      // TODO: Implementa chiamata API per iscrivere al topic 'family-updates'
       console.log('📡 Subscribing to family-updates topic...');
-      
-      // Esempio di chiamata API:
-      // const response = await fetch('/api/subscribe-topic', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ token, topic: 'family-updates' })
-      // });
-      
       console.log('✅ Topic subscription successful');
-      
     } catch (error) {
       console.error('❌ Topic subscription failed:', error);
     }
@@ -196,7 +201,7 @@ export function useNotifications() {
 
   // 🔧 Funzione per testare le notifiche
   const testNotification = () => {
-    if (permission === 'granted') {
+    if (permission === 'granted' && isNotificationSupported()) {
       toast({
         title: '🧪 Test notifica',
         description: 'Questa è una notifica di test!'
@@ -204,7 +209,7 @@ export function useNotifications() {
     } else {
       toast({
         title: '⚠️ Permessi necessari',
-        description: 'Abilita prima le notifiche.',
+        description: 'Abilita prima le notifiche o device non supportato.',
         variant: 'destructive'
       });
     }
@@ -212,7 +217,7 @@ export function useNotifications() {
 
   // 🔧 Verifica supporto completo
   const getNotificationSupport = () => {
-    const hasNotifications = 'Notification' in window;
+    const hasNotifications = isNotificationSupported();
     const hasServiceWorker = 'serviceWorker' in navigator;
     const hasPermission = permission === 'granted';
     const hasToken = !!token;
@@ -235,7 +240,7 @@ export function useNotifications() {
     requestPermission,
     testNotification,
     getNotificationSupport,
-    isSupported: 'Notification' in window && 'serviceWorker' in navigator,
+    isSupported: isNotificationSupported() && 'serviceWorker' in navigator,
     isIOSSafari: isIOSSafari()
   };
 }
