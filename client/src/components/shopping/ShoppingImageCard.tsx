@@ -163,9 +163,9 @@ export function ShoppingImageCard({
     try {
       const images = await googleSearchService.searchProductImages(
         item.link,
+        item.name+" "+item.brandName,
         10
       );
-
       if (images.length === 0) {
         toast({
           title: 'Nessuna immagine trovata',

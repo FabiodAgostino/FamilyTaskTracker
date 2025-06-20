@@ -33,10 +33,11 @@ export function prepareForFirestore<T extends Record<string, any>>(data: T): Par
   return removeUndefinedFields(data);
 }
 
-export function getPathAfterDomain(url:string): string | null {
+export function getPathAfterDomain(url: string): string | null {
   try {
+    console.log("🔍 DEBUG - URL input:", url);
+    
     const parsedUrl = new URL(url);
-    // Rimuove lo slash iniziale dalla pathname e aggiunge query string e hash se presenti
     let path = parsedUrl.pathname.startsWith("/") ? parsedUrl.pathname.slice(1) : parsedUrl.pathname;
     if (parsedUrl.search) {
       path += parsedUrl.search;
@@ -44,6 +45,49 @@ export function getPathAfterDomain(url:string): string | null {
     if (parsedUrl.hash) {
       path += parsedUrl.hash;
     }
+    
+    path = path.replace(/\.(html|htm|php|asp|aspx|jsp|cfm|cgi)(\?|#|$)/gi, '$2');
+    console.log("🔍 DEBUG - Step 1 (estensioni):", path);
+    path = path.replace(/^[a-z]{2}-[a-z]{2}\//i, '');
+    path = path.replace(/\/[a-z]{2}-[a-z]{2}\//gi, '/');
+    path = path.replace(/\/[a-z]{2}-[a-z]{2}$/i, '');
+    console.log("🔍 DEBUG - Step 2 (codici doppi):", path);
+    let previousPath;
+    do {
+      previousPath = path;
+      path = path.replace(/^(it|en|fr|de|es|pt|nl|ru|zh|ja|ko|ar)\//i, '');
+    } while (path !== previousPath && path.match(/^(it|en|fr|de|es|pt|nl|ru|zh|ja|ko|ar)\//i));
+    
+    path = path.replace(/\/(it|en|fr|de|es|pt|nl|ru|zh|ja|ko|ar)\//gi, '/');
+    path = path.replace(/\/(it|en|fr|de|es|pt|nl|ru|zh|ja|ko|ar)$/i, '');
+    path = path.replace(/^(product|item|detail|p|products|items|details|shop|store|catalog)\/+/i, '');
+    path = path.replace(/\/(product|item|detail|p|products|items|details|shop|store|catalog)\/+/gi, '/');
+    path = path.replace(/\/+/g, '/');
+    
+    path = path.replace(/\/$/, '');
+    
+    // ✅ PULIZIA FINALE DEI PARAMETRI UTM (OPZIONALE)
+    if (path.includes('?')) {
+      const [pathPart, queryPart] = path.split('?', 2);
+      // Rimuove parametri UTM ma mantiene altri parametri importanti
+      const cleanQuery = queryPart
+        .split('&')
+        .filter(param => !param.startsWith('utm_') && 
+                        !param.startsWith('gclid=') && 
+                        !param.startsWith('gbraid=') &&
+                        !param.startsWith('gad_source=') &&
+                        !param.startsWith('esl-k='))
+        .join('&');
+      
+      if (cleanQuery) {
+        path = pathPart + '?' + cleanQuery;
+      } else {
+        path = pathPart;
+      }
+    }
+    
+    console.log("🎯 DEBUG - RISULTATO FINALE:", path);
+    
     return path;
   } catch (e) {
     console.error("Invalid URL:", e);
