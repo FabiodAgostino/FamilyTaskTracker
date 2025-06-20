@@ -1,4 +1,7 @@
-name: Deploy static site to Pages
+# .github/workflows/deploy.yml
+# 🔥 Deploy con Service Worker Template Replacement
+
+name: Deploy Family Task Tracker to Pages
 
 on:
   push:
@@ -15,60 +18,198 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  deploy-frontend:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    
     steps:
-      - name: Checkout
+      - name: 📥 Checkout Repository
         uses: actions/checkout@v4
         
-      - name: Setup Node
+      - name: 🟢 Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            client/package-lock.json
           
-      - name: Install dependencies
-        run: npm ci
+      - name: 📦 Install Dependencies
+        run: |
+          npm ci
+          cd client && npm ci
         
-      - name: Create .env file
+      - name: 🔍 Verify GitHub Secrets
+        run: |
+          echo "✅ Checking critical environment variables..."
+          if [ -z "${{ secrets.FIREBASE_API_KEY }}" ]; then
+            echo "❌ FIREBASE_API_KEY is missing!"
+            exit 1
+          fi
+          if [ -z "${{ secrets.FIREBASE_PROJECT_ID }}" ]; then
+            echo "❌ FIREBASE_PROJECT_ID is missing!"
+            exit 1
+          fi
+          if [ -z "${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}" ]; then
+            echo "❌ FIREBASE_MESSAGING_SENDER_ID is missing!"
+            exit 1
+          fi
+          if [ -z "${{ secrets.FIREBASE_APP_ID }}" ]; then
+            echo "❌ FIREBASE_APP_ID is missing!"
+            exit 1
+          fi
+          echo "✅ All critical variables are present"
+        
+      - name: 🔐 Create Environment Variables
         run: |
           cat > client/.env << EOF
+          # Firebase Configuration
           VITE_FIREBASE_API_KEY=${{ secrets.FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN=${{ secrets.FIREBASE_AUTH_DOMAIN }}
           VITE_FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET=${{ secrets.FIREBASE_STORAGE_BUCKET }}
           VITE_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID }}
           VITE_FIREBASE_MEASUREMENT_ID=${{ secrets.FIREBASE_MEASUREMENT_ID }}
+          
+          # Google Services
           VITE_GOOGLE_SEARCH_API_KEY=${{ secrets.GOOGLE_SEARCH_API_KEY }}
           VITE_GOOGLE_SEARCH_ENGINE_ID=${{ secrets.GOOGLE_SEARCH_ENGINE_ID }}
+          
+          # Application Configuration
           VITE_APP_NAME=Family Task Tracker
           VITE_APP_VERSION=1.0.0
+          VITE_APP_ENVIRONMENT=production
+          VITE_BASE_URL=/FamilyTaskTracker/
+          
+          # Build Configuration
+          NODE_ENV=production
           EOF
           
-      - name: Build
-        run: npm run build
+      - name: 🔧 Generate Service Worker
+        run: |
+          cd client
+          echo "🔄 Creating scripts directory..."
+          mkdir -p scripts
+          
+          echo "🔄 Copying build scripts..."
+          cp ../scripts/build-service-worker.js scripts/
+          cp ../scripts/verify-build.js scripts/
+          
+          echo "🔄 Generating service worker with environment variables..."
+          node scripts/build-service-worker.js build
+          
+          echo "🔍 Verifying service worker was generated..."
+          if [ ! -f "public/firebase-messaging-sw.js" ]; then
+            echo "❌ Service worker not generated!"
+            exit 1
+          fi
+          
+          echo "✅ Service worker generated successfully"
+          echo "📊 Service worker size: $(wc -c < public/firebase-messaging-sw.js) bytes"
+        env:
+          # Pass all environment variables to the build script
+          VITE_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
+          VITE_APP_NAME: "Family Task Tracker"
+          VITE_APP_VERSION: "1.0.0"
+          VITE_APP_ENVIRONMENT: "production"
+          VITE_BASE_URL: "/FamilyTaskTracker/"
+          NODE_ENV: production
+          
+      - name: 🛡️ Security Check Service Worker
+        run: |
+          cd client
+          echo "🔍 Checking service worker for security issues..."
+          
+          # Verifica che non ci siano placeholder non sostituiti
+          if grep -q "__VITE_" public/firebase-messaging-sw.js; then
+            echo "❌ Service worker contains unreplaced placeholders!"
+            grep "__VITE_" public/firebase-messaging-sw.js
+            exit 1
+          fi
+          
+          # Verifica che non ci siano valori vuoti per variabili critiche
+          if grep -q 'apiKey: ""' public/firebase-messaging-sw.js; then
+            echo "❌ Service worker has empty API key!"
+            exit 1
+          fi
+          
+          # Verifica che la configurazione Firebase sia valida
+          if ! grep -q "firebase.initializeApp" public/firebase-messaging-sw.js; then
+            echo "❌ Service worker missing Firebase initialization!"
+            exit 1
+          fi
+          
+          echo "✅ Service worker security check passed"
+        
+      - name: 🏗️ Build Application
+        run: |
+          cd client
+          npm run build
         env:
           NODE_ENV: production
           VITE_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
           VITE_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
           VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
           VITE_GOOGLE_SEARCH_API_KEY: ${{ secrets.GOOGLE_SEARCH_API_KEY }}
           VITE_GOOGLE_SEARCH_ENGINE_ID: ${{ secrets.GOOGLE_SEARCH_ENGINE_ID }}
+          VITE_APP_NAME: "Family Task Tracker"
+          VITE_APP_VERSION: "1.0.0"
+          VITE_APP_ENVIRONMENT: "production"
+          VITE_BASE_URL: "/FamilyTaskTracker/"
           
-      - name: Setup Pages
+      - name: 📋 Copy Service Worker to Docs
+        run: |
+          cd client
+          echo "📋 Copying service worker to docs folder..."
+          cp public/firebase-messaging-sw.js ../docs/
+          
+          echo "🔍 Verifying service worker in docs..."
+          if [ ! -f "../docs/firebase-messaging-sw.js" ]; then
+            echo "❌ Service worker not found in docs!"
+            exit 1
+          fi
+          
+          echo "✅ Service worker copied to docs"
+          
+      - name: 🔍 Final Build Verification
+        run: |
+          cd client
+          echo "🔍 Running final build verification..."
+          node scripts/verify-build.js
+          
+          echo "📊 Build statistics:"
+          echo "  - Docs folder size: $(du -sh ../docs | cut -f1)"
+          echo "  - Service worker size: $(wc -c < ../docs/firebase-messaging-sw.js) bytes"
+          echo "  - Total files in docs: $(find ../docs -type f | wc -l)"
+        
+      - name: 📤 Setup GitHub Pages
         uses: actions/configure-pages@v5
         
-      - name: Upload artifact
+      - name: 📦 Upload Build Artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: './docs'
           
-      - name: Deploy to GitHub Pages
+      - name: 🚀 Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: ✅ Deployment Success
+        run: |
+          echo "🎉 Deployment completed successfully!"
+          echo "🌐 Site URL: ${{ steps.deployment.outputs.page_url }}"
+          echo "🔔 Service Worker with environment variables deployed!"

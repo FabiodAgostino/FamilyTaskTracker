@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 import { useToast } from './use-toast';
 
-const vapidKey = 'BHvJqEIDOQuhXFouxEo9drLiqJpatiR-25GUZxorXO5GaA8viMvouU9N3oQ7wtmgCFCx3eDW_JP62fHHxAfGlNw';
+const vapidKey = import.meta.env.VITE_FIREBASE_API_KEY;
 
 export function useNotifications() {
   const [permission, setPermission] = useState<NotificationPermission>('default');
