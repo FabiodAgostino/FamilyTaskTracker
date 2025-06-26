@@ -7,12 +7,14 @@
     <meta name="description" content="Manage your family's shopping lists, notes, and calendar events all in one place.">
     
     <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="/favicon.png" />
-    <link rel="shortcut icon" href="/favicon.ico" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+<link rel="icon" type="image/svg+xml" href="/FamilyTaskTracker/favicon.png" />
+<link rel="shortcut icon" href="/FamilyTaskTracker/favicon.ico" />
+<link rel="apple-touch-icon" sizes="180x180" href="/FamilyTaskTracker/apple-touch-icon.png" />
+
     
     <!-- PWA Manifest -->
-    <link rel="manifest" href="/site.webmanifest" />
+<link rel="manifest" href="/FamilyTaskTracker/site.webmanifest" />
+
     
     <!-- Theme Colors -->
     <meta name="theme-color" content="#f8b500">
@@ -24,12 +26,8 @@
     <meta name="apple-mobile-web-app-title" content="Tasks">
     
     <!-- Splash Screen (fallback per iOS) -->
-    <link rel="apple-touch-startup-image" 
-          href="/splash.png" 
-          media="(max-width: 768px)">
-    <link rel="apple-touch-startup-image" 
-          href="/splash.png" 
-          media="(min-width: 769px)">
+<link rel="apple-touch-startup-image" href="/FamilyTaskTracker/splash.png" media="(max-width: 768px)">
+<link rel="apple-touch-startup-image" href="/FamilyTaskTracker/splash.png" media="(min-width: 769px)">
     
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -398,16 +396,25 @@
         const versionData = await response.json();
         const versionElement = document.getElementById('versionText');
         
-        if (versionData.version) {
+        console.log('Version data loaded:', versionData);
+        
+        // Il tuo formato: { "major": 1, "minor": 0, "patch": 0, "build": 27 }
+        if (versionData.major !== undefined && versionData.minor !== undefined && versionData.patch !== undefined) {
+            const versionString = `v${versionData.major}.${versionData.minor}.${versionData.patch}`;
+            const buildString = versionData.build ? ` (${versionData.build})` : '';
+            versionElement.textContent = versionString + buildString;
+        } 
+        // Fallback per altri formati
+        else if (versionData.version) {
             versionElement.textContent = `v${versionData.version}`;
         } else if (versionData.buildVersion) {
             versionElement.textContent = `v${versionData.buildVersion}`;
         } else {
-            const version = versionData.appVersion || versionData.clientVersion || '1.0.0';
-            versionElement.textContent = `v${version}`;
+            versionElement.textContent = 'v1.0.0';
         }
     } catch (error) {
-        console.log('Version file not found, using default');
+        console.log('Version file not found:', error);
+        document.getElementById('versionText').textContent = 'v1.0.0';
     }
 }
 
@@ -460,16 +467,19 @@
         return isReactLoaded;
     }
     
-    // Tempo massimo di attesa: 10 secondi
-    let maxWaitTime = 10000;
-    let checkInterval = 100;
+    // Tempo massimo di attesa: 15 secondi (aumentato)
+    let maxWaitTime = 15000;
+    let checkInterval = 200;
     let elapsedTime = 0;
+    
+    console.log('Starting to wait for React...');
     
     const waitForReact = setInterval(() => {
         elapsedTime += checkInterval;
         
         if (checkReactLoaded()) {
             // React caricato! Nascondi splash dopo 2 secondi
+            console.log('React loaded! Hiding splash in 2 seconds...');
             clearInterval(waitForReact);
             setTimeout(() => {
                 splash.classList.add('fade-out');
@@ -490,13 +500,24 @@
                 
                 // Mostra messaggio di errore se React non è caricato
                 if (!checkReactLoaded()) {
-                    document.body.innerHTML += '<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:20px;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.3);text-align:center;z-index:10000;"><h3>Errore di caricamento</h3><p>Ricarica la pagina</p><button onclick="window.location.reload()" style="margin-top:10px;padding:10px 20px;background:#f8b500;color:white;border:none;border-radius:5px;cursor:pointer;">Ricarica</button></div>';
+                    document.body.innerHTML += `
+                        <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:20px;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.3);text-align:center;z-index:10000;font-family:Inter,sans-serif;">
+                            <h3 style="margin:0 0 10px 0;color:#333;">Errore di caricamento</h3>
+                            <p style="margin:0 0 15px 0;color:#666;">L'app non si è caricata correttamente</p>
+                            <button onclick="window.location.reload()" style="margin:0;padding:10px 20px;background:#f8b500;color:white;border:none;border-radius:5px;cursor:pointer;font-family:inherit;">
+                                Ricarica
+                            </button>
+                        </div>`;
                 }
             }, 800);
+        } else {
+            // Debug: mostra progresso ogni 2 secondi
+            if (elapsedTime % 2000 === 0) {
+                console.log(`Waiting for React... ${elapsedTime/1000}s elapsed`);
+            }
         }
     }, checkInterval);
 }
-
         // Inizializza splash screen
         document.addEventListener('DOMContentLoaded', () => {
             loadVersion();
