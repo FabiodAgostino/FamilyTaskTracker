@@ -188,6 +188,10 @@
             position: relative;
             opacity: 0;
             animation: textEntry 1s ease-out 0.8s forwards;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
 
         @keyframes textEntry {
@@ -206,6 +210,7 @@
             display: inline-block;
             opacity: 0;
             animation: charFadeIn 0.1s ease-out forwards;
+            text-align: center;
         }
 
         @keyframes charFadeIn {
@@ -304,6 +309,12 @@
             
             .splash-text {
                 padding: 0 20px;
+                text-align: center !important;
+                justify-content: center !important;
+                margin: 0 auto;
+                left: 50%;
+                transform: translateX(-50%);
+                position: relative;
             }
         }
 
@@ -401,21 +412,24 @@
                    document.referrer.includes('android-app://');
         }
 
-        // Gestione sessione per PC
+        // Gestione sessione - LOGICA INVERTITA
         function shouldShowSplash() {
-            if (isMobile()) {
-                return true; // Mobile mostra sempre l'animazione
+            if (isPWA()) {
+                // PWA: mostra SEMPRE l'animazione
+                return true;
             }
             
-            // PC: controlla se già vista in questa sessione
+            // Browser: mostra solo la prima volta per sessione
             const splashShown = sessionStorage.getItem('splashShown');
             return !splashShown;
         }
 
         function markSplashAsShown() {
-            if (!isMobile()) {
+            if (!isPWA()) {
+                // Solo browser salva in sessione
                 sessionStorage.setItem('splashShown', 'true');
             }
+            // PWA non salva nulla, così mostra sempre
         }
 
         // Carica versione da version.json - SUBITO
@@ -481,12 +495,13 @@
             
             // Se non deve mostrare splash, nascondila subito
             if (!shouldShowSplash()) {
-                console.log('Splash già vista in questa sessione - saltata');
+                console.log('Browser: splash già vista in questa sessione - saltata');
                 splash.classList.add('hidden');
                 return;
             }
 
             console.log('Mostrando splash screen...');
+            console.log('Modalità:', isPWA() ? 'PWA (sempre)' : 'Browser (prima volta)');
             
             // Mobile: nascondi splash iOS nativa se PWA
             if (isMobile() && isPWA()) {
@@ -520,9 +535,9 @@
                 if (checkReactLoaded()) {
                     // React caricato!
                     clearInterval(waitForReact);
-                    console.log('React loaded! Hiding splash in 2 seconds...');
+                    console.log('React loaded! Hiding splash in 4 seconds...');
                     
-                    // Marca come vista per PC
+                    // Marca come vista solo per browser
                     markSplashAsShown();
                     
                     setTimeout(() => {
@@ -531,7 +546,7 @@
                             splash.style.display = 'none';
                             document.body.style.overflow = 'auto';
                         }, 800);
-                    }, 2000);
+                    }, 4000); // Aumentato da 2000 a 4000 (4 secondi)
                     
                 } else if (elapsedTime >= maxWaitTime) {
                     // Timeout
@@ -566,8 +581,8 @@
 
         // Inizializza tutto
         document.addEventListener('DOMContentLoaded', () => {
+            console.log('Modalità app:', isPWA() ? 'PWA' : 'Browser');
             console.log('Device type:', isMobile() ? 'Mobile' : 'Desktop');
-            console.log('PWA mode:', isPWA() ? 'Yes' : 'No');
             
             loadVersion(); // Carica subito la versione
             createParticles();
