@@ -449,17 +449,17 @@
 
         // Nascondi splash dopo caricamento
         function hideSplash() {
-            setTimeout(() => {
-                const splash = document.getElementById('splash');
-                splash.classList.add('fade-out');
-                
-                setTimeout(() => {
-                    splash.style.display = 'none';
-                    // App principale ora visibile
-                    document.body.style.overflow = 'auto';
-                }, 800);
-            }, 3500); // Mostra per 3.5 secondi
-        }
+    const splash = document.getElementById('splash');
+    
+    // FORZA SEMPRE L'ANIMAZIONE (sia browser che PWA)
+    setTimeout(() => {
+        splash.classList.add('fade-out');
+        setTimeout(() => {
+            splash.style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }, 800);
+    }, 3500); // 3.5 secondi sempre, anche su PWA installata
+}
 
         // Inizializza splash screen
         document.addEventListener('DOMContentLoaded', () => {
