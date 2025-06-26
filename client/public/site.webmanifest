@@ -1,21 +1,89 @@
 {
   "name": "Family Task Tracker",
   "short_name": "Tasks",
+  "description": "Gestione attività e shopping list per la famiglia",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8b500",
+  "theme_color": "#f8b500",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  
   "icons": [
     {
-      "src": "/web-app-manifest-192x192.png",
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512x512.png", 
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192-maskable.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "/web-app-manifest-512x512.png",
+      "src": "/icons/icon-512-maskable.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
     }
   ],
-  "theme_color": "#7ed5ff",
-  "background_color": "#7ed5ff",
-  "display": "standalone"
+  
+  "categories": ["productivity", "lifestyle", "utilities"],
+  "lang": "it-IT",
+  "dir": "ltr",
+  
+  "prefer_related_applications": false,
+  
+  "shortcuts": [
+    {
+      "name": "Shopping List",
+      "short_name": "Shopping",
+      "description": "Apri Shopping",
+      "url": "/shopping",
+      "icons": [
+        {
+          "src": "/icons/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Note",
+      "short_name": "Note",
+      "description": "Apri le note",
+      "url": "/notes", 
+      "icons": [
+        {
+          "src": "/icons/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Calendario",
+      "short_name": "Calendario",
+      "description": "Apri il calendario",
+      "url": "/calendar",
+      "icons": [
+        {
+          "src": "/icons/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
 }

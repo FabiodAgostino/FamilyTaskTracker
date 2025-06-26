@@ -3,91 +3,520 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-    <title>Family Task Tracker</title>
+    <title>Tasks</title>
     <meta name="description" content="Manage your family's shopping lists, notes, and calendar events all in one place.">
     
-    <!-- 🍎 META TAG PWA iOS (essenziali) -->
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.png" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/site.webmanifest" />
+    
+    <!-- Theme Colors -->
+    <meta name="theme-color" content="#f8b500">
+    <meta name="background-color" content="#f8b500">
+    
+    <!-- Apple PWA Configuration -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="FamilyTaskTracker">
+    <meta name="apple-mobile-web-app-title" content="Tasks">
     
-    <!-- 🎨 Theme color -->
-    <meta name="theme-color" content="#E07A5F">
+    <!-- Splash Screen (fallback per iOS) -->
+    <link rel="apple-touch-startup-image" 
+          href="/splash.png" 
+          media="(max-width: 768px)">
+    <link rel="apple-touch-startup-image" 
+          href="/splash.png" 
+          media="(min-width: 769px)">
     
-    <!-- 🔗 MANIFEST (senza icone) -->
-    <link rel="manifest" href="/manifest.json">
-    
-    <!-- 🔧 Cache control per iOS -->
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    
-    <!-- 🎨 Fonts -->
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="icon" type="image/svg+xml" href="/favicon.png" />
-    <link rel="shortcut icon" href="/favicon.ico" />
+    
+    <!-- Animated Splash Screen CSS -->
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    <!-- Apple Touch Icon -->
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+        .splash-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(135deg, #f8b500 0%, #a3d900 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            opacity: 1;
+            transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        }
 
-    <!-- Apple PWA -->
-    <meta name="apple-mobile-web-app-title" content="HomeTask" />
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+        .splash-container.fade-out {
+            opacity: 0;
+            transform: scale(1.1);
+            pointer-events: none;
+        }
 
-    <!-- Manifest PWA -->
-    <link rel="manifest" href="/site.webmanifest" />
+        /* Particelle flottanti */
+        .particles {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
 
-<!-- Theme colors -->
-<meta name="theme-color" content="#2563eb">
-<meta name="background-color" content="#ffffff">
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            animation: float 6s infinite ease-in-out;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); opacity: 0; }
+            50% { transform: translateY(-100px) rotate(180deg); opacity: 1; }
+        }
+
+        /* Icona casa container */
+        .icon-container {
+            position: relative;
+            margin-bottom: 60px;
+            animation: iconEntry 1.2s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
+            transform: scale(0) rotate(-180deg);
+        }
+
+        @keyframes iconEntry {
+            0% {
+                transform: scale(0) rotate(-180deg);
+                opacity: 0;
+            }
+            70% {
+                transform: scale(1.1) rotate(10deg);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(1) rotate(0deg);
+                opacity: 1;
+            }
+        }
+
+        /* Icona casa */
+        .home-icon {
+            width: 140px;
+            height: 140px;
+            background: white;
+            border-radius: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 
+                0 20px 40px rgba(0, 0, 0, 0.15),
+                0 8px 16px rgba(0, 0, 0, 0.1),
+                inset 0 1px 0 rgba(255, 255, 255, 0.8);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Effetto shimmer sull'icona */
+        .home-icon::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+            100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+        }
+
+        .home-icon svg {
+            width: 80px;
+            height: 80px;
+            fill: #f8b500;
+            position: relative;
+            z-index: 1;
+            filter: drop-shadow(0 2px 4px rgba(248, 181, 0, 0.3));
+        }
+
+        /* Pulse effect per l'icona */
+        .icon-container::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 140px;
+            height: 140px;
+            border: 3px solid rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            animation: pulse 2s infinite ease-in-out;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(1.4);
+                opacity: 0;
+            }
+        }
+
+        /* Testo animato */
+        .splash-text {
+            color: white;
+            font-size: clamp(24px, 5vw, 42px);
+            font-weight: 700;
+            text-align: center;
+            letter-spacing: 1px;
+            text-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            position: relative;
+            opacity: 0;
+            animation: textEntry 1s ease-out 0.8s forwards;
+        }
+
+        @keyframes textEntry {
+            0% {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Effetto typing per ogni lettera */
+        .text-char {
+            display: inline-block;
+            opacity: 0;
+            animation: charFadeIn 0.1s ease-out forwards;
+        }
+
+        @keyframes charFadeIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Loading dots */
+        .loading-dots {
+            position: absolute;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+            opacity: 0;
+            animation: dotsEntry 0.5s ease-out 1.5s forwards;
+        }
+
+        @keyframes dotsEntry {
+            to { opacity: 1; }
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.7);
+            animation: dotBounce 1.4s infinite ease-in-out;
+        }
+
+        .dot:nth-child(1) { animation-delay: -0.32s; }
+        .dot:nth-child(2) { animation-delay: -0.16s; }
+        .dot:nth-child(3) { animation-delay: 0s; }
+
+        @keyframes dotBounce {
+            0%, 80%, 100% {
+                transform: scale(0.8);
+                opacity: 0.5;
+            }
+            40% {
+                transform: scale(1.2);
+                opacity: 1;
+            }
+        }
+
+        /* Version info */
+        .version-info {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            animation: versionEntry 0.5s ease-out 2s forwards;
+        }
+
+        @keyframes versionEntry {
+            0% {
+                opacity: 0;
+                transform: translateX(-50%) translateY(10px);
+            }
+            100% {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+
+        #versionText {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 14px;
+            font-weight: 400;
+            letter-spacing: 0.5px;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+            font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .home-icon {
+                width: 120px;
+                height: 120px;
+                border-radius: 24px;
+            }
+            
+            .home-icon svg {
+                width: 70px;
+                height: 70px;
+            }
+            
+            .icon-container::after {
+                width: 120px;
+                height: 120px;
+            }
+            
+            .splash-text {
+                padding: 0 20px;
+            }
+        }
+
+        /* Background gradient animation */
+        .splash-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, #f8b500 0%, #a3d900 100%);
+            animation: gradientShift 4s ease-in-out infinite alternate;
+        }
+
+        @keyframes gradientShift {
+            0% {
+                filter: hue-rotate(0deg) brightness(1);
+            }
+            100% {
+                filter: hue-rotate(10deg) brightness(1.1);
+            }
+        }
+
+        /* Content above background */
+        .splash-content {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100%;
+            justify-content: center;
+        }
+    </style>
   </head>
   <body>
+    <!-- Animated Splash Screen -->
+    <div id="splash" class="splash-container">
+        <!-- Particelle animate -->
+        <div class="particles" id="particles"></div>
+        
+        <div class="splash-content">
+            <!-- Icona casa animata -->
+            <div class="icon-container">
+                <div class="home-icon">
+                    <svg viewBox="0 0 100 100">
+                        <!-- Tetto più largo -->
+                        <path d="M50 8 L10 48 L15 48 L50 13 L85 48 L90 48 Z"/>
+                        <!-- Casa principale più larga -->
+                        <path d="M15 48 L15 85 Q15 90 20 90 L38 90 L38 70 Q38 65 43 65 L57 65 Q62 65 62 70 L62 90 L80 90 Q85 90 85 85 L85 48 L50 13 Z"/>
+                        <!-- Comignolo più visibile -->
+                        <path d="M72 18 L72 38 L80 38 L80 22 Q80 18 76 18 Z"/>
+                        <!-- Dettaglio comignolo -->
+                        <rect x="72" y="16" width="8" height="4" rx="1"/>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Testo animato -->
+            <div class="splash-text" id="splashText">
+                Family Task Tracker
+            </div>
+
+            <!-- Loading dots -->
+            <div class="loading-dots">
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+            </div>
+
+            <!-- Version info -->
+            <div class="version-info" id="versionInfo">
+                <span id="versionText">v1.0.0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App -->
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     
-    <!-- 🍎 Script anti-schermata bianca iOS -->
+    <!-- Splash Screen Logic + iOS Safari Fixes -->
     <script>
-      // Fix per iOS Safari - gestione schermata bianca
-      let reloadAttempted = false;
-      
-      function checkBlankScreen() {
-        const root = document.getElementById('root');
+        // Carica versione da version.json
+        async function loadVersion() {
+            try {
+                const response = await fetch('/version.json');
+                const versionData = await response.json();
+                const versionElement = document.getElementById('versionText');
+                
+                if (versionData.version) {
+                    versionElement.textContent = `v${versionData.version}`;
+                } else if (versionData.buildVersion) {
+                    versionElement.textContent = `v${versionData.buildVersion}`;
+                } else {
+                    // Fallback se il formato è diverso
+                    const version = versionData.appVersion || versionData.clientVersion || '1.0.0';
+                    versionElement.textContent = `v${version}`;
+                }
+            } catch (error) {
+                console.log('Version file not found, using default');
+                // Mantieni versione di default se file non trovato
+            }
+        }
+
+        // Crea particelle flottanti
+        function createParticles() {
+            const particlesContainer = document.getElementById('particles');
+            const particleCount = 15;
+
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                
+                // Posizione random
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 6 + 's';
+                particle.style.animationDuration = (Math.random() * 3 + 4) + 's';
+                
+                particlesContainer.appendChild(particle);
+            }
+        }
+
+        // Effetto typing per il testo
+        function animateText() {
+            const textElement = document.getElementById('splashText');
+            const text = textElement.textContent;
+            textElement.innerHTML = '';
+
+            text.split('').forEach((char, index) => {
+                const span = document.createElement('span');
+                span.className = 'text-char';
+                span.textContent = char === ' ' ? '\u00A0' : char;
+                span.style.animationDelay = (1 + index * 0.05) + 's';
+                span.style.transform = 'translateY(20px)';
+                textElement.appendChild(span);
+            });
+        }
+
+        // Nascondi splash dopo caricamento
+        function hideSplash() {
+            setTimeout(() => {
+                const splash = document.getElementById('splash');
+                splash.classList.add('fade-out');
+                
+                setTimeout(() => {
+                    splash.style.display = 'none';
+                    // App principale ora visibile
+                    document.body.style.overflow = 'auto';
+                }, 800);
+            }, 3500); // Mostra per 3.5 secondi
+        }
+
+        // Inizializza splash screen
+        document.addEventListener('DOMContentLoaded', () => {
+            loadVersion();
+            createParticles();
+            animateText();
+            hideSplash();
+        });
+
+        // Nascondi splash al click (per testing)
+        document.getElementById('splash').addEventListener('click', () => {
+            const splash = document.getElementById('splash');
+            splash.classList.add('fade-out');
+            setTimeout(() => {
+                splash.style.display = 'none';
+                document.body.style.overflow = 'auto';
+            }, 800);
+        });
+
+        // iOS Safari Fixes
+        let reloadAttempted = false;
         
-        if (root && root.children.length === 0 && !reloadAttempted) {
-          reloadAttempted = true;
-          window.location.reload();
+        function checkBlankScreen() {
+            const root = document.getElementById('root');
+            
+            if (root && root.children.length === 0 && !reloadAttempted) {
+                reloadAttempted = true;
+                window.location.reload();
+            }
         }
-      }
-      
-      // Controlla dopo load e dopo 3 secondi
-      window.addEventListener('load', () => {
-        setTimeout(checkBlankScreen, 3000);
-      });
-      
-      // 🍎 Fix height dinamica iOS Safari
-      function setVH() {
-        const vh = window.innerHeight * 0.01;
-        document.documentElement.style.setProperty('--vh', vh + 'px');
-      }
-      
-      setVH();
-      window.addEventListener('resize', setVH);
-      window.addEventListener('orientationchange', () => {
-        setTimeout(setVH, 100);
-      });
-      
-      // 🍎 Previeni zoom doppio tap iOS
-      let lastTouchEnd = 0;
-      document.addEventListener('touchend', (event) => {
-        const now = (new Date()).getTime();
-        if (now - lastTouchEnd <= 300) {
-          event.preventDefault();
+        
+        // Controlla dopo load e dopo 3 secondi
+        window.addEventListener('load', () => {
+            setTimeout(checkBlankScreen, 3000);
+        });
+        
+        // Fix height dinamica iOS Safari
+        function setVH() {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', vh + 'px');
         }
-        lastTouchEnd = now;
-      }, { passive: false });
+        
+        setVH();
+        window.addEventListener('resize', setVH);
+        window.addEventListener('orientationchange', () => {
+            setTimeout(setVH, 100);
+        });
+        
+        // Previeni zoom doppio tap iOS
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', (event) => {
+            const now = (new Date()).getTime();
+            if (now - lastTouchEnd <= 300) {
+                event.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, { passive: false });
     </script>
   </body>
 </html>
