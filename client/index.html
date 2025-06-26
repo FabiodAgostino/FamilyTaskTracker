@@ -7,14 +7,12 @@
     <meta name="description" content="Manage your family's shopping lists, notes, and calendar events all in one place.">
     
     <!-- Favicon -->
-<link rel="icon" type="image/svg+xml" href="/FamilyTaskTracker/favicon.png" />
-<link rel="shortcut icon" href="/FamilyTaskTracker/favicon.ico" />
-<link rel="apple-touch-icon" sizes="180x180" href="/FamilyTaskTracker/apple-touch-icon.png" />
-
+    <link rel="icon" type="image/svg+xml" href="/FamilyTaskTracker/favicon.png" />
+    <link rel="shortcut icon" href="/FamilyTaskTracker/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/FamilyTaskTracker/apple-touch-icon.png" />
     
     <!-- PWA Manifest -->
-<link rel="manifest" href="/FamilyTaskTracker/site.webmanifest" />
-
+    <link rel="manifest" href="/FamilyTaskTracker/site.webmanifest" />
     
     <!-- Theme Colors -->
     <meta name="theme-color" content="#f8b500">
@@ -24,10 +22,6 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Tasks">
-    
-    <!-- Splash Screen (fallback per iOS) -->
-<link rel="apple-touch-startup-image" href="/FamilyTaskTracker/splash.png" media="(max-width: 768px)">
-<link rel="apple-touch-startup-image" href="/FamilyTaskTracker/splash.png" media="(min-width: 769px)">
     
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -63,6 +57,11 @@
             opacity: 0;
             transform: scale(1.1);
             pointer-events: none;
+        }
+
+        /* Nasconde splash se già vista */
+        .splash-container.hidden {
+            display: none !important;
         }
 
         /* Particelle flottanti */
@@ -255,14 +254,14 @@
             }
         }
 
-        /* Version info */
+        /* Version info - APPARE PRIMA */
         .version-info {
             position: absolute;
             bottom: 40px;
             left: 50%;
             transform: translateX(-50%);
             opacity: 0;
-            animation: versionEntry 0.5s ease-out 2s forwards;
+            animation: versionEntry 0.5s ease-out 0.5s forwards; /* Cambiato da 2s a 0.5s */
         }
 
         @keyframes versionEntry {
@@ -389,34 +388,59 @@
     
     <!-- Splash Screen Logic + iOS Safari Fixes -->
     <script>
-        // Carica versione da version.json
-       async function loadVersion() {
-    try {
-        const response = await fetch('/FamilyTaskTracker/version.json');
-        const versionData = await response.json();
-        const versionElement = document.getElementById('versionText');
-        
-        console.log('Version data loaded:', versionData);
-        
-        // Il tuo formato: { "major": 1, "minor": 0, "patch": 0, "build": 27 }
-        if (versionData.major !== undefined && versionData.minor !== undefined && versionData.patch !== undefined) {
-            const versionString = `v${versionData.major}.${versionData.minor}.${versionData.patch}`;
-            const buildString = versionData.build ? ` (${versionData.build})` : '';
-            versionElement.textContent = versionString + buildString;
-        } 
-        // Fallback per altri formati
-        else if (versionData.version) {
-            versionElement.textContent = `v${versionData.version}`;
-        } else if (versionData.buildVersion) {
-            versionElement.textContent = `v${versionData.buildVersion}`;
-        } else {
-            versionElement.textContent = 'v1.0.0';
+        // Rileva dispositivo mobile
+        function isMobile() {
+            return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+                   (window.innerWidth <= 768);
         }
-    } catch (error) {
-        console.log('Version file not found:', error);
-        document.getElementById('versionText').textContent = 'v1.0.0';
-    }
-}
+
+        // Rileva se è PWA installata
+        function isPWA() {
+            return window.matchMedia('(display-mode: standalone)').matches ||
+                   window.navigator.standalone === true ||
+                   document.referrer.includes('android-app://');
+        }
+
+        // Gestione sessione per PC
+        function shouldShowSplash() {
+            if (isMobile()) {
+                return true; // Mobile mostra sempre l'animazione
+            }
+            
+            // PC: controlla se già vista in questa sessione
+            const splashShown = sessionStorage.getItem('splashShown');
+            return !splashShown;
+        }
+
+        function markSplashAsShown() {
+            if (!isMobile()) {
+                sessionStorage.setItem('splashShown', 'true');
+            }
+        }
+
+        // Carica versione da version.json - SUBITO
+        async function loadVersion() {
+            try {
+                const response = await fetch('/FamilyTaskTracker/version.json');
+                const versionData = await response.json();
+                const versionElement = document.getElementById('versionText');
+                
+                console.log('Version data loaded:', versionData);
+                
+                if (versionData.major !== undefined && versionData.minor !== undefined && versionData.patch !== undefined) {
+                    const versionString = `v${versionData.major}.${versionData.minor}.${versionData.patch}`;
+                    const buildString = versionData.build ? ` (${versionData.build})` : '';
+                    versionElement.textContent = versionString + buildString;
+                } else if (versionData.version) {
+                    versionElement.textContent = `v${versionData.version}`;
+                } else {
+                    versionElement.textContent = 'v1.0.0';
+                }
+            } catch (error) {
+                console.log('Version file not found:', error);
+                document.getElementById('versionText').textContent = 'v1.0.0';
+            }
+        }
 
         // Crea particelle flottanti
         function createParticles() {
@@ -427,7 +451,6 @@
                 const particle = document.createElement('div');
                 particle.className = 'particle';
                 
-                // Posizione random
                 particle.style.left = Math.random() * 100 + '%';
                 particle.style.animationDelay = Math.random() * 6 + 's';
                 particle.style.animationDuration = (Math.random() * 3 + 4) + 's';
@@ -452,83 +475,111 @@
             });
         }
 
-        // Nascondi splash dopo caricamento
-        function hideSplash() {
-    const splash = document.getElementById('splash');
-    
-    // Controlla se React è caricato correttamente
-    function checkReactLoaded() {
-        const root = document.getElementById('root');
-        const isReactLoaded = root && root.children.length > 0;
-        
-        console.log('React loaded:', isReactLoaded);
-        console.log('Root children count:', root ? root.children.length : 0);
-        
-        return isReactLoaded;
-    }
-    
-    // Tempo massimo di attesa: 15 secondi (aumentato)
-    let maxWaitTime = 15000;
-    let checkInterval = 200;
-    let elapsedTime = 0;
-    
-    console.log('Starting to wait for React...');
-    
-    const waitForReact = setInterval(() => {
-        elapsedTime += checkInterval;
-        
-        if (checkReactLoaded()) {
-            // React caricato! Nascondi splash dopo 2 secondi
-            console.log('React loaded! Hiding splash in 2 seconds...');
-            clearInterval(waitForReact);
-            setTimeout(() => {
-                splash.classList.add('fade-out');
-                setTimeout(() => {
-                    splash.style.display = 'none';
-                    document.body.style.overflow = 'auto';
-                }, 800);
-            }, 2000);
+        // Gestione intelligente splash
+        function handleSplash() {
+            const splash = document.getElementById('splash');
             
-        } else if (elapsedTime >= maxWaitTime) {
-            // Timeout: nascondi splash comunque
-            clearInterval(waitForReact);
-            console.warn('React loading timeout - hiding splash anyway');
-            splash.classList.add('fade-out');
-            setTimeout(() => {
-                splash.style.display = 'none';
-                document.body.style.overflow = 'auto';
-                
-                // Mostra messaggio di errore se React non è caricato
-                if (!checkReactLoaded()) {
-                    document.body.innerHTML += `
-                        <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:20px;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.3);text-align:center;z-index:10000;font-family:Inter,sans-serif;">
-                            <h3 style="margin:0 0 10px 0;color:#333;">Errore di caricamento</h3>
-                            <p style="margin:0 0 15px 0;color:#666;">L'app non si è caricata correttamente</p>
-                            <button onclick="window.location.reload()" style="margin:0;padding:10px 20px;background:#f8b500;color:white;border:none;border-radius:5px;cursor:pointer;font-family:inherit;">
-                                Ricarica
-                            </button>
-                        </div>`;
-                }
-            }, 800);
-        } else {
-            // Debug: mostra progresso ogni 2 secondi
-            if (elapsedTime % 2000 === 0) {
-                console.log(`Waiting for React... ${elapsedTime/1000}s elapsed`);
+            // Se non deve mostrare splash, nascondila subito
+            if (!shouldShowSplash()) {
+                console.log('Splash già vista in questa sessione - saltata');
+                splash.classList.add('hidden');
+                return;
             }
+
+            console.log('Mostrando splash screen...');
+            
+            // Mobile: nascondi splash iOS nativa se PWA
+            if (isMobile() && isPWA()) {
+                // Aspetta un momento per far passare la splash nativa iOS
+                setTimeout(() => {
+                    console.log('PWA mobile: mostrando animazione dopo splash nativa');
+                }, 1000);
+            }
+
+            // Controlla caricamento React
+            function checkReactLoaded() {
+                const root = document.getElementById('root');
+                const isReactLoaded = root && root.children.length > 0;
+                
+                if (isReactLoaded) {
+                    console.log('React loaded! Root has', root.children.length, 'children');
+                }
+                
+                return isReactLoaded;
+            }
+            
+            let maxWaitTime = 15000;
+            let checkInterval = 200;
+            let elapsedTime = 0;
+            
+            console.log('Waiting for React to load...');
+            
+            const waitForReact = setInterval(() => {
+                elapsedTime += checkInterval;
+                
+                if (checkReactLoaded()) {
+                    // React caricato!
+                    clearInterval(waitForReact);
+                    console.log('React loaded! Hiding splash in 2 seconds...');
+                    
+                    // Marca come vista per PC
+                    markSplashAsShown();
+                    
+                    setTimeout(() => {
+                        splash.classList.add('fade-out');
+                        setTimeout(() => {
+                            splash.style.display = 'none';
+                            document.body.style.overflow = 'auto';
+                        }, 800);
+                    }, 2000);
+                    
+                } else if (elapsedTime >= maxWaitTime) {
+                    // Timeout
+                    clearInterval(waitForReact);
+                    console.warn('React loading timeout - hiding splash anyway');
+                    
+                    markSplashAsShown();
+                    
+                    splash.classList.add('fade-out');
+                    setTimeout(() => {
+                        splash.style.display = 'none';
+                        document.body.style.overflow = 'auto';
+                        
+                        if (!checkReactLoaded()) {
+                            document.body.innerHTML += `
+                                <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:20px;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.3);text-align:center;z-index:10000;font-family:Inter,sans-serif;">
+                                    <h3 style="margin:0 0 10px 0;color:#333;">Errore di caricamento</h3>
+                                    <p style="margin:0 0 15px 0;color:#666;">L'app non si è caricata correttamente</p>
+                                    <button onclick="window.location.reload()" style="margin:0;padding:10px 20px;background:#f8b500;color:white;border:none;border-radius:5px;cursor:pointer;font-family:inherit;">
+                                        Ricarica
+                                    </button>
+                                </div>`;
+                        }
+                    }, 800);
+                } else {
+                    if (elapsedTime % 2000 === 0) {
+                        console.log(`Waiting for React... ${elapsedTime/1000}s elapsed`);
+                    }
+                }
+            }, checkInterval);
         }
-    }, checkInterval);
-}
-        // Inizializza splash screen
+
+        // Inizializza tutto
         document.addEventListener('DOMContentLoaded', () => {
-            loadVersion();
+            console.log('Device type:', isMobile() ? 'Mobile' : 'Desktop');
+            console.log('PWA mode:', isPWA() ? 'Yes' : 'No');
+            
+            loadVersion(); // Carica subito la versione
             createParticles();
             animateText();
-            hideSplash();
+            handleSplash();
         });
 
-        // Nascondi splash al click (per testing)
+        // Click per saltare (solo per testing)
         document.getElementById('splash').addEventListener('click', () => {
+            console.log('Splash clicked - skipping');
             const splash = document.getElementById('splash');
+            markSplashAsShown();
             splash.classList.add('fade-out');
             setTimeout(() => {
                 splash.style.display = 'none';
@@ -548,12 +599,10 @@
             }
         }
         
-        // Controlla dopo load e dopo 3 secondi
         window.addEventListener('load', () => {
             setTimeout(checkBlankScreen, 3000);
         });
         
-        // Fix height dinamica iOS Safari
         function setVH() {
             const vh = window.innerHeight * 0.01;
             document.documentElement.style.setProperty('--vh', vh + 'px');
@@ -565,7 +614,6 @@
             setTimeout(setVH, 100);
         });
         
-        // Previeni zoom doppio tap iOS
         let lastTouchEnd = 0;
         document.addEventListener('touchend', (event) => {
             const now = (new Date()).getTime();
