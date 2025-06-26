@@ -4,7 +4,7 @@
   "description": "Gestione attività e shopping list per la famiglia",
   "start_url": "/FamilyTaskTracker/",
   "display": "standalone",
-  "background_color": "#f8b500",
+  "background_color": "#ffffff",
   "theme_color": "#f8b500",
   "orientation": "portrait-primary",
   "scope": "/FamilyTaskTracker/",
@@ -13,20 +13,6 @@
       "src": "/FamilyTaskTracker/splash.png",
       "sizes": "1024x1536",
       "type": "image/png"
-    }
-  ],
-  "screenshots": [
-    {
-      "src": "/FamilyTaskTracker/splash.png",
-      "sizes": "1024x1536",
-      "type": "image/png",
-      "platform": "ios"
-    },
-    {
-      "src": "/FamilyTaskTracker/splash.png", 
-      "sizes": "1024x1536",
-      "type": "image/png",
-      "platform": "android"
     }
   ],
   "icons": [

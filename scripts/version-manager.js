@@ -37,7 +37,26 @@ const DEFAULT_VERSION = {
   lastUpdated: new Date().toISOString(),
   environment: 'development'
 };
-
+function setSpecificVersion(versionString, environment = 'production') {
+  const versionRegex = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/;
+  const match = versionString.match(versionRegex);
+  
+  if (!match) {
+    throw new Error('Formato versione non valido. Usa: major.minor.patch.build (es: 5.1.4.0)');
+  }
+  
+  const [, major, minor, patch, build] = match.map(Number);
+  
+  return {
+    major,
+    minor,
+    patch,
+    build,
+    lastUpdated: new Date().toISOString(),
+    environment,
+    deploymentId: generateDeploymentId()
+  };
+}
 /**
  * Genera build number basato su timestamp (più unico)
  */
@@ -99,6 +118,24 @@ function generateTimestampVersion(type = 'build', environment = 'production') {
         deploymentId: generateDeploymentId()
       };
       break;
+
+    case 'set': {
+      const versionString = process.argv[3];
+      if (!versionString) {
+        log('red', '❌ Specifica la versione (es: 5.1.4.0)');
+        process.exit(1);
+      }
+
+      try {
+        const newVersion = setSpecificVersion(versionString, environment);
+        writeVersion(newVersion);
+        log('green', `🎯 Versione impostata: ${formatVersion(newVersion)}`);
+      } catch (error) {
+        log('red', `❌ ${error.message}`);
+        process.exit(1);
+      }
+      break;
+      }
       
     case 'build':
     default:
@@ -286,4 +323,4 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main();
 }
 
-export { readVersion, writeVersion, incrementVersion, formatVersion };
+export { readVersion, writeVersion, incrementVersion, formatVersion,setSpecificVersion  };

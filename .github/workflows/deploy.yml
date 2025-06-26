@@ -44,22 +44,54 @@ jobs:
           npm ci
           cd client && npm ci
 
-      - name: 🔢 Generate Version Number
+      - name: 🔢 Generate Version Number Based on Commit
         id: version
         run: |
-          echo "🔢 Generating new version number..."
+          echo "🔢 Analyzing commit message for version strategy..."
           
-          # Esegui lo script di versioning e cattura l'output
-          VERSION_OUTPUT=$(node scripts/version-manager.js increment build production)
+          # Ottieni il messaggio dell'ultimo commit
+          COMMIT_MSG=$(git log -1 --pretty=%B | head -n1)
+          echo "📝 Commit message: $COMMIT_MSG"
+          
+          # Controlla se il commit contiene una versione specifica (es: 5.1.4.0)
+          VERSION_PATTERN="[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+"
+          if echo "$COMMIT_MSG" | grep -qE "$VERSION_PATTERN"; then
+            # Estrai la versione specifica dal commit
+            SPECIFIC_VERSION=$(echo "$COMMIT_MSG" | grep -oE "$VERSION_PATTERN" | head -n1)
+            echo "🎯 Found specific version in commit: $SPECIFIC_VERSION"
+            
+            # Imposta la versione specifica
+            VERSION_OUTPUT=$(node scripts/version-manager.js set "$SPECIFIC_VERSION" production)
+            INCREMENT_TYPE="specific"
+            
+          elif echo "$COMMIT_MSG" | grep -qiE "^fix(\(.*\))?:" || echo "$COMMIT_MSG" | grep -qiE "\bfix\b"; then
+            # Fix: incrementa solo build
+            echo "🔧 Fix detected - incrementing build number"
+            VERSION_OUTPUT=$(node scripts/version-manager.js increment build production)
+            INCREMENT_TYPE="build"
+            
+          elif echo "$COMMIT_MSG" | grep -qiE "^feat(\(.*\))?:" || echo "$COMMIT_MSG" | grep -qiE "^feature(\(.*\))?:" || echo "$COMMIT_MSG" | grep -qiE "\b(feat|feature)\b"; then
+            # Feature: incrementa minor
+            echo "✨ Feature detected - incrementing minor version"
+            VERSION_OUTPUT=$(node scripts/version-manager.js increment minor production)
+            INCREMENT_TYPE="minor"
+            
+          else
+            # Default: incrementa patch
+            echo "📦 Default increment - incrementing patch version"
+            VERSION_OUTPUT=$(node scripts/version-manager.js increment patch production)
+            INCREMENT_TYPE="patch"
+          fi
+          
           echo "$VERSION_OUTPUT"
           
-          # Estrai le variabili dall'output dello script
-          VERSION=$(echo "$VERSION_OUTPUT" | grep "^version=" | cut -d'=' -f2)
-          BUILD_NUMBER=$(echo "$VERSION_OUTPUT" | grep "^build_number=" | cut -d'=' -f2)
-          DEPLOYMENT_ID=$(echo "$VERSION_OUTPUT" | grep "^deployment_id=" | cut -d'=' -f2)
-          
-          # Se non riesce a estrarre dall'output, leggi dal file version.json
-          if [ -z "$VERSION" ] || [ -z "$BUILD_NUMBER" ]; then
+          # Estrai le variabili dall'output o dal file
+          if echo "$VERSION_OUTPUT" | grep -q "version="; then
+            VERSION=$(echo "$VERSION_OUTPUT" | grep "^version=" | cut -d'=' -f2)
+            BUILD_NUMBER=$(echo "$VERSION_OUTPUT" | grep "^build_number=" | cut -d'=' -f2)
+            DEPLOYMENT_ID=$(echo "$VERSION_OUTPUT" | grep "^deployment_id=" | cut -d'=' -f2)
+          else
+            # Leggi dal file version.json
             echo "📄 Reading from version.json file..."
             MAJOR=$(jq -r '.major' version.json)
             MINOR=$(jq -r '.minor' version.json)
@@ -72,22 +104,24 @@ jobs:
             DEPLOYMENT_ID="$DEPLOY_ID"
           fi
           
-          # Genera altre info utili
+          # Info aggiuntive
           SHORT_SHA=$(git rev-parse --short HEAD)
           BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           
-          echo "📊 Version Info:"
+          echo "📊 Version Strategy Applied:"
+          echo "  Strategy: $INCREMENT_TYPE"
           echo "  Version: $VERSION"
           echo "  Build: #$BUILD_NUMBER"
           echo "  Commit: $SHORT_SHA"
           echo "  Deploy ID: $DEPLOYMENT_ID"
           
-          # Salva per i prossimi step
+          # Output per i prossimi step
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
           echo "deployment_id=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT
           echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
           echo "build_date=$BUILD_DATE" >> $GITHUB_OUTPUT
+          echo "increment_type=$INCREMENT_TYPE" >> $GITHUB_OUTPUT
 
       - name: 📝 Commit Version Update
         run: |
