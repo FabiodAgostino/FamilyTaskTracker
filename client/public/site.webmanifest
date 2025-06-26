@@ -8,16 +8,23 @@
   "theme_color": "#f8b500",
   "orientation": "portrait-primary",
   "scope": "/FamilyTaskTracker/",
+   "splash_pages": [
+    {
+      "src": "/FamilyTaskTracker/splash.png",
+      "sizes": "1024x1536",
+      "type": "image/png"
+    }
+  ],
   "screenshots": [
     {
       "src": "/FamilyTaskTracker/splash.png",
-      "sizes": "640x360",
+      "sizes": "1024x1536",
       "type": "image/png",
       "platform": "ios"
     },
     {
       "src": "/FamilyTaskTracker/splash.png", 
-      "sizes": "640x360",
+      "sizes": "1024x1536",
       "type": "image/png",
       "platform": "android"
     }
