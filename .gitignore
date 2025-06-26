@@ -1,0 +1,190 @@
+# ================================
+# FAMILY TASK TRACKER - .gitignore
+# ================================
+
+# ================================
+# SERVICE WORKER GENERATO
+# ================================
+# NON committare il service worker generato - viene creato durante il build
+client/public/firebase-messaging-sw.js
+**/firebase-messaging-sw.js
+!**/firebase-messaging-sw.template.js
+
+# ================================
+# VARIABILI D'AMBIENTE E SECRETS
+# ================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.production
+.env.development
+.env.staging
+
+# File di configurazione con credenziali
+config.json
+secrets.json
+credentials.json
+service-account-key.json
+firebase-adminsdk-*.json
+
+# Google Cloud Service Account (CRITICO)
+**/*service-account*.json
+**/service-account*.json
+functions/service-account.json
+service-account.json
+
+# ================================
+# DIPENDENZE NODE.JS
+# ================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ================================
+# BUILD E DIST
+# ================================
+dist/
+build/
+out/
+.next/
+.nuxt/
+.vuepress/dist
+.serverless/
+
+# ================================
+# CACHE E TEMP
+# ================================
+.vite/
+.cache/
+.temp/
+.tmp/
+*.tsbuildinfo
+.eslintcache
+
+# ================================
+# SCRIPT BUILD COPIATI
+# ================================
+# Script che vengono copiati durante il build
+client/scripts/build-service-worker.js
+client/scripts/verify-build.js
+
+# ================================
+# LOG FILES
+# ================================
+*.log
+logs/
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# ================================
+# EDITOR E IDE
+# ================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ================================
+# TESTING
+# ================================
+coverage/
+.nyc_output/
+*.lcov
+.coverage/
+
+# ================================
+# FIREBASE SPECIFICO
+# ================================
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+
+# Firebase emulator data
+ui-debug.log
+firestore-debug.log
+database-debug.log
+pubsub-debug.log
+
+# ================================
+# GOOGLE CLOUD
+# ================================
+.gcloud/
+gcloud-debug.log
+application_default_credentials.json
+
+# ================================
+# BACKUP E DATABASE
+# ================================
+*.backup
+*.bak
+*.dump
+*.sql
+*.sqlite
+*.sqlite3
+*.db
+
+# ================================
+# CERTIFICATI E CHIAVI
+# ================================
+*.pem
+*.key
+*.crt
+*.csr
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# ================================
+# DOCUMENTI SENSIBILI
+# ================================
+passwords.txt
+secrets.txt
+api-keys.txt
+tokens.txt
+credentials.txt
+
+# ================================
+# DEPLOYMENT E CI/CD
+# ================================
+.vercel/
+.netlify/
+.github/workflows/*.local.yml
+
+# ================================
+# MONITORAGGIO E ANALYTICS
+# ================================
+.sentry/
+newrelic_agent.log
+
+# ================================
+# SISTEMA OPERATIVO
+# ================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" 
+     xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="512" height="512" fill="#E07A5F" rx="24"/>
+  
+  <!-- Icon content -->
+  <g transform="translate(102.4, 102.4)">
+    
+    <!-- Checklist background -->
+    <rect x="0" y="0" width="307.2" height="368.64" 
+          fill="#F4F1DE" rx="8" stroke="#3D405B" stroke-width="2"/>
+    
+    <!-- Checklist items -->
+    <g fill="#3D405B">
+      <!-- Item 1 -->
+      <rect x="30.72" y="46.08" width="36.864" height="36.864" rx="2"/>
+      <rect x="92.16" y="49.152" width="153.6" height="24.576" rx="2"/>
+      
+      <!-- Item 2 -->
+      <rect x="30.72" y="107.52" width="36.864" height="36.864" rx="2"/>
+      <rect x="92.16" y="110.592" width="122.88" height="24.576" rx="2"/>
+      
+      <!-- Item 3 (checked) -->
+      <rect x="30.72" y="168.96" width="36.864" height="36.864" 
+            rx="2" fill="#81B29A"/>
+      <path d="M 36.864 184.32 l 9.216 9.216 l 18.432 -18.432" 
+            stroke="#F4F1DE" stroke-width="2" fill="none"/>
+      <rect x="92.16" y="172.032" width="138.24" height="24.576" 
+            rx="2" fill="#81B29A"/>
+    </g>
+  
+  </g>
+  
+  <!-- Border -->
+  <rect width="512" height="512" fill="none" stroke="#3D405B" 
+        stroke-width="4" rx="24"/>
+</svg>

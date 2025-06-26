@@ -1,0 +1,188 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* ✅ PALETTE LIGHT MODERNA - Ispirata a "Warm Neutral" */
+  --background: hsl(200, 25%, 97%);        /* Blu-grigio chiarissimo */
+  --foreground: hsl(220, 19%, 24%);        /* Mantieni delft-blue per testo */
+  --muted: hsl(210, 15%, 92%);             /* Grigio neutro, non giallo */
+  --muted-foreground: hsl(220, 10%, 45%);  /* Mantieni */
+  --popover: hsl(0, 0%, 100%);             /* Bianco puro */
+  --popover-foreground: hsl(220, 19%, 24%);
+  --card: hsl(0, 0%, 100%);                /* Bianco puro per card */
+  --card-foreground: hsl(220, 19%, 24%);
+  --border: hsl(210, 12%, 87%);            /* Border grigio-blu */
+  --input: hsl(210, 12%, 94%);             /* Input background neutro */
+  --primary: hsl(14, 73%, 60%);            /* Mantieni burnt-sienna */
+  --primary-foreground: hsl(0, 0%, 98%);
+  --secondary: hsl(150, 25%, 58%);         /* Mantieni cambridge-blue */
+  --secondary-foreground: hsl(220, 19%, 24%);
+  --accent: hsl(210, 15%, 92%);            /* Accent neutro */
+  --accent-foreground: hsl(220, 19%, 24%);
+  --destructive: hsl(0, 84%, 60%);
+  --destructive-foreground: hsl(60, 9%, 98%);
+  --ring: hsl(220, 19%, 24%);
+  --radius: 0.5rem;
+  
+  /* ✅ CUSTOM PALETTE MIGLIORATA */
+  --eggshell: hsl(210, 20%, 96%);          /* Background fresco */
+  --burnt-sienna: hsl(14, 73%, 60%);       /* Mantieni - colore brand */
+  --delft-blue: hsl(220, 19%, 24%);        /* Mantieni - perfetto per testo */
+  --cambridge-blue: hsl(150, 25%, 58%);    /* Mantieni - bel verde */
+  --sunset: hsl(35, 85%, 65%);             /* Arancione caldo, più vivace */
+}
+
+/* ✅ PALETTE DARK BILANCIATA */
+.dark {
+  --background: hsl(220, 15%, 8%);          /* Background blu-grigio scuro */
+  --foreground: hsl(210, 15%, 95%);         /* Testo chiaro leggermente blu */
+  --muted: hsl(220, 12%, 14%);              /* Muted coerente */
+  --muted-foreground: hsl(210, 10%, 70%);   /* Testo secondario più leggibile */
+  --popover: hsl(220, 15%, 10%);            /* Popover scuro */
+  --popover-foreground: hsl(210, 15%, 95%);
+  --card: hsl(220, 15%, 10%);               /* Card scure con tonalità blu */
+  --card-foreground: hsl(210, 15%, 95%);
+  --border: hsl(220, 10%, 22%);             /* Border visibili */
+  --input: hsl(220, 12%, 16%);              /* Input scuri */
+  --primary: hsl(14, 73%, 60%);             /* Mantieni burnt-sienna */
+  --primary-foreground: hsl(0, 0%, 98%);
+  --secondary: hsl(220, 12%, 16%);
+  --secondary-foreground: hsl(210, 15%, 95%);
+  --accent: hsl(220, 12%, 16%);
+  --accent-foreground: hsl(210, 15%, 95%);
+  --destructive: hsl(0, 62%, 55%);
+  --destructive-foreground: hsl(0, 0%, 98%);
+  --ring: hsl(210, 15%, 84%);
+  
+  /* ✅ CUSTOM PALETTE DARK COERENTE */
+  --eggshell: hsl(220, 15%, 8%);           /* Background principale */
+  --burnt-sienna: hsl(14, 80%, 65%);       /* Leggermente più brillante */
+  --delft-blue: hsl(210, 20%, 88%);        /* Testo chiaro blu */
+  --cambridge-blue: hsl(150, 35%, 65%);    /* Verde più vivace */
+  --sunset: hsl(35, 90%, 70%);             /* Arancione brillante */
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased transition-colors duration-200;
+    background: var(--background);
+    color: var(--foreground);
+  }
+  
+  /* ✅ Smoothing delle transizioni */
+  html {
+    @apply transition-colors duration-200;
+  }
+}
+
+@layer utilities {
+  /* ✅ UTILITIES CON NUOVA PALETTE */
+  .text-eggshell {
+    color: var(--eggshell);
+  }
+  
+  .text-burnt-sienna {
+    color: var(--burnt-sienna);
+  }
+  
+  .text-delft-blue {
+    color: var(--delft-blue);
+  }
+  
+  .text-cambridge-blue {
+    color: var(--cambridge-blue);
+  }
+  
+  .text-sunset {
+    color: var(--sunset);
+  }
+  
+  .bg-eggshell {
+    background-color: var(--eggshell);
+  }
+  
+  .bg-burnt-sienna {
+    background-color: var(--burnt-sienna);
+  }
+  
+  .bg-delft-blue {
+    background-color: var(--delft-blue);
+  }
+  
+  .bg-cambridge-blue {
+    background-color: var(--cambridge-blue);
+  }
+  
+  .bg-sunset {
+    background-color: var(--sunset);
+  }
+  
+  .border-burnt-sienna {
+    border-color: var(--burnt-sienna);
+  }
+  
+  .border-cambridge-blue {
+    border-color: var(--cambridge-blue);
+  }
+  
+  /* ✅ Badge utilities per entrambi i temi */
+  .badge-high-priority {
+    @apply bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-red-300 dark:border-red-800;
+  }
+  
+  .badge-medium-priority {
+    @apply bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border-orange-300 dark:border-orange-800;
+  }
+  
+  .badge-low-priority {
+    @apply bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-green-300 dark:border-green-800;
+  }
+  
+  /* ✅ NUOVO: Gradient utilities per un tocco moderno */
+  .bg-gradient-warm {
+    background: linear-gradient(135deg, var(--background) 0%, var(--muted) 100%);
+  }
+  
+  .bg-gradient-card {
+    background: linear-gradient(145deg, var(--card) 0%, var(--muted) 100%);
+  }
+  
+  /* ✅ Utilities per shadow coerenti */
+  .shadow-warm {
+    box-shadow: 0 4px 6px -1px hsl(220, 15%, 20%, 0.1), 0 2px 4px -1px hsl(220, 15%, 20%, 0.06);
+  }
+  
+  .shadow-warm-lg {
+    box-shadow: 0 10px 15px -3px hsl(220, 15%, 20%, 0.1), 0 4px 6px -2px hsl(220, 15%, 20%, 0.05);
+  }
+}
+
+/* ✅ BONUS: Custom scrollbar styling */
+@layer components {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--muted-foreground) var(--muted);
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: var(--muted);
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: var(--muted-foreground);
+    border-radius: 3px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: var(--foreground);
+  }
+}
