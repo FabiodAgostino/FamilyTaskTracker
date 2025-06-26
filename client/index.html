@@ -392,26 +392,24 @@
     <!-- Splash Screen Logic + iOS Safari Fixes -->
     <script>
         // Carica versione da version.json
-        async function loadVersion() {
-            try {
-                const response = await fetch('/version.json');
-                const versionData = await response.json();
-                const versionElement = document.getElementById('versionText');
-                
-                if (versionData.version) {
-                    versionElement.textContent = `v${versionData.version}`;
-                } else if (versionData.buildVersion) {
-                    versionElement.textContent = `v${versionData.buildVersion}`;
-                } else {
-                    // Fallback se il formato è diverso
-                    const version = versionData.appVersion || versionData.clientVersion || '1.0.0';
-                    versionElement.textContent = `v${version}`;
-                }
-            } catch (error) {
-                console.log('Version file not found, using default');
-                // Mantieni versione di default se file non trovato
-            }
+       async function loadVersion() {
+    try {
+        const response = await fetch('/FamilyTaskTracker/version.json');
+        const versionData = await response.json();
+        const versionElement = document.getElementById('versionText');
+        
+        if (versionData.version) {
+            versionElement.textContent = `v${versionData.version}`;
+        } else if (versionData.buildVersion) {
+            versionElement.textContent = `v${versionData.buildVersion}`;
+        } else {
+            const version = versionData.appVersion || versionData.clientVersion || '1.0.0';
+            versionElement.textContent = `v${version}`;
         }
+    } catch (error) {
+        console.log('Version file not found, using default');
+    }
+}
 
         // Crea particelle flottanti
         function createParticles() {
@@ -451,14 +449,52 @@
         function hideSplash() {
     const splash = document.getElementById('splash');
     
-    // FORZA SEMPRE L'ANIMAZIONE (sia browser che PWA)
-    setTimeout(() => {
-        splash.classList.add('fade-out');
-        setTimeout(() => {
-            splash.style.display = 'none';
-            document.body.style.overflow = 'auto';
-        }, 800);
-    }, 3500); // 3.5 secondi sempre, anche su PWA installata
+    // Controlla se React è caricato correttamente
+    function checkReactLoaded() {
+        const root = document.getElementById('root');
+        const isReactLoaded = root && root.children.length > 0;
+        
+        console.log('React loaded:', isReactLoaded);
+        console.log('Root children count:', root ? root.children.length : 0);
+        
+        return isReactLoaded;
+    }
+    
+    // Tempo massimo di attesa: 10 secondi
+    let maxWaitTime = 10000;
+    let checkInterval = 100;
+    let elapsedTime = 0;
+    
+    const waitForReact = setInterval(() => {
+        elapsedTime += checkInterval;
+        
+        if (checkReactLoaded()) {
+            // React caricato! Nascondi splash dopo 2 secondi
+            clearInterval(waitForReact);
+            setTimeout(() => {
+                splash.classList.add('fade-out');
+                setTimeout(() => {
+                    splash.style.display = 'none';
+                    document.body.style.overflow = 'auto';
+                }, 800);
+            }, 2000);
+            
+        } else if (elapsedTime >= maxWaitTime) {
+            // Timeout: nascondi splash comunque
+            clearInterval(waitForReact);
+            console.warn('React loading timeout - hiding splash anyway');
+            splash.classList.add('fade-out');
+            setTimeout(() => {
+                splash.style.display = 'none';
+                document.body.style.overflow = 'auto';
+                
+                // Mostra messaggio di errore se React non è caricato
+                if (!checkReactLoaded()) {
+                    document.body.innerHTML += '<div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;padding:20px;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.3);text-align:center;z-index:10000;"><h3>Errore di caricamento</h3><p>Ricarica la pagina</p><button onclick="window.location.reload()" style="margin-top:10px;padding:10px 20px;background:#f8b500;color:white;border:none;border-radius:5px;cursor:pointer;">Ricarica</button></div>';
+                }
+            }, 800);
+        }
+    }, checkInterval);
 }
 
         // Inizializza splash screen
