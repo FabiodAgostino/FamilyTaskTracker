@@ -15,8 +15,8 @@
     <link rel="manifest" href="/FamilyTaskTracker/site.webmanifest" />
     
     <!-- Theme Colors -->
-    <meta name="theme-color" content="#f8b500">
-    <meta name="background-color" content="#f8b500">
+    <meta name="theme-color" content="#ffffff">
+    <meta name="background-color" content="#ffffff">
     
     <!-- iOS Splash Screens - TUTTI I DISPOSITIVI SUPPORTATI -->
 
@@ -125,7 +125,6 @@
       media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)">
 <link rel="apple-touch-startup-image" href="/FamilyTaskTracker/splash.png" 
       media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3)">
-      <meta name="theme-color" content="#f8b500">
 
     <!-- Animated Splash Screen CSS -->
     <style>
@@ -134,7 +133,26 @@
             padding: 0;
             box-sizing: border-box;
         }
+            body {
+  background-color: #ffffff !important;
+  --status-bar-color: #ffffff;
+}
 
+/* PWA full viewport */
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #ffffff;
+}
+
+/* Fix per il viewport su mobile */
+@supports (padding: max(0px)) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    background: #ffffff;
+  }
+}
         .splash-container {
             position: fixed;
             top: 0;
