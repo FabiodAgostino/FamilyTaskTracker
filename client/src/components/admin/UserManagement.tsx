@@ -480,8 +480,10 @@ export function UserManagement() {
         </Card>
       </div>
 
-      {/* Lista utenti */}
-      <Card>
+
+{/* Lista utenti */}
+{/* Lista utenti - FIX COMPLETO */}
+      <Card className="overflow-hidden">
         <CardHeader>
           <CardTitle className="flex items-center">
             <Users className="h-5 w-5 mr-2" />
@@ -504,27 +506,28 @@ export function UserManagement() {
               {users.map((user) => (
                 <div
                   key={user.id}
-                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 border rounded-lg hover:bg-gray-50 gap-3 overflow-hidden"
                 >
-                  <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 bg-cambridge-blue/10 rounded-full flex items-center justify-center">
+                  {/* Contenuto utente */}
+                  <div className="flex items-center space-x-4 min-w-0 flex-1">
+                    <div className="w-10 h-10 bg-cambridge-blue/10 rounded-full flex items-center justify-center flex-shrink-0">
                       {getRoleIcon(user.role)}
                     </div>
                     
-                    <div>
-                      <div className="flex items-center space-x-2">
-                        <h3 className="font-medium">{user.displayName || user.username}</h3>
-                        <Badge variant={getRoleBadgeVariant(user.role)}>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <h3 className="font-medium truncate">{user.displayName || user.username}</h3>
+                        <Badge variant={getRoleBadgeVariant(user.role)} className="flex-shrink-0">
                           {user.role}
                         </Badge>
                       </div>
                       
-                      <div className="flex items-center space-x-4 text-sm text-gray-600">
-                        <span className="flex items-center">
-                          <Mail className="h-3 w-3 mr-1" />
-                          {user.email}
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 text-sm text-gray-600 space-y-1 sm:space-y-0">
+                        <span className="flex items-center min-w-0">
+                          <Mail className="h-3 w-3 mr-1 flex-shrink-0" />
+                          <span className="truncate">{user.email}</span>
                         </span>
-                        <span>@{user.username}</span>
+                        <span className="flex-shrink-0">@{user.username}</span>
                       </div>
                       
                       <div className="text-xs text-gray-500 mt-1">
@@ -533,16 +536,21 @@ export function UserManagement() {
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-2">
-                    <Button variant="outline" size="sm">
-                      <Edit className="h-3 w-3 mr-1" />
-                      Modifica
+                  {/* Azioni - Responsive */}
+                  <div className="flex items-center justify-end space-x-2 flex-shrink-0">
+                    <Button variant="outline" size="sm" className="text-xs px-2 py-1 h-8">
+                      <Edit className="h-3 w-3 sm:mr-1" />
+                      <span className="hidden sm:inline">Modifica</span>
                     </Button>
                     
                     {user.username !== currentUser.username && (
-                      <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50">
-                        <Trash2 className="h-3 w-3 mr-1" />
-                        Elimina
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="text-red-600 border-red-200 hover:bg-red-50 text-xs px-2 py-1 h-8"
+                      >
+                        <Trash2 className="h-3 w-3 sm:mr-1" />
+                        <span className="hidden sm:inline">Elimina</span>
                       </Button>
                     )}
                   </div>

@@ -46,9 +46,6 @@ try {
       }
     };
 
-    // 🔔 Log per debugging (solo in development)
-    if (APP_CONFIG.environment === 'development') {
-    }
 
     return self.registration.showNotification(notificationTitle, notificationOptions);
   });

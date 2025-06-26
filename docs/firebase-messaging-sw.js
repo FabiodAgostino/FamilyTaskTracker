@@ -1,7 +1,7 @@
 // 🔥 Generated Service Worker - DO NOT EDIT MANUALLY
-// Generated at: 2025-06-20T12:31:53.285Z
+// Generated at: 2025-06-26T12:30:24.117Z
 // Environment: development
-// Version: 1.0.0-test
+// Version: 1.0.0
 
 // client/public/firebase-messaging-sw.template.js
 // 🔥 Template Service Worker - I placeholder verranno sostituiti durante il build
@@ -12,21 +12,21 @@ importScripts('https://www.gstatic.com/firebasejs/11.9.1/firebase-messaging-comp
 
 // 🔧 Configurazione Firebase da variabili d'ambiente (placeholder)
 const firebaseConfig = {
-  apiKey: "test-api-key-replace-with-real-one",
-  authDomain: "familytasktracker-c2dfe.firebaseapp.com",
-  projectId: "familytasktracker-c2dfe",
-  storageBucket: "familytasktracker-c2dfe.firebasestorage.app",
-  messagingSenderId: "984085570940",
-  appId: "1:984085570940:web:ddc61b61702341939130f9",
-  measurementId: "G-2TFQZKTN8G"
+  apiKey: "",
+  authDomain: "",
+  projectId: "",
+  storageBucket: "",
+  messagingSenderId: "",
+  appId: "",
+  measurementId: ""
 };
 
 // 🔧 Configurazioni da variabili d'ambiente
 const APP_CONFIG = {
   appName: "Family Task Tracker",
-  baseUrl: "./",
-  environment: "local",
-  version: "1.0.0-test"
+  baseUrl: "/FamilyTaskTracker/",
+  environment: "development",
+  version: "1.0.0"
 };
 
 // 🍎 Try-catch per iOS Safari compatibility
@@ -34,12 +34,9 @@ try {
   firebase.initializeApp(firebaseConfig);
   const messaging = firebase.messaging();
 
-  console.log(`🔔 Service Worker inizializzato per ${APP_CONFIG.appName} v${APP_CONFIG.version}`);
-  console.log(`🌍 Environment: ${APP_CONFIG.environment}`);
 
   // Handler per notifiche in background
   messaging.onBackgroundMessage((payload) => {
-    console.log('🔔 Background message received:', payload);
     
     const notificationTitle = payload.notification?.title || `🏠 ${APP_CONFIG.appName}`;
     const notificationOptions = {
@@ -54,17 +51,12 @@ try {
       }
     };
 
-    // 🔔 Log per debugging (solo in development)
-    if (APP_CONFIG.environment === 'development') {
-      console.log('🔔 Showing notification:', notificationTitle, notificationOptions);
-    }
 
     return self.registration.showNotification(notificationTitle, notificationOptions);
   });
 
   // 🍎 Gestione click notifiche
   self.addEventListener('notificationclick', (event) => {
-    console.log('🔔 Notification clicked:', event);
     
     event.notification.close();
     
@@ -94,37 +86,28 @@ try {
   // 🔄 Gestione aggiornamenti service worker
   self.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'SKIP_WAITING') {
-      console.log('🔄 Service Worker: SKIP_WAITING ricevuto');
       self.skipWaiting();
     }
   });
 
   // 📊 Service Worker installato
   self.addEventListener('install', (event) => {
-    console.log(`✅ Service Worker v${APP_CONFIG.version} installato`);
     self.skipWaiting();
   });
 
   // 🔄 Service Worker attivato
   self.addEventListener('activate', (event) => {
-    console.log(`🚀 Service Worker v${APP_CONFIG.version} attivato`);
     event.waitUntil(clients.claim());
   });
 
 } catch (error) {
   console.error('🚨 Firebase service worker error:', error);
   
-  // 🍎 Fallback per iOS Safari o altri browser non supportati
-  console.log('🍎 Browser non supporta Firebase messaging, continuando senza notifiche push');
-  
-  // Mantieni comunque il service worker base attivo
   self.addEventListener('install', () => {
-    console.log('📱 Service Worker base installato (senza Firebase)');
     self.skipWaiting();
   });
   
   self.addEventListener('activate', () => {
-    console.log('📱 Service Worker base attivato (senza Firebase)');
     self.skipWaiting();
   });
 }

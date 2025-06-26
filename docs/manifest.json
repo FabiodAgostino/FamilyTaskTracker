@@ -34,7 +34,7 @@
     {
       "name": "Shopping List",
       "short_name": "Shopping",
-      "description": "Apri Shopping",
+      "description": "Apri Shopping ",
       "url": "./shopping",
       "icons": [
         {

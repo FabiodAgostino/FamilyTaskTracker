@@ -67,7 +67,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
   const AppIcon = appConfig.icon;
 
   return (
-    <header className="bg-card shadow-md border-b border-border sticky top-0 z-40 transition-colors duration-200">
+    <header className="bg-card shadow-md border-b border-border sticky top-0 z-50 transition-colors duration-200">
       <div className="px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo e pulsante menu mobile */}

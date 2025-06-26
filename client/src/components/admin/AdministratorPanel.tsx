@@ -194,95 +194,69 @@ export default function AdminPanel() {
   const activeTabConfig = tabs.find(tab => tab.id === activeTab);
   const ActiveComponent = activeTabConfig?.component || PriceMonitoringDashboard;
 
-  return (
-    <div className="min-h-screen bg-background">
-      {/* Header del pannello admin */}
-      <header className="bg-card border-b sticky top-0 z-50">
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <h1 className="text-2xl font-bold text-foreground flex items-center gap-3">
-                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                  <Shield className="w-5 h-5 text-primary-foreground" />
-                </div>
-                Pannello Amministratore
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                {activeTabConfig?.description || 'Controllo e gestione del sistema'}
-              </p>
-            </div>
-            
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 px-3 py-1 rounded-md bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="text-xs font-medium">Admin: {user.displayName || user.username}</span>
+
+return (
+  <div className="min-h-screen bg-background">
+    {/* Header del pannello admin - FIX Z-INDEX */}
+    <header className="bg-card border-b sticky top-0 z-40">
+      <div className="px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-bold text-foreground flex items-center gap-3">
+              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                <Shield className="w-5 h-5 text-primary-foreground" />
               </div>
+              Pannello Amministratore
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {activeTabConfig?.description || 'Controllo e gestione del sistema'}
+            </p>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 px-3 py-1 rounded-md bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="text-xs font-medium">Admin: {user.displayName || user.username}</span>
             </div>
           </div>
         </div>
-      </header>
+      </div>
+    </header>
 
-      {/* Navigation Tabs */}
-      <nav className="bg-card border-b">
-        <div className="px-6">
-          <div className="flex space-x-8 overflow-x-auto">
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`
-                    flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap
-                    transition-colors duration-200
-                    ${isActive 
-                      ? 'border-primary text-primary bg-primary/5' 
-                      : 'border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/50'
-                    }
-                  `}
-                >
-                  <Icon className="w-4 h-4" />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
+    {/* Navigation Tabs - FIX Z-INDEX */}
+    <nav className="bg-card border-b relative z-35">
+      <div className="px-6">
+        <div className="flex space-x-8 overflow-x-auto">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`
+                  flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap
+                  transition-colors duration-200
+                  ${isActive 
+                    ? 'border-primary text-primary' 
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+                  }
+                `}
+              >
+                <Icon className="w-4 h-4" />
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
-      </nav>
+      </div>
+    </nav>
 
-      {/* Tab Content */}
-      <main className="flex-1">
-        <div className="transition-all duration-300 ease-in-out">
-          <ActiveComponent />
-        </div>
-      </main>
-
-      {/* Footer informativo per admin */}
-      <footer className="bg-card border-t">
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-between text-sm text-muted-foreground">
-            <div className="flex items-center gap-4">
-              <span className="flex items-center gap-1">
-                <Database className="w-4 h-4" />
-                Firestore: Connesso
-              </span>
-              <span className="flex items-center gap-1">
-                <Activity className="w-4 h-4" />
-                Sistema: Operativo
-              </span>
-              <span className="flex items-center gap-1">
-                <Mail className="w-4 h-4" />
-                Email: Configurato
-              </span>
-            </div>
-            <div className="text-xs">
-              Ultimo aggiornamento: {new Date().toLocaleString('it-IT')}
-            </div>
-          </div>
-        </div>
-      </footer>
-    </div>
-  );
+    {/* Main Content Area - FIX Z-INDEX */}
+    <main className="relative z-10">
+      <ActiveComponent />
+    </main>
+  </div>
+);
 }

@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { db, hasFirebaseConfig } from '@/lib/firebase';
 import { ReportDocument } from '@/lib/models/report';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 // Funzione helper per deserializzare da Firestore
 function deserializeReport(docData: any): ReportDocument {
@@ -60,6 +61,7 @@ export default function PriceMonitoringDashboard() {
   const [showEmailModal, setShowEmailModal] = useState<ReportDocument | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  const [isFiltersExpanded, setIsFiltersExpanded] = useState(true);
 
   // Carica i dati da Firestore
   useEffect(() => {
@@ -565,88 +567,111 @@ export default function PriceMonitoringDashboard() {
     <div className="bg-background">
       <div className="p-6 space-y-6">
         {/* Filtri - Tab Fissa */}
-        <div className="bg-card border rounded-lg p-6 sticky top-0 z-40">
-          <div className="flex items-center justify-between mb-4">
+        <div className="bg-card border rounded-lg sticky top-0 z-30">
+          {/* Header filtri */}
+          <div 
+            className="flex items-center justify-between p-4 cursor-pointer border-b"
+            onClick={() => setIsFiltersExpanded(!isFiltersExpanded)}
+          >
             <h3 className="text-lg font-semibold flex items-center gap-2">
               <Filter className="w-5 h-5" />
               Filtri e Controlli
             </h3>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
               <button 
-                onClick={() => setFilters({ dateFrom: '', dateTo: '', environment: '', status: '', emailStatus: '' })}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFilters({ dateFrom: '', dateTo: '', environment: '', status: '', emailStatus: '' });
+                }}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded"
               >
                 Reset Filtri
               </button>
               <button
-                onClick={handleRefresh}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRefresh();
+                }}
                 disabled={isRefreshing}
                 className="flex items-center gap-2 px-3 py-1 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50"
               >
                 <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                 <span className="text-sm">Aggiorna</span>
               </button>
+              <div className="ml-2 p-1">
+                {isFiltersExpanded ? (
+                  <ChevronUp className="w-5 h-5 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                )}
+              </div>
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Data Inizio</label>
-              <input
-                type="date"
-                value={filters.dateFrom}
-                onChange={(e) => setFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-md bg-background text-foreground"
-              />
+          
+          {/* Contenuto filtri - Espandibile */}
+          {isFiltersExpanded && (
+            <div className="p-6 pt-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Data Inizio</label>
+                  <input
+                    type="date"
+                    value={filters.dateFrom}
+                    onChange={(e) => setFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
+                    className="w-full px-3 py-2 border rounded-md bg-background text-foreground"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Data Fine</label>
+                  <input
+                    type="date"
+                    value={filters.dateTo}
+                    onChange={(e) => setFilters(prev => ({ ...prev, dateTo: e.target.value }))}
+                    className="w-full px-3 py-2 border rounded-md bg-background text-foreground"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Ambiente</label>
+                  <select
+                    value={filters.environment}
+                    onChange={(e) => setFilters(prev => ({ ...prev, environment: e.target.value }))}
+                    className="w-full px-3 py-2 border rounded-md bg-background text-foreground"
+                  >
+                    <option value="">Tutti</option>
+                    <option value="production">Production</option>
+                    <option value="staging">Staging</option>
+                    <option value="development">Development</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Stato</label>
+                  <select
+                    value={filters.status}
+                    onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+                    className="w-full px-3 py-2 border rounded-md bg-background text-foreground"
+                  >
+                    <option value="">Tutti</option>
+                    <option value="success">Solo Successi</option>
+                    <option value="error">Solo Errori</option>
+                    <option value="changes">Con Cambiamenti</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Email</label>
+                  <select
+                    value={filters.emailStatus}
+                    onChange={(e) => setFilters(prev => ({ ...prev, emailStatus: e.target.value }))}
+                    className="w-full px-3 py-2 border rounded-md bg-background text-foreground"
+                  >
+                    <option value="">Tutte</option>
+                    <option value="sent">Inviate</option>
+                    <option value="failed">Fallite</option>
+                    <option value="pending">In Attesa</option>
+                  </select>
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Data Fine</label>
-              <input
-                type="date"
-                value={filters.dateTo}
-                onChange={(e) => setFilters(prev => ({ ...prev, dateTo: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-md bg-background text-foreground"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Ambiente</label>
-              <select
-                value={filters.environment}
-                onChange={(e) => setFilters(prev => ({ ...prev, environment: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-md bg-background text-foreground"
-              >
-                <option value="">Tutti</option>
-                <option value="production">Production</option>
-                <option value="staging">Staging</option>
-                <option value="development">Development</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Stato</label>
-              <select
-                value={filters.status}
-                onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-md bg-background text-foreground"
-              >
-                <option value="">Tutti</option>
-                <option value="success">Solo Successi</option>
-                <option value="error">Solo Errori</option>
-                <option value="changes">Con Cambiamenti</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Email</label>
-              <select
-                value={filters.emailStatus}
-                onChange={(e) => setFilters(prev => ({ ...prev, emailStatus: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-md bg-background text-foreground"
-              >
-                <option value="">Tutte</option>
-                <option value="sent">Inviate</option>
-                <option value="failed">Fallite</option>
-                <option value="pending">In Attesa</option>
-              </select>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Statistiche Principali - RIMOSSA TILE DEEPSEEK */}

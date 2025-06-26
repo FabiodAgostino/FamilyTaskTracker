@@ -1,0 +1,268 @@
+/* 
+ * Fix per problemi pannello amministratore
+ * Aggiungere a globals.css o creare un file separato admin-fixes.css
+ */
+
+/* 1. FIX FILTRI DASHBOARD - Ridurre z-index filtri */
+.admin-filters-section {
+  position: sticky;
+  top: 0;
+  z-index: 30 !important; /* Ridotto da z-40 a z-30 */
+  background: var(--background);
+  border-bottom: 1px solid var(--border);
+}
+
+/* 2. FIX MENU LATERALE - Aumentare z-index del sidebar */
+.sidebar-menu {
+  z-index: 40 !important; /* Più alto dei filtri */
+}
+
+/* Dropdown menu ha priorità maggiore */
+[data-radix-popper-content-wrapper] {
+  z-index: 50 !important;
+}
+
+/* 3. FIX CARD UTENTI - Contenimento e overflow */
+.user-management-card {
+  overflow: hidden;
+  position: relative;
+}
+
+.user-card-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  margin-bottom: 1rem;
+  position: relative;
+  min-height: 80px; /* Altezza minima per contenere i pulsanti */
+}
+
+.user-card-content {
+  flex: 1;
+  min-width: 0; /* Permette al contenuto di ridursi */
+  margin-right: 1rem;
+}
+
+.user-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0; /* I pulsanti non si riducono */
+  position: relative;
+  z-index: 10;
+}
+
+/* Responsive per mobile */
+@media (max-width: 768px) {
+  .user-card-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+    padding: 1rem 0.75rem;
+  }
+  
+  .user-card-content {
+    margin-right: 0;
+    margin-bottom: 0.5rem;
+  }
+  
+  .user-card-actions {
+    align-self: flex-end;
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+/* 4. FIX FILTRI ESPANDIBILI - Layout corretto per ShoppingList */
+.filters-section {
+  position: relative;
+  z-index: 20 !important; /* Più basso del sidebar */
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  margin-bottom: 2rem;
+}
+
+.filters-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.filters-content {
+  padding: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.filters-content.collapsed {
+  display: none;
+}
+
+/* 5. FIX HEADER ADMIN - Z-index corretto */
+.admin-header {
+  position: sticky;
+  top: 0;
+  z-index: 45 !important; /* Più alto dei filtri ma più basso del menu */
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+
+/* 6. FIX NAVIGATION TABS */
+.admin-nav {
+  position: relative;
+  z-index: 35 !important;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+
+/* 7. FIX DROPDOWN CONTENT - Assicura che sia sempre sopra */
+.dropdown-content,
+[data-radix-dropdown-menu-content] {
+  z-index: 50 !important;
+  position: relative;
+}
+
+/* 8. FIX MODAL E DIALOG */
+.dialog-overlay {
+  z-index: 60 !important;
+}
+
+.dialog-content {
+  z-index: 65 !important;
+}
+
+/* 9. FIX GENERAL LAYOUT ISSUES */
+.main-content {
+  position: relative;
+  z-index: 10;
+}
+
+/* Assicura che i toast siano sempre visibili */
+.toast-container {
+  z-index: 70 !important;
+}
+
+/* 10. FIX PULSANTI CHE ESCONO DALLE CARD */
+.card-with-actions {
+  position: relative;
+  overflow: visible; /* Permette ai dropdown di uscire */
+}
+
+.card-actions-container {
+  position: relative;
+  z-index: 20;
+}
+
+/* Per pulsanti che necessitano dropdown */
+.action-button-dropdown {
+  position: relative;
+}
+
+.action-button-dropdown [data-radix-dropdown-menu-content] {
+  z-index: 55 !important;
+  white-space: nowrap;
+}
+
+
+
+
+[data-radix-dropdown-menu-content],
+[data-radix-context-menu-content],
+[data-radix-select-content] {
+  z-index: 50 !important;
+}
+
+/* Fix per dialog */
+[data-radix-dialog-overlay] {
+  z-index: 60 !important;
+}
+
+[data-radix-dialog-content] {
+  z-index: 65 !important;
+}
+
+/* Fix per toast */
+[data-sonner-toaster] {
+  z-index: 70 !important;
+}
+
+/* Fix specifico per pulsanti che escono dalle card su mobile */
+@media (max-width: 640px) {
+  /* Assicura che i pulsanti siano sempre visibili */
+  .user-card-actions {
+    position: relative;
+    z-index: 20;
+  }
+  
+  /* Migliora la gestione dell'overflow */
+  .card-content-wrapper {
+    overflow: visible !important;
+  }
+}
+
+
+/* Header principale del layout - PRIORITÀ MASSIMA */
+.main-header,
+header[role="banner"],
+.layout-header {
+  z-index: 50 !important;
+}
+
+/* Sidebar - Deve stare sotto l'header principale ma sopra l'admin */
+.sidebar-nav,
+.navigation-sidebar,
+[data-sidebar],
+.sidebar-container,
+aside {
+  z-index: 45 !important;
+}
+
+/* Menu di navigazione laterale */
+.nav-menu,
+.navigation-menu {
+  z-index: 45 !important;
+}
+
+/* Overlay del sidebar mobile */
+.sidebar-overlay {
+  z-index: 42 !important;
+}
+
+/* Dropdown menu - Sopra tutto tranne dialog e toast */
+[data-radix-dropdown-menu-content],
+[data-radix-context-menu-content],
+[data-radix-select-content] {
+  z-index: 55 !important;
+}
+
+/* Dialog */
+[data-radix-dialog-overlay] {
+  z-index: 60 !important;
+}
+
+[data-radix-dialog-content] {
+  z-index: 65 !important;
+}
+
+/* Toast - Priorità massima per notifiche */
+[data-sonner-toaster] {
+  z-index: 70 !important;
+}
+
+/* Fix per pulsanti che escono dalle card su mobile */
+@media (max-width: 640px) {
+  .user-card-actions {
+    position: relative;
+    z-index: 20;
+  }
+  
+  .card-content-wrapper {
+    overflow: visible !important;
+  }
+}
