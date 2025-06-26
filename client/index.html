@@ -312,7 +312,6 @@
                 text-align: center !important;
                 justify-content: center !important;
                 margin: 0 auto;
-                left: 50%;
                 transform: translateX(-50%);
                 position: relative;
             }
@@ -443,7 +442,7 @@
                 
                 if (versionData.major !== undefined && versionData.minor !== undefined && versionData.patch !== undefined) {
                     const versionString = `v${versionData.major}.${versionData.minor}.${versionData.patch}`;
-                    const buildString = versionData.build ? ` (${versionData.build})` : '';
+                    const buildString = versionData.build ? `.${versionData.build}` : '';
                     versionElement.textContent = versionString + buildString;
                 } else if (versionData.version) {
                     versionElement.textContent = `v${versionData.version}`;

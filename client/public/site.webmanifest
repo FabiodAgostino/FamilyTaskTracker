@@ -8,7 +8,20 @@
   "theme_color": "#f8b500",
   "orientation": "portrait-primary",
   "scope": "/FamilyTaskTracker/",
-  
+  "screenshots": [
+    {
+      "src": "/FamilyTaskTracker/splash.png",
+      "sizes": "640x360",
+      "type": "image/png",
+      "platform": "ios"
+    },
+    {
+      "src": "/FamilyTaskTracker/splash.png", 
+      "sizes": "640x360",
+      "type": "image/png",
+      "platform": "android"
+    }
+  ],
   "icons": [
     {
       "src": "/FamilyTaskTracker/apple-touch-icon.png",
