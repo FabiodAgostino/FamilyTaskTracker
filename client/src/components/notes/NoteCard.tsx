@@ -144,7 +144,7 @@ export function NoteCard({
                   e.stopPropagation(); // ✅ NUOVO: Evita il click sulla card
                   onEdit(note);
                 }}
-                className="text-gray-400 hover:text-cambridge-blue h-8 w-8 p-0"
+                className="text-gray-400 hover:text-cambridge-newStyle h-8 w-8 p-0"
               >
                 <Edit className="h-4 w-4" />
               </Button>

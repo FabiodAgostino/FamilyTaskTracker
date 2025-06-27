@@ -146,7 +146,7 @@ export function CategoryFoodManagement({ className }: CategoryManagementProps) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-delft-blue flex items-center gap-2">
-            <Tag className="h-6 w-6 text-burnt-sienna" />
+            <Tag className="h-6 w-6 text-burnt-newStyle" />
             Categorie Alimentari
           </h2>
           <p className="text-muted-foreground">Gestisci le categorie per organizzare i prodotti</p>
@@ -154,7 +154,7 @@ export function CategoryFoodManagement({ className }: CategoryManagementProps) {
 
         <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
           <DialogTrigger asChild>
-            <Button className="bg-burnt-sienna hover:bg-burnt-sienna/90">
+            <Button className="bg-burnt-newStyle hover:bg-burnt-newStyle/90">
               <Plus className="h-4 w-4 mr-2" />
               Nuova Categoria
             </Button>
@@ -193,7 +193,7 @@ export function CategoryFoodManagement({ className }: CategoryManagementProps) {
                       key={icon}
                       type="button"
                       className={`p-2 border rounded-md hover:bg-gray-50 ${
-                        formData.icon === icon ? 'border-burnt-sienna bg-burnt-sienna/10' : 'border-gray-200'
+                        formData.icon === icon ? 'border-burnt-newStyle bg-burnt-newStyle/10' : 'border-gray-200'
                       }`}
                       onClick={() => setFormData({ ...formData, icon })}
                     >
@@ -221,7 +221,7 @@ export function CategoryFoodManagement({ className }: CategoryManagementProps) {
               </div>
 
               <div className="flex gap-2 pt-4">
-                <Button type="submit" className="flex-1 bg-burnt-sienna hover:bg-burnt-sienna/90">
+                <Button type="submit" className="flex-1 bg-burnt-newStyle hover:bg-burnt-newStyle/90">
                   Crea Categoria
                 </Button>
                 <Button 
@@ -268,7 +268,7 @@ export function CategoryFoodManagement({ className }: CategoryManagementProps) {
                       rows={2}
                     />
                     <div className="flex gap-2">
-                      <Button type="submit" size="sm" className="bg-cambridge-blue hover:bg-cambridge-blue/90">
+                      <Button type="submit" size="sm" className="bg-cambridge-newStyle hover:bg-cambridge-newStyle/90">
                         <Save className="h-3 w-3" />
                       </Button>
                       <Button 
@@ -440,7 +440,7 @@ export function SupermarketManagement({ className }: SupermarketManagementProps)
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-delft-blue flex items-center gap-2">
-            <Store className="h-6 w-6 text-burnt-sienna" />
+            <Store className="h-6 w-6 text-burnt-newStyle" />
             Supermercati
           </h2>
           <p className="text-muted-foreground">Gestisci i tuoi supermercati preferiti</p>
@@ -448,7 +448,7 @@ export function SupermarketManagement({ className }: SupermarketManagementProps)
 
         <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
           <DialogTrigger asChild>
-            <Button className="bg-burnt-sienna hover:bg-burnt-sienna/90">
+            <Button className="bg-burnt-newStyle hover:bg-burnt-newStyle/90">
               <Plus className="h-4 w-4 mr-2" />
               Nuovo Supermercato
             </Button>
@@ -548,7 +548,7 @@ export function SupermarketManagement({ className }: SupermarketManagementProps)
               </div>
 
               <div className="flex gap-2 pt-4">
-                <Button type="submit" className="flex-1 bg-burnt-sienna hover:bg-burnt-sienna/90">
+                <Button type="submit" className="flex-1 bg-burnt-newStyle hover:bg-burnt-newStyle/90">
                   Crea Supermercato
                 </Button>
                 <Button 
@@ -580,7 +580,7 @@ export function SupermarketManagement({ className }: SupermarketManagementProps)
           {/* Supermercati Attivi */}
           <div>
             <h3 className="text-lg font-medium text-delft-blue mb-4 flex items-center gap-2">
-              <Check className="h-5 w-5 text-cambridge-blue" />
+              <Check className="h-5 w-5 text-cambridge-newStyle" />
               Attivi ({activeSupermarkets.length})
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -674,7 +674,7 @@ function SupermarketCard({
               placeholder="Città"
             />
             <div className="flex gap-2">
-              <Button type="submit" size="sm" className="bg-cambridge-blue hover:bg-cambridge-blue/90">
+              <Button type="submit" size="sm" className="bg-cambridge-newStyle hover:bg-cambridge-newStyle/90">
                 <Save className="h-3 w-3 mr-1" />
                 Salva
               </Button>
@@ -746,7 +746,7 @@ function SupermarketCard({
               href={supermarket.website} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="text-burnt-sienna hover:underline"
+              className="text-burnt-newStyle hover:underline"
             >
               Sito web
             </a>

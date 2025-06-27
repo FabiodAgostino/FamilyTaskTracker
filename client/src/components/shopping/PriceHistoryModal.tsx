@@ -189,7 +189,7 @@ export function PriceHistoryModal({ isOpen, onClose, item }: PriceHistoryModalPr
         <DialogHeader className={isMobile ? 'pb-2' : ''}>
           <div className="flex items-center justify-between">
             <DialogTitle className={`flex items-center gap-2 ${isMobile ? 'text-base' : ''}`}>
-              <BarChart3 className={`h-5 w-5 text-cambridge-blue ${isMobile ? 'h-4 w-4' : ''}`} />
+              <BarChart3 className={`h-5 w-5 text-cambridge-newStyle ${isMobile ? 'h-4 w-4' : ''}`} />
               <span className={isMobile ? 'truncate max-w-[200px]' : ''}>
                 Storico Prezzi - {item.name}
               </span>

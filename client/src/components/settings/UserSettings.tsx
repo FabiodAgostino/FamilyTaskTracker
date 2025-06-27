@@ -87,7 +87,7 @@ export function UserSettings() {
     return (
       <div className="flex items-center justify-center min-h-64">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cambridge-blue mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cambridge-newStyle mx-auto mb-4"></div>
           <p className="text-delft-blue dark:text-eggshell">Caricamento impostazioni...</p>
         </div>
       </div>
@@ -134,15 +134,15 @@ export function UserSettings() {
             <Label className="text-base font-medium">Modalità Vista Shopping List</Label>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3 p-3 border rounded-lg bg-eggshell/50 dark:bg-delft-blue/20">
-                <LayoutList className={`h-4 w-4 ${preferences.viewMode === 'compact' ? 'text-cambridge-blue' : 'text-gray-400'}`} />
+                <LayoutList className={`h-4 w-4 ${preferences.viewMode === 'compact' ? 'text-cambridge-newStyle' : 'text-gray-400'}`} />
                 <Switch
                   checked={preferences.viewMode === 'images'}
                   onCheckedChange={(checked) => 
                     handlePreferenceChange('viewMode', checked ? 'images' : 'compact')
                   }
-                  className="data-[state=checked]:bg-cambridge-blue"
+                  className="data-[state=checked]:bg-cambridge-newStyle"
                 />
-                <LayoutGrid className={`h-4 w-4 ${preferences.viewMode === 'images' ? 'text-cambridge-blue' : 'text-gray-400'}`} />
+                <LayoutGrid className={`h-4 w-4 ${preferences.viewMode === 'images' ? 'text-cambridge-newStyle' : 'text-gray-400'}`} />
                 <span className="font-medium">
                   {preferences.viewMode === 'images' ? 'Vista Immagini' : 'Vista Compatta'}
                 </span>
@@ -185,13 +185,13 @@ export function UserSettings() {
             <Label className="text-base font-medium">Tema Applicazione</Label>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3 p-3 border rounded-lg bg-eggshell/50 dark:bg-delft-blue/20">
-                <Sun className={`h-4 w-4 ${theme === 'light' ? 'text-cambridge-blue' : 'text-gray-400'}`} />
+                <Sun className={`h-4 w-4 ${theme === 'light' ? 'text-cambridge-newStyle' : 'text-gray-400'}`} />
                 <Switch
                   checked={theme === 'dark'}
                   onCheckedChange={toggleTheme}
-                  className="data-[state=checked]:bg-cambridge-blue"
+                  className="data-[state=checked]:bg-cambridge-newStyle"
                 />
-                <Moon className={`h-4 w-4 ${theme === 'dark' ? 'text-cambridge-blue' : 'text-gray-400'}`} />
+                <Moon className={`h-4 w-4 ${theme === 'dark' ? 'text-cambridge-newStyle' : 'text-gray-400'}`} />
                 <span className="font-medium">
                   {theme === 'light' ? 'Tema Chiaro' : 'Tema Scuro'}
                 </span>
@@ -266,7 +266,7 @@ export function UserSettings() {
               <Switch
                 checked={preferences.showCompleted}
                 onCheckedChange={(checked) => handlePreferenceChange('showCompleted', checked)}
-                className="data-[state=checked]:bg-cambridge-blue"
+                className="data-[state=checked]:bg-cambridge-newStyle"
               />
             </div>
           </div>
@@ -294,7 +294,7 @@ export function UserSettings() {
               <Switch
                 checked={preferences.enableNotifications}
                 onCheckedChange={(checked) => handlePreferenceChange('enableNotifications', checked)}
-                className="data-[state=checked]:bg-cambridge-blue"
+                className="data-[state=checked]:bg-cambridge-newStyle"
               />
             </div>
           </div>
@@ -311,7 +311,7 @@ export function UserSettings() {
               <Switch
                 checked={preferences.emailNotifications}
                 onCheckedChange={(checked) => handlePreferenceChange('emailNotifications', checked)}
-                className="data-[state=checked]:bg-cambridge-blue"
+                className="data-[state=checked]:bg-cambridge-newStyle"
                 disabled={!preferences.enableNotifications}
               />
             </div>

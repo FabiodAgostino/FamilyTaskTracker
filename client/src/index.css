@@ -14,9 +14,9 @@
   --card-foreground: hsl(220, 19%, 24%);
   --border: hsl(210, 12%, 87%);            /* Border grigio-blu */
   --input: hsl(210, 12%, 94%);             /* Input background neutro */
-  --primary: hsl(14, 73%, 60%);            /* Mantieni burnt-sienna */
+  --primary: #663EF3;            /* Mantieni burnt-sienna */
   --primary-foreground: hsl(0, 0%, 98%);
-  --secondary: hsl(150, 25%, 58%);         /* Mantieni cambridge-blue */
+  --secondary: #ff6b35;         /* Mantieni cambridge-blue */
   --secondary-foreground: hsl(220, 19%, 24%);
   --accent: hsl(210, 15%, 92%);            /* Accent neutro */
   --accent-foreground: hsl(220, 19%, 24%);
@@ -32,7 +32,11 @@
   --cambridge-blue: hsl(150, 25%, 58%);    /* Mantieni - bel verde */
   --sunset: hsl(35, 85%, 65%);   
   
-  --burnt-newStyle: linear-gradient(135deg, #f8b500 0%, #a3d900 100%);
+  --burnt-newStyle: linear-gradient(50deg, #536DFE 0%, #663EF3 100%);
+  --burnt-text-newStyle: #663EF3;
+  --cambridge-newStyle: #663EF3;    
+  --icons-newStyle: #ff6b35;
+
 
 }
 
@@ -64,6 +68,8 @@
   --delft-blue: hsl(210, 20%, 88%);        /* Testo chiaro blu */
   --cambridge-blue: hsl(150, 35%, 65%);    /* Verde più vivace */
   --sunset: hsl(35, 90%, 70%);             /* Arancione brillante */
+
+
 }
 
 @layer base {
@@ -113,9 +119,7 @@
     background-color: var(--burnt-sienna);
   }
 
- .bg-burnt-newStyle {
-  background: var(--burnt-newStyle);
-}
+ 
   
   .bg-delft-blue {
     background-color: var(--delft-blue);
@@ -167,6 +171,35 @@
   .shadow-warm-lg {
     box-shadow: 0 10px 15px -3px hsl(220, 15%, 20%, 0.1), 0 4px 6px -2px hsl(220, 15%, 20%, 0.05);
   }
+
+  /* newstyle */
+  .bg-burnt-newStyle {
+  background: var(--burnt-newStyle);
+}
+ .text-burnt-newStyle {
+    color: var(--burnt-text-newStyle);
+  }
+
+  .border-burnt-newStyle {
+    border-color: var(--burnt-text-newStyle);
+  }
+
+   .text-cambridge-newStyle {
+    color: var(--cambridge-newStyle);
+  }
+
+  .border-cambridge-newStyle {
+    border-color: var(--cambridge-newStyle);
+  }
+
+   .bg-cambridge-newStyle {
+    background-color: var(--cambridge-newStyle);
+  }
+
+   .bg-icons-newStyle {
+    color: var(--icons-newStyle);
+  }
+
 }
 
 /* ✅ BONUS: Custom scrollbar styling */

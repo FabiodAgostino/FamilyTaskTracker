@@ -376,7 +376,7 @@ const { data: categories } = useDynamicCategories();
     return (
       <div className="container mx-auto p-6 max-w-7xl">
         <div className="flex justify-center items-center py-20">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cambridge-blue"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cambridge-newStyle"></div>
           <span className="ml-3 text-gray-600">Caricamento Shopping...</span>
         </div>
       </div>
@@ -392,7 +392,7 @@ const { data: categories } = useDynamicCategories();
       )}>
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-3">
-            <FaShoppingBag className="h-8 w-8 text-cambridge-blue" />
+            <FaShoppingBag className="h-8 w-8 text-cambridge-newStyle" />
             <h1 className="text-3xl font-bold text-delft-blue">Shopping</h1>
             
             {/* ✅ NUOVO: Bottone piccolo a fianco del titolo su mobile */}
@@ -400,7 +400,7 @@ const { data: categories } = useDynamicCategories();
               <Button
                 onClick={() => handleOpenModal()}
                 size="sm"
-                className="ml-auto bg-cambridge-blue hover:bg-cambridge-blue/90 text-white p-2"
+                className="ml-auto bg-cambridge-newStyle hover:bg-cambridge-newStyle/90 text-white p-2"
               >
                 <Plus className="h-4 w-4" />
               </Button>
@@ -412,10 +412,10 @@ const { data: categories } = useDynamicCategories();
             "flex flex-wrap gap-4",
             isMobile && "mb-4"
           )}>
-            <Badge variant="outline" className="text-cambridge-blue border-cambridge-blue">
+            <Badge variant="outline" className="text-cambridge-newStyle border-cambridge-newStyle">
               {stats.totalVisible} {stats.totalVisible === 1 ? 'articolo' : 'articoli'}
             </Badge>
-            <Badge variant="outline" className="text-cambridge-blue border-cambridge-blue">
+            <Badge variant="outline" className="text-cambridge-newStyle border-cambridge-newStyle">
               {stats.totalPending} da comprare
             </Badge>
             <Badge variant="outline" className="text-green-600 border-green-300">
@@ -455,14 +455,14 @@ const { data: categories } = useDynamicCategories();
         {!isMobile && (
           <div className="flex items-center gap-4">
             <div className="flex items-center space-x-2 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
-              <List className={`h-4 w-4 ${viewMode === 'compact' ? 'text-cambridge-blue' : 'text-gray-400'}`} />
+              <List className={`h-4 w-4 ${viewMode === 'compact' ? 'text-cambridge-newStyle' : 'text-gray-400'}`} />
               <Switch
                 id="view-mode"
                 checked={viewMode === 'images'}
                 onCheckedChange={(checked) => setViewMode(checked ? 'images' : 'compact')}
-                className="data-[state=checked]:bg-cambridge-blue"
+                className="data-[state=checked]:bg-cambridge-newStyle"
               />
-              <LayoutGrid className={`h-4 w-4 ${viewMode === 'images' ? 'text-cambridge-blue' : 'text-gray-400'}`} />
+              <LayoutGrid className={`h-4 w-4 ${viewMode === 'images' ? 'text-cambridge-newStyle' : 'text-gray-400'}`} />
               <Label htmlFor="view-mode" className="text-sm font-medium cursor-pointer">
                 {viewMode === 'images' ? 'Vista Immagini' : 'Vista Compatta'}
               </Label>
@@ -470,7 +470,7 @@ const { data: categories } = useDynamicCategories();
 
             <Button
               onClick={() => handleOpenModal()}
-              className="bg-cambridge-blue hover:bg-cambridge-blue/90 text-white"
+              className="bg-cambridge-newStyle hover:bg-cambridge-newStyle/90 text-white"
             >
               <Plus className="mr-2 h-4 w-4" />
               Aggiungi Articolo
@@ -490,7 +490,7 @@ const { data: categories } = useDynamicCategories();
                 <Filter className="h-4 w-4 text-gray-500" />
                 <span className="font-medium text-sm">Filtri di ricerca</span>
                 {activeFiltersCount > 0 && (
-                  <Badge variant="secondary" className="bg-cambridge-blue/10 text-cambridge-blue text-xs">
+                  <Badge variant="secondary" className="bg-cambridge-newStyle/10 text-cambridge-newStyle text-xs">
                     {activeFiltersCount}
                   </Badge>
                 )}
@@ -588,7 +588,7 @@ const { data: categories } = useDynamicCategories();
                     id="show-completed"
                     checked={showCompleted}
                     onCheckedChange={handleShowCompletedChange}
-                    className="data-[state=checked]:bg-cambridge-blue"
+                    className="data-[state=checked]:bg-cambridge-newStyle"
                   />
                   <Label htmlFor="show-completed" className="text-sm font-medium cursor-pointer">
                     Mostra archiviati
@@ -597,13 +597,13 @@ const { data: categories } = useDynamicCategories();
 
                 {/* ✅ NUOVO: Vista toggle inline con filtri */}
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 dark:bg-gray-800 rounded-lg border">
-                  <List className={`h-4 w-4 ${viewMode === 'compact' ? 'text-cambridge-blue' : 'text-gray-400'}`} />
+                  <List className={`h-4 w-4 ${viewMode === 'compact' ? 'text-cambridge-newStyle' : 'text-gray-400'}`} />
                   <Switch
                     checked={viewMode === 'images'}
                     onCheckedChange={(checked) => setViewMode(checked ? 'images' : 'compact')}
-                    className="data-[state=checked]:bg-cambridge-blue"
+                    className="data-[state=checked]:bg-cambridge-newStyle"
                   />
-                  <LayoutGrid className={`h-4 w-4 ${viewMode === 'images' ? 'text-cambridge-blue' : 'text-gray-400'}`} />
+                  <LayoutGrid className={`h-4 w-4 ${viewMode === 'images' ? 'text-cambridge-newStyle' : 'text-gray-400'}`} />
                   <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
                     {viewMode === 'images' ? 'Immagini' : 'Compatta'}
                   </span>

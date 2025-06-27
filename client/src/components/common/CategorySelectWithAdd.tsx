@@ -188,7 +188,7 @@ export function CategorySelectWithAdd({
         </SelectTrigger>
         <SelectContent>
           {/* Opzione per aggiungere nuova categoria */}
-          <SelectItem value="__add_new__" className="text-cambridge-blue font-medium">
+          <SelectItem value="__add_new__" className="text-cambridge-newStyle font-medium">
             <div className="flex items-center">
               <Plus className="h-4 w-4 mr-2" />
               Aggiungi nuova categoria
@@ -276,7 +276,7 @@ export function CategorySelectWithAdd({
                     }}
                     title="Promuovi a categoria principale"
                   >
-                    <Plus className="h-3 w-3 text-cambridge-blue" />
+                    <Plus className="h-3 w-3 text-cambridge-newStyle" />
                   </Button>
                 </div>
               ))}
@@ -289,7 +289,7 @@ export function CategorySelectWithAdd({
       <Dialog open={showAddCategoryModal} onOpenChange={setShowAddCategoryModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center text-lg text-cambridge-blue">
+            <DialogTitle className="flex items-center text-lg text-cambridge-newStyle">
               <Plus className="mr-2 h-5 w-5" />
               {promotingCategory ? `Promuovi "${promotingCategory.name}"` : 'Aggiungi Nuova Categoria'}
             </DialogTitle>
@@ -417,7 +417,7 @@ export function CategorySelectWithAdd({
                 <Button
                   type="submit"
                   disabled={isAddingCategory}
-                  className="bg-cambridge-blue hover:bg-cambridge-blue/90"
+                  className="bg-cambridge-newStyle hover:bg-cambridge-newStyle/90"
                 >
                   {isAddingCategory ? (
                     <>

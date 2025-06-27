@@ -689,7 +689,7 @@ const handlePermanentDelete = async (listId: string) => {
     return (
       <div className="container mx-auto p-6 max-w-7xl">
         <div className="flex justify-center items-center py-20">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cambridge-blue"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cambridge-newStyle"></div>
           <span className="ml-3 text-gray-600">Caricamento Spesa...</span>
         </div>
       </div>
@@ -702,12 +702,12 @@ const handlePermanentDelete = async (listId: string) => {
       <div className="flex items-center justify-between mb-8">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-3">
-            <FaCartShopping className="h-8 w-8 text-cambridge-blue" />
+            <FaCartShopping className="h-8 w-8 text-cambridge-newStyle" />
             <h1 className="text-3xl font-bold text-delft-blue">Spesa</h1>
           </div>
           
           <div className="flex flex-wrap gap-4">
-            <Badge variant="outline" className="text-cambridge-blue border-cambridge-blue">
+            <Badge variant="outline" className="text-cambridge-newStyle border-cambridge-newStyle">
               {stats.total} {stats.total === 1 ? 'lista' : 'liste'}
             </Badge>
             {stats.completed > 0 && (
@@ -722,7 +722,7 @@ const handlePermanentDelete = async (listId: string) => {
         <div className="flex items-center gap-2">
           <Button
             onClick={() => setShowCreateDialog(true)}
-            className="bg-cambridge-blue hover:bg-cambridge-blue/90 text-white"
+            className="bg-cambridge-newStyle hover:bg-cambridge-newStyle/90 text-white"
           >
             <Plus className="h-4 w-4 mr-2" />
             {isMobile ? '' : 'Nuova Lista'}
@@ -762,7 +762,7 @@ const handlePermanentDelete = async (listId: string) => {
         <CardContent className="p-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-cambridge-blue" />
+              <Filter className="h-4 w-4 text-cambridge-newStyle" />
               <span className="font-medium text-delft-blue">Filtri</span>
             </div>
             <Button
@@ -859,7 +859,7 @@ const handlePermanentDelete = async (listId: string) => {
                     key={list.id}
                     className={cn(
                       "cursor-pointer transition-all hover:shadow-md",
-                      selectedList?.id === list.id ? 'ring-2 ring-burnt-sienna border-burnt-sienna' : ''
+                      selectedList?.id === list.id ? 'ring-2 ring-burnt-sienna border-burnt-newStyle' : ''
                     )}
                     onClick={() => {
                       setSelectedList(list);
@@ -935,7 +935,7 @@ const handlePermanentDelete = async (listId: string) => {
                       variant={isEditing ? "default" : "outline"}
                       size="sm"
                       onClick={handleSaveList}
-                      className={isEditing ? "bg-burnt-sienna hover:bg-burnt-sienna/90" : ""}
+                      className={isEditing ? "bg-burnt-newStyle hover:bg-burnt-newStyle/90" : ""}
                     >
                       {isEditing ? <Check className="h-4 w-4" /> : <Edit className="h-4 w-4" />}
                       {isEditing ? 'Salva' : 'Modifica'}
@@ -1339,7 +1339,7 @@ const handlePermanentDelete = async (listId: string) => {
             </div>
             
             <div className="flex gap-2 pt-4">
-              <Button onClick={handleCreateList} className="flex-1 bg-burnt-sienna hover:bg-burnt-sienna/90">
+              <Button onClick={handleCreateList} className="flex-1 bg-burnt-newStyle hover:bg-burnt-newStyle/90">
                 Crea Lista
               </Button>
               <Button variant="outline" onClick={() => setShowCreateDialog(false)} className="flex-1">
@@ -1374,7 +1374,7 @@ const handlePermanentDelete = async (listId: string) => {
                     key={icon}
                     className={cn(
                       "p-2 border rounded-md hover:bg-gray-50",
-                      newCategoryForm.icon === icon ? 'border-burnt-sienna bg-burnt-sienna/10' : ''
+                      newCategoryForm.icon === icon ? 'border-burnt-newStyle bg-burnt-newStyle/10' : ''
                     )}
                     onClick={() => setNewCategoryForm(prev => ({ ...prev, icon }))}
                   >
@@ -1388,7 +1388,7 @@ const handlePermanentDelete = async (listId: string) => {
               <Button 
                 onClick={handleCreateCategory}
                 disabled={!newCategoryForm.name.trim()}
-                className="flex-1 bg-burnt-sienna hover:bg-burnt-sienna/90"
+                className="flex-1 bg-burnt-newStyle hover:bg-burnt-newStyle/90"
               >
                 Crea Categoria
               </Button>
@@ -1429,7 +1429,7 @@ const handlePermanentDelete = async (listId: string) => {
               <Button 
                 onClick={handleCreateSupermarket}
                 disabled={!newSupermarketForm.name.trim()}
-                className="flex-1 bg-burnt-sienna hover:bg-burnt-sienna/90"
+                className="flex-1 bg-burnt-newStyle hover:bg-burnt-newStyle/90"
               >
                 Crea Supermercato
               </Button>
@@ -1450,7 +1450,7 @@ const handlePermanentDelete = async (listId: string) => {
             <DialogTitle className="text-center">Creazione Lista in Corso</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cambridge-blue mb-4"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cambridge-newStyle mb-4"></div>
             <p className="text-muted-foreground text-center">
               Sto sincronizzando la nuova lista...
             </p>

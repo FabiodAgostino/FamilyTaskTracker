@@ -79,14 +79,14 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       path: '/shopping',
       icon: FaShoppingBag,
       count: stats.shopping,
-      color: 'bg-burnt-sienna'
+      color: 'bg-burnt-newStyle'
     },
     {
       name: 'Note',
       path: '/notes',
       icon: FaNoteSticky,
       count: stats.notes,
-      color: 'bg-cambridge-blue'
+      color: 'bg-cambridge-newStyle'
     },
      {
       name: 'Spesa',
@@ -140,14 +140,14 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     className={cn(
                       "group flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200 cursor-pointer",
                       isActive
-                        ? "bg-burnt-sienna/10 text-burnt-sienna border border-burnt-sienna/20"
+                        ? "bg-burnt-newStyle/10 text-burnt-newStyle border border-burnt-newStyle/20"
                         : "text-muted-foreground hover:bg-muted hover:text-card-foreground border border-transparent"
                     )}
                     onClick={() => window.innerWidth < 1024 && onClose()}
                   >
                     <Icon className={cn(
                       "mr-3 h-5 w-5 transition-colors",
-                      isActive ? "text-burnt-sienna" : "text-muted-foreground group-hover:text-card-foreground"
+                      isActive ? "text-burnt-newStyle" : "text-muted-foreground group-hover:text-card-foreground"
                     )} />
                     <span className="flex-1">{item.name}</span>
                     {/* ✅ MIGLIORATO: Mostra count solo se > 0 */}
@@ -155,7 +155,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                       <span className={cn(
                         "text-xs px-2 py-1 rounded-full font-medium transition-colors",
                         isActive
-                          ? "bg-burnt-sienna text-white"
+                          ? "bg-burnt-newStyle text-white"
                           : "bg-muted text-muted-foreground group-hover:bg-muted-foreground/10"
                       )}>
                         {item.count}
@@ -187,15 +187,15 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           
           {/* ✅ MIGLIORATO: Footer statistiche con dati reali */}
           <div className="px-4 py-4 border-t border-border mt-auto">
-            <div className="bg-cambridge-blue/10 dark:bg-cambridge-blue/20 rounded-lg p-4 border border-cambridge-blue/20">
+            <div className="bg-cambridge-newStyle/10 dark:bg-cambridge-newStyle/20 rounded-lg p-4 border border-cambridge-newStyle/20">
               <div className="flex items-center mb-3">
-                <Clock className="h-4 w-4 text-cambridge-blue mr-2" />
+                <Clock className="h-4 w-4 text-cambridge-newStyle mr-2" />
                 <h3 className="text-sm font-semibold text-card-foreground">Statistiche Rapide</h3>
               </div>
               <div className="space-y-2 text-xs">
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Archiviati Oggi</span>
-                  <span className="font-medium text-cambridge-blue bg-cambridge-blue/10 px-2 py-1 rounded-full">
+                  <span className="font-medium text-cambridge-newStyle bg-cambridge-newStyle/10 px-2 py-1 rounded-full">
                     {stats.completedToday}
                   </span>
                 </div>

@@ -127,7 +127,7 @@ export function NotesList() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-burnt-sienna"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-burnt-newStyle"></div>
         <span className="ml-3 text-delft-blue font-medium">Loading...</span>
       </div>
     );
@@ -143,7 +143,7 @@ export function NotesList() {
         )}>
           <div className={cn(isMobile ? "w-full" : "")}>
             <div className="flex items-center gap-3 mb-3">
-              <FaNoteSticky  className="h-8 w-8 text-cambridge-blue" />
+              <FaNoteSticky  className="h-8 w-8 text-cambridge-newStyle" />
               <h1 className="text-3xl font-bold text-delft-blue">Note</h1>
               
               {/* Bottone piccolo a fianco del titolo in mobile */}
@@ -151,7 +151,7 @@ export function NotesList() {
                 <Button
                   onClick={() => setIsEditorOpen(true)}
                   size="sm"
-                  className="ml-auto bg-cambridge-blue hover:bg-cambridge-blue/90 text-white p-2"
+                  className="ml-auto bg-cambridge-newStyle hover:bg-cambridge-newStyle/90 text-white p-2"
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
@@ -163,7 +163,7 @@ export function NotesList() {
               "flex flex-wrap gap-2",
               isMobile ? "mb-4" : ""
             )}>
-              <Badge variant="secondary" className="bg-cambridge-blue/10 text-cambridge-blue border-cambridge-blue/20">
+              <Badge variant="secondary" className="bg-cambridge-newStyle/10 text-cambridge-newStyle border-cambridge-newStyle/20">
                 {stats.total} {stats.total === 1 ? 'nota' : 'note'}
               </Badge>
               <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200">
@@ -184,7 +184,7 @@ export function NotesList() {
           {!isMobile && (
             <Button
               onClick={() => setIsEditorOpen(true)}
-              className="bg-cambridge-blue hover:bg-cambridge-blue/90 text-white dark:text-black shadow-lg"
+              className="bg-cambridge-newStyle hover:bg-cambridge-newStyle/90 text-white dark:text-black shadow-lg"
             >
               <Plus className="mr-2 h-4 w-4" />
               Nuova Nota
@@ -315,7 +315,7 @@ export function NotesList() {
             </p>
             <Button
               onClick={() => setIsEditorOpen(true)}
-              className="bg-burnt-sienna hover:bg-burnt-sienna/90 text-white font-semibold"
+              className="bg-burnt-newStyle hover:bg-burnt-newStyle/90 text-white font-semibold"
             >
               <Plus className="mr-2 h-4 w-4" />
               Crea Prima Nota
