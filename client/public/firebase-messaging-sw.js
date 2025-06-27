@@ -1,5 +1,5 @@
 // 🔥 Generated Service Worker - DO NOT EDIT MANUALLY
-// Generated at: 2025-06-27T12:13:26.602Z
+// Generated at: 2025-06-27T12:37:31.225Z
 // Environment: development
 // Version: 1.0.0
 

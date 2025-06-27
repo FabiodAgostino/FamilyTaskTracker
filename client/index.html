@@ -473,8 +473,8 @@ html, body {
             }
             
             .home-icon {
-                width: 70px;
-                height: 70px;
+                width: 300px;
+                height: 300px;
             }
             
             .orbit-particle:nth-child(1), .orbit-particle:nth-child(2), .orbit-particle:nth-child(3) {
@@ -483,7 +483,6 @@ html, body {
             
             .splash-text {
                 font-size: 32px;
-                padding: 0 20px;
             }
         }
     </style>
@@ -541,7 +540,7 @@ html, body {
 
             <!-- Testo animato -->
             <div class="splash-text" id="splashText">
-                Family Task Tracker
+                Home Task
             </div>
 
             <!-- Version info -->
@@ -625,19 +624,23 @@ html, body {
 
         // Effetto typing per il testo
         function animateText() {
-            const textElement = document.getElementById('splashText');
-            const text = textElement.textContent;
-            textElement.innerHTML = '';
+    const textElement = document.getElementById('splashText');
+    const text = textElement.textContent;
+    textElement.innerHTML = '';
 
-            text.split('').forEach((char, index) => {
-                const span = document.createElement('span');
-                span.className = 'text-char';
-                span.textContent = char === ' ' ? '\u00A0' : char;
-                span.style.animationDelay = (1 + index * 0.05) + 's';
-                span.style.transform = 'translateY(20px)';
-                textElement.appendChild(span);
-            });
+    text.split('').forEach((char, index) => {
+        if (char === ' ') {
+            textElement.appendChild(document.createTextNode(' '));
+        } else {
+            const span = document.createElement('span');
+            span.className = 'text-char';
+            span.textContent = char;
+            span.style.animationDelay = (1 + index * 0.05) + 's';
+            span.style.transform = 'translateY(20px)';
+            textElement.appendChild(span);
         }
+    });
+}
 
         // Gestione intelligente splash
         function handleSplash() {
@@ -696,7 +699,7 @@ html, body {
                             splash.style.display = 'none';
                             document.body.style.overflow = 'auto';
                         }, 800);
-                    }, 4000); // Aumentato da 2000 a 4000 (4 secondi)
+                    }, 400000); // Aumentato da 2000 a 4000 (4 secondi)
                     
                 } else if (elapsedTime >= maxWaitTime) {
                     // Timeout
