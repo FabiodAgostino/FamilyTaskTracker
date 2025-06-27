@@ -82,6 +82,8 @@ export function ShoppingImageCard({
   const [showImageSelector, setShowImageSelector] = useState(false);
   const [searchedImages, setSearchedImages] = useState<ProcessedImageResult[]>([]);
   const [searchError, setSearchError] = useState<string>('');
+  const [showUnarchiveModal, setShowUnarchiveModal] = useState(false);
+  const [isUnarchiving, setIsUnarchiving] = useState(false);
 
   // Stati per modali
   const [showURLModal, setShowURLModal] = useState(false);
@@ -204,6 +206,11 @@ export function ShoppingImageCard({
     if (!isClickEnabled) {
       return;
     }
+
+    if (item.completed) {
+    setShowUnarchiveModal(true);
+    return;
+  }
     
     if (onClick) {
       onClick(item);
@@ -216,6 +223,26 @@ export function ShoppingImageCard({
       onClick(item);
     }
   };
+
+  const handleUnarchive = async () => {
+  setIsUnarchiving(true);
+  try {
+    await onComplete(item.id); // Usa la stessa funzione che togglea lo stato
+    toast({
+      title: 'Elemento ripristinato',
+      description: 'Elemento rimesso nella lista shopping!',
+    });
+    setShowUnarchiveModal(false);
+  } catch (error) {
+    toast({
+      title: 'Errore',
+      description: "Impossibile ripristinare l'elemento",
+      variant: 'destructive',
+    });
+  } finally {
+    setIsUnarchiving(false);
+  }
+};
 
   // Handler per rigenerare immagine
   const handleRegenerateImage = async (e: React.MouseEvent) => {
@@ -833,6 +860,37 @@ export function ShoppingImageCard({
           productName={item.name || 'Prodotto'}
           brandName={item.brandName}
         />
+
+        <AlertDialog open={showUnarchiveModal} onOpenChange={setShowUnarchiveModal}>
+  <AlertDialogContent>
+    <AlertDialogHeader>
+      <AlertDialogTitle>Ripristina elemento</AlertDialogTitle>
+      <AlertDialogDescription>
+        Vuoi rimettere "{item.name || 'questo elemento'}" nella lista shopping attiva?
+        L'elemento tornerà visibile nella lista principale.
+      </AlertDialogDescription>
+    </AlertDialogHeader>
+    <AlertDialogFooter>
+      <AlertDialogCancel disabled={isUnarchiving}>
+        Annulla
+      </AlertDialogCancel>
+      <AlertDialogAction
+        onClick={handleUnarchive}
+        disabled={isUnarchiving}
+        className="bg-blue-600 hover:bg-blue-700"
+      >
+        {isUnarchiving ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Ripristinando...
+          </>
+        ) : (
+          'Ripristina'
+        )}
+      </AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
 
         {/* ✅ NUOVO: Modale storico prezzi */}
         <PriceHistoryModal
