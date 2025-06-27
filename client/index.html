@@ -181,28 +181,7 @@ html, body {
             display: none !important;
         }
 
-        /* Particelle flottanti */
-        .particles {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-        }
-
-        .particle {
-            position: absolute;
-            width: 4px;
-            height: 4px;
-            background: rgba(255, 255, 255, 0.6);
-            border-radius: 50%;
-            animation: float 6s infinite ease-in-out;
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translateY(0px) rotate(0deg); opacity: 0; }
-            50% { transform: translateY(-100px) rotate(180deg); opacity: 1; }
-        }
-
+     
         /* Icona casa container */
         .icon-container {
             position: relative;
@@ -470,9 +449,6 @@ html, body {
   <body>
     <!-- Animated Splash Screen -->
     <div id="splash" class="splash-container">
-        <!-- Particelle animate -->
-        <div class="particles" id="particles"></div>
-        
         <div class="splash-content">
             <!-- Icona casa animata -->
             <div class="icon-container">
@@ -529,10 +505,16 @@ html, body {
         }
 
         // Gestione sessione - LOGICA INVERTITA
-        function shouldShowSplash() {
+       function shouldShowSplash() {
             if (isPWA()) {
-                // PWA: mostra SEMPRE l'animazione
-                return true;
+                // PWA: mostra una volta al giorno
+                const lastShown = localStorage.getItem('pwaLastSplash');
+                const today = new Date().toDateString();
+                
+                if (lastShown !== today) {
+                    return true;
+                }
+                return false;
             }
             
             // Browser: mostra solo la prima volta per sessione
@@ -540,12 +522,15 @@ html, body {
             return !splashShown;
         }
 
-        function markSplashAsShown() {
-            if (!isPWA()) {
-                // Solo browser salva in sessione
+       function markSplashAsShown() {
+            if (isPWA()) {
+                // PWA: salva la data di oggi
+                const today = new Date().toDateString();
+                localStorage.setItem('pwaLastSplash', today);
+            } else {
+                // Browser: salva in sessione
                 sessionStorage.setItem('splashShown', 'true');
             }
-            // PWA non salva nulla, così mostra sempre
         }
 
         // Carica versione da version.json - SUBITO
@@ -572,22 +557,6 @@ html, body {
             }
         }
 
-        // Crea particelle flottanti
-        function createParticles() {
-            const particlesContainer = document.getElementById('particles');
-            const particleCount = 15;
-
-            for (let i = 0; i < particleCount; i++) {
-                const particle = document.createElement('div');
-                particle.className = 'particle';
-                
-                particle.style.left = Math.random() * 100 + '%';
-                particle.style.animationDelay = Math.random() * 6 + 's';
-                particle.style.animationDuration = (Math.random() * 3 + 4) + 's';
-                
-                particlesContainer.appendChild(particle);
-            }
-        }
 
         // Effetto typing per il testo
         function animateText() {

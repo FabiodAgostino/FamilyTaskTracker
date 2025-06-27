@@ -30,7 +30,10 @@
   --burnt-sienna: hsl(14, 73%, 60%);       /* Mantieni - colore brand */
   --delft-blue: hsl(220, 19%, 24%);        /* Mantieni - perfetto per testo */
   --cambridge-blue: hsl(150, 25%, 58%);    /* Mantieni - bel verde */
-  --sunset: hsl(35, 85%, 65%);             /* Arancione caldo, più vivace */
+  --sunset: hsl(35, 85%, 65%);   
+  
+  --burnt-newStyle: linear-gradient(135deg, #f8b500 0%, #a3d900 100%);
+
 }
 
 /* ✅ PALETTE DARK BILANCIATA */
@@ -109,6 +112,10 @@
   .bg-burnt-sienna {
     background-color: var(--burnt-sienna);
   }
+
+ .bg-burnt-newStyle {
+  background: var(--burnt-newStyle);
+}
   
   .bg-delft-blue {
     background-color: var(--delft-blue);
