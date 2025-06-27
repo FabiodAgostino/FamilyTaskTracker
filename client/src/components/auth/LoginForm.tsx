@@ -119,7 +119,7 @@ useEffect(() => {
         <CardContent className="pt-8 pb-8 px-8">
           {/* Header */}
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-burnt-sienna rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 bg-burnt-newStyle rounded-full flex items-center justify-center mx-auto mb-4">
               <Home className="h-8 w-8 text-white" />
             </div>
             <h1 className="text-3xl font-bold text-delft-blue mb-2">HomeTask</h1>
@@ -208,7 +208,7 @@ useEffect(() => {
               {/* Pulsante di submit */}
               <Button
                 type="submit"
-                className="w-full bg-burnt-sienna hover:bg-burnt-sienna/90 text-white font-semibold py-3"
+                className="w-full bg-cambridge-newStyle hover:bg-burnt-newStyle/90 text-white font-semibold py-3"
                 disabled={isLoading || isLoadingUsers}
               >
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

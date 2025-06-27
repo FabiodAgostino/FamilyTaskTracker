@@ -613,7 +613,7 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
                       ))}
                       
                       <SelectItem value="add_new">
-                        <div className="flex items-center text-cambridge-blue">
+                        <div className="flex items-center text-cambridge-newStyle">
                           <Plus className="mr-2 h-4 w-4" />
                           <span>Aggiungi nuova categoria</span>
                         </div>
@@ -627,7 +627,7 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
 
             {/* Form per nuova categoria */}
             {showNewCategoryForm && (
-              <div className="p-4 border border-cambridge-blue/20 rounded-lg bg-cambridge-blue/5">
+              <div className="p-4 border border-cambridge-newStyle/20 rounded-lg bg-cambridge-newStyle/5">
                 <h4 className="font-medium text-delft-blue mb-3 flex items-center">
                   <Plus className="mr-2 h-4 w-4" />
                   Nuova Categoria

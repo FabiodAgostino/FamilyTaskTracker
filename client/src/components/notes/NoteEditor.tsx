@@ -235,12 +235,12 @@ export function NoteEditor({ isOpen, onClose, onSave, editNote }: NoteEditorProp
           <DialogTitle className="text-2xl font-bold text-delft-blue flex items-center">
             {editNote ? (
               <>
-                <Pin className="mr-3 h-6 w-6 text-burnt-sienna" />
+                <Pin className="mr-3 h-6 w-6 text-burnt-newStyle" />
                 Modifica Nota
               </>
             ) : (
               <>
-                <Plus className="mr-3 h-6 w-6 text-burnt-sienna" />
+                <Plus className="mr-3 h-6 w-6 text-burnt-newStyle" />
                 Crea Nuova Nota
               </>
             )}
@@ -364,7 +364,7 @@ export function NoteEditor({ isOpen, onClose, onSave, editNote }: NoteEditorProp
                         onClick={() => field.onChange(color.value)}
                         className={`p-4 rounded-xl border-2 text-sm font-medium transition-all hover:scale-105 ${
                           field.value === color.value 
-                            ? 'border-burnt-sienna ring-2 ring-burnt-sienna/30 shadow-md' 
+                            ? 'border-burnt-newStyle ring-2 ring-burnt-sienna/30 shadow-md' 
                             : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
                         }`}
                         style={{ 
@@ -458,7 +458,7 @@ export function NoteEditor({ isOpen, onClose, onSave, editNote }: NoteEditorProp
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="flex-1 bg-burnt-sienna hover:bg-burnt-sienna/90 text-white font-semibold"
+                className="flex-1 bg-burnt-newStyle hover:bg-burnt-newStyle/90 text-white font-semibold"
               >
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {editNote ? 'Aggiorna Nota' : 'Crea Nota'}

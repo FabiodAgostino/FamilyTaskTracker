@@ -53,13 +53,13 @@ export function Header({ onMenuToggle }: HeaderProps) {
     ? {
         icon: RatIcon,
         title: 'TopiniTask',
-        iconBgColor: 'bg-burnt-sienna',
+        iconBgColor: 'bg-burnt-newStyle',
         iconTextColor: 'text-white'
       }
     : {
         icon: Home,
         title: 'HomeTask', 
-        iconBgColor: 'bg-burnt-sienna',
+        iconBgColor: 'bg-burnt-newStyle',
         iconBgStyle: {},
         iconTextColor: 'text-white'
       };
@@ -106,7 +106,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
               <Link key={item.name} href={item.path}>
                 <span className={`font-medium px-1 pb-4 border-b-2 transition-colors cursor-pointer block ${
                   location === item.path
-                    ? 'text-burnt-sienna border-burnt-sienna'
+                    ? 'text-burnt-newStyle border-burnt-newStyle'
                     : 'text-muted-foreground hover:text-delft-blue border-transparent hover:border-muted'
                 }`}>
                   {item.name}
@@ -136,7 +136,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
                   className="hidden sm:flex items-center space-x-2 ml-2 h-auto p-2 hover:bg-muted transition-colors rounded-lg"
                 >
                   <div 
-                    className={`w-8 h-8 ${isTopiniTheme ? '' : 'bg-cambridge-blue'} rounded-full flex items-center justify-center shadow-sm`}
+                    className={`w-8 h-8 ${isTopiniTheme ? '' : 'bg-cambridge-newStyle'} rounded-full flex items-center justify-center shadow-sm`}
                     style={isTopiniTheme ? { backgroundColor: 'rgb(37, 99, 235)' } : {}}
                   >
                     {isTopiniTheme ? (
@@ -156,7 +156,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
                 {/* Header del dropdown */}
                 <DropdownMenuLabel className="flex items-center space-x-2">
                   <div 
-                    className={`w-6 h-6 ${isTopiniTheme ? '' : 'bg-cambridge-blue'} rounded-full flex items-center justify-center`}
+                    className={`w-6 h-6 ${isTopiniTheme ? '' : 'bg-cambridge-newStyle'} rounded-full flex items-center justify-center`}
                     style={isTopiniTheme ? { backgroundColor: 'rgb(37, 99, 235)' } : {}}
                   >
                     {isTopiniTheme ? (
@@ -246,7 +246,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
                     className="w-12 h-12 rounded-full p-2 text-muted-foreground hover:text-delft-blue hover:bg-muted transition-colors"
                   >
                     <div 
-                      className={`w-8 h-8 ${isTopiniTheme ? '' : 'bg-cambridge-blue'} rounded-full flex items-center justify-center shadow-sm`}
+                      className={`w-8 h-8 ${isTopiniTheme ? '' : 'bg-cambridge-newStyle'} rounded-full flex items-center justify-center shadow-sm`}
                       style={isTopiniTheme ? { backgroundColor: 'rgb(37, 99, 235)' } : {}}
                     >
                       {isTopiniTheme ? (

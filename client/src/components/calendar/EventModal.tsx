@@ -316,12 +316,12 @@ export function EventModal({ isOpen, onClose, onSave, onDelete, editEvent, selec
             <DialogTitle className="text-2xl font-bold text-delft-blue flex items-center">
               {editEvent ? (
                 <>
-                  <CalendarIcon className="mr-3 h-6 w-6 text-burnt-sienna" />
+                  <CalendarIcon className="mr-3 h-6 w-6 text-burnt-newStyle" />
                   Modifica Evento
                 </>
               ) : (
                 <>
-                  <Plus className="mr-3 h-6 w-6 text-burnt-sienna" />
+                  <Plus className="mr-3 h-6 w-6 text-burnt-newStyle" />
                   Crea Nuovo Evento
                 </>
               )}
@@ -687,13 +687,13 @@ export function EventModal({ isOpen, onClose, onSave, onDelete, editEvent, selec
                   {form.watch('attendees').map((attendee, index) => (
                     <div
                       key={index}
-                      className="bg-cambridge-blue/10 text-cambridge-blue px-3 py-1 rounded-full text-sm flex items-center border border-cambridge-blue/20"
+                      className="bg-cambridge-newStyle/10 text-cambridge-newStyle px-3 py-1 rounded-full text-sm flex items-center border border-cambridge-newStyle/20"
                     >
                       {attendee}
                       <button
                         type="button"
                         onClick={() => removeAttendee(attendee)}
-                        className="ml-2 text-cambridge-blue hover:text-red-500 transition-colors"
+                        className="ml-2 text-cambridge-newStyle hover:text-red-500 transition-colors"
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -754,7 +754,7 @@ export function EventModal({ isOpen, onClose, onSave, onDelete, editEvent, selec
               <Button
                 type="submit"
                 disabled={isLoading || isDeleting}
-                className="flex-1 bg-burnt-sienna hover:bg-burnt-sienna/90 text-white font-semibold"
+                className="flex-1 bg-burnt-newStyle hover:bg-burnt-newStyle/90 text-white font-semibold"
               >
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {editEvent ? 'Aggiorna Evento' : 'Crea Evento'}

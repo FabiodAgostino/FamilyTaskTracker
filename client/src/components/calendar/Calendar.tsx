@@ -172,10 +172,10 @@ export function Calendar() {
             !isSameMonth(day, monthStart)
               ? 'text-gray-300 dark:text-gray-600 bg-gray-50 dark:bg-gray-800/50'
               : isToday(day)
-              ? 'bg-burnt-sienna text-white font-bold shadow-md dark:bg-burnt-sienna dark:text-white'
+              ? 'bg-burnt-newStyle text-white font-bold shadow-md dark:bg-burnt-newStyle dark:text-white'
               : isWeekendDay
               ? 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/30'
-              : 'text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 hover:bg-cambridge-blue/10 dark:hover:bg-cambridge-blue/20'
+              : 'text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800 hover:bg-cambridge-newStyle/10 dark:hover:bg-cambridge-newStyle/20'
           }`}
           onClick={() => {
             if (dayEvents.length > 0) {
@@ -284,7 +284,7 @@ export function Calendar() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-burnt-sienna"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-burnt-newStyle"></div>
         <span className="ml-3 text-delft-blue font-medium">Caricamento...</span>
       </div>
     );
@@ -300,7 +300,7 @@ export function Calendar() {
         )}>
           <div className={cn(isMobile ? "w-full" : "")}>
             <div className="flex items-center gap-3 mb-3">
-              <FaCalendar  className="h-8 w-8 text-cambridge-blue" />
+              <FaCalendar  className="h-8 w-8 text-cambridge-newStyle" />
               <h1 className="text-3xl font-bold text-delft-blue">Eventi</h1>
               
               {/* ✅ Bottone piccolo a fianco del titolo su mobile */}
@@ -308,7 +308,7 @@ export function Calendar() {
                 <Button
                   onClick={() => setIsEventModalOpen(true)}
                   size="sm"
-                  className="ml-auto bg-cambridge-blue hover:bg-cambridge-blue/90 text-white p-2"
+                  className="ml-auto bg-cambridge-newStyle hover:bg-cambridge-newStyle/90 text-white p-2"
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
@@ -320,7 +320,7 @@ export function Calendar() {
               "flex flex-wrap gap-2",
               isMobile && "mb-4"
             )}>
-              <Badge variant="secondary" className="bg-cambridge-blue/10 text-cambridge-blue border-cambridge-blue/20">
+              <Badge variant="secondary" className="bg-cambridge-newStyle/10 text-cambridge-newStyle border-cambridge-newStyle/20">
                 {stats.total} {stats.total === 1 ? 'evento' : 'eventi'}
               </Badge>
               <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200">
@@ -341,7 +341,7 @@ export function Calendar() {
           {!isMobile && (
             <Button
               onClick={() => setIsEventModalOpen(true)}
-              className="bg-cambridge-blue hover:bg-cambridge-blue/90 text-white dark:text-black shadow-lg"
+              className="bg-cambridge-newStyle hover:bg-cambridge-newStyle/90 text-white dark:text-black shadow-lg"
             >
               <Plus className="mr-2 h-4 w-4" />
               Nuovo Evento
@@ -465,7 +465,7 @@ export function Calendar() {
             <Clock className="mr-2 h-5 w-5" />
             Prossimi Eventi
             {upcomingEvents.length > 0 && (
-              <Badge variant="secondary" className="ml-2 bg-cambridge-blue/10 text-cambridge-blue">
+              <Badge variant="secondary" className="ml-2 bg-cambridge-newStyle/10 text-cambridge-newStyle">
                 {upcomingEvents.length}
               </Badge>
             )}

@@ -386,7 +386,7 @@ export function ShoppingItemCard({
                       e.stopPropagation();
                       onEdit(item);
                     }}
-                    className="text-gray-400 hover:text-cambridge-blue h-6 w-6 p-0"
+                    className="text-gray-400 hover:text-cambridge-newStyle h-6 w-6 p-0"
                   >
                     <Edit className="h-3 w-3" />
                   </Button>
@@ -505,7 +505,7 @@ export function ShoppingItemCard({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center text-xs text-cambridge-blue hover:text-cambridge-blue/80 hover:underline"
+                className="inline-flex items-center text-xs text-cambridge-newStyle hover:text-cambridge-newStyle/80 hover:underline"
               >
                 <ExternalLink className="h-3 w-3 mr-1" />
                 Vedi prodotto
