@@ -21,6 +21,10 @@ export function useNotifications() {
   const [currentToken, setCurrentToken] = useState<string | null>(null);
   const [isRegistering, setIsRegistering] = useState(false);
   const [tokenRecord, setTokenRecord] = useState<FCMToken | null>(null);
+  const [isInitializing, setIsInitializing] = useState(false);
+  const [isManuallyDisabled, setIsManuallyDisabled] = useState(false);
+
+
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -366,25 +370,29 @@ export function useNotifications() {
       return;
     }
 
-    initPromise = (async () => {
-      try {
-        if (!globalSwRegistration) {
-          await registerServiceWorker();
-        }
+  initPromise = (async () => {
+  try {
+    setIsInitializing(true);
+    
+    if (!globalSwRegistration) {
+      await registerServiceWorker();
+    }
 
-        if (!globalMessaging) {
-          globalMessaging = getMessaging();
-        }
+    if (!globalMessaging) {
+      globalMessaging = getMessaging();
+    }
 
-        await setupForegroundListener();
+    await setupForegroundListener();
 
-        isGloballyInitialized = true;
-      } catch (error) {
-        isGloballyInitialized = false;
-        initPromise = null;
-        throw error;
-      }
-    })();
+    isGloballyInitialized = true;
+  } catch (error) {
+    isGloballyInitialized = false;
+    initPromise = null;
+    throw error;
+  } finally {
+    setIsInitializing(false);
+  }
+})();
 
     await initPromise;
   };
@@ -404,25 +412,30 @@ export function useNotifications() {
   }, [user]);
 
   // Effect separato per gestire l'automatismo quando permessi sono già granted
-  useEffect(() => {
-    const handleAutoSetup = async () => {
-      if (permission === 'granted' && user && !currentToken && isGloballyInitialized) {
-        try {
-          await setupFCM();
-        } catch (error) {
-          // Errore non critico per l'automatismo
-        }
+useEffect(() => {
+  const handleAutoSetup = async () => {
+    if (permission === 'granted' && user && !currentToken && isGloballyInitialized && !isInitializing && !isManuallyDisabled) {
+      try {
+        setIsInitializing(true);
+        await setupFCM();
+      } catch (error) {
+        // Errore non critico per l'automatismo
+      } finally {
+        setIsInitializing(false);
       }
-    };
+    }
+  };
 
-    handleAutoSetup();
-  }, [permission, user, isGloballyInitialized, currentToken]);
+  handleAutoSetup();
+}, [permission, user, isGloballyInitialized, currentToken, isInitializing, isManuallyDisabled]);
 
   // Effect per cleanup quando cambia utente
   useEffect(() => {
     if (!user) {
       setCurrentToken(null);
       setTokenRecord(null);
+      setIsManuallyDisabled(false);
+
     }
   }, [user]);
 
@@ -465,6 +478,7 @@ export function useNotifications() {
       setPermission(requestedPermission);
       
       if (requestedPermission === 'granted') {
+        setIsManuallyDisabled(false); 
         await initializeOnce();
         await setupFCM();
         
@@ -568,18 +582,75 @@ export function useNotifications() {
     }
   };
 
-  return {
-    permission,
-    token: currentToken,
-    tokenRecord,
-    isRegistering,
-    isSupported: isNotificationSupported(),
-    isInitialized: isGloballyInitialized,
-    requestPermission,
-    testNotification,
-    refreshToken,
-    clearUserTokens,
-    // Esponi le funzioni di debug per compatibilità con l'header
+ const disableNotifications = async (): Promise<void> => {
+  try {
+    setIsInitializing(true);
+
+    // Segna come disabilitato volontariamente
+    setIsManuallyDisabled(true);
+    
+    // Pulisci i token dell'utente
+    if (user) {
+      await cleanupUserTokens(user.username);
+    }
+    
+    // Reset stato locale
+    setCurrentToken(null);
+    setTokenRecord(null);
+    
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    toast({
+      title: 'Notifiche disabilitate',
+      description: 'Non riceverai più notifiche da questo dispositivo'
+    });
+  } catch (error) {
+    toast({
+      title: 'Errore disabilitazione',
+      description: 'Impossibile disabilitare le notifiche',
+      variant: 'destructive'
+    });
+  } finally {
+    setIsInitializing(false);
+  }
+};
+const enableNotifications = async (): Promise<void> => {
+  try {
+    setIsInitializing(true);
+    setIsManuallyDisabled(false);
+    
+    // L'auto-setup si attiverà automaticamente grazie all'useEffect
+    
+    toast({
+      title: 'Notifiche riabilitate',
+      description: 'Configurazione automatica in corso...'
+    });
+  } catch (error) {
+    toast({
+      title: 'Errore riabilitazione',
+      description: 'Impossibile riabilitare le notifiche',
+      variant: 'destructive'
+    });
+  } finally {
+    setIsInitializing(false);
+  }
+};
+
+return {
+  permission,
+  token: currentToken,
+  tokenRecord,
+  isRegistering,
+  isInitializing,
+  isManuallyDisabled,
+  isSupported: isNotificationSupported(),
+  isInitialized: isGloballyInitialized,
+  requestPermission,
+  testNotification,
+  refreshToken,
+  clearUserTokens,
+  disableNotifications,
+  enableNotifications,
     debug: {
       setupFCM,
       runDiagnostics: async () => {

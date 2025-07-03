@@ -3,17 +3,27 @@
 // ====================================
 
 const functions = require("firebase-functions/v1");  // 🔧 IMPORTA ESPLICITAMENTE V1
-const { initializeApp } = require("firebase-admin/app");
+const admin = require('firebase-admin');
 
-// Inizializzazione Firebase Admin
-initializeApp();
+// Assicurati che sia inizializzato
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.applicationDefault(),
+  });
+}
+
 
 // Import dei servizi modulari
 const { unifiedNotificationService } = require('./services/notification-service');
 const { scraperService } = require('./services/scraping-service');
 const { priceMonitorService } = require('./services/price-monitor-service');
+const {
+    onDocumentChange,
+    testRealtimeNotifications,
+    getNotificationStatus
+} = require('./services/realtime-notifications');
 
-
+exports.onDocumentChange = onDocumentChange;
 
 /**
  * Funzione unificata che gestisce tutte le notifiche ogni 30 minuti
@@ -147,73 +157,6 @@ exports.scheduledPriceMonitoring = functions
         }
     });
 
-exports.manualPriceMonitoring = functions
-    .region('europe-west1')
-    .runWith({
-        timeoutSeconds: 540,
-        memory: '1GB'
-    })
-    .https
-    .onRequest(async (req, res) => {
-        // Controlla metodo HTTP
-        if (req.method !== 'POST') {
-            return res.status(405).json({
-                error: 'Metodo non supportato. Usa POST.',
-                success: false
-            });
-        }
-        
-        // CORS headers
-        res.set('Access-Control-Allow-Origin', '*');
-        res.set('Access-Control-Allow-Methods', 'POST');
-        res.set('Access-Control-Allow-Headers', 'Content-Type');
-        
-        const startTime = Date.now();
-        
-        console.log('🔧 ===== AVVIO JOB MANUALE MONITORAGGIO PREZZI =====');
-        console.log(`🕘 Orario esecuzione: ${new Date().toLocaleString('it-IT')}`);
-        console.log(`🌐 Origin: ${req.headers.origin || 'Unknown'}`);
-        console.log(`🔑 User-Agent: ${req.headers['user-agent'] || 'Unknown'}`);
-        
-        try {
-            
-            // Esegui monitoraggio
-            const result = await priceMonitorService.runDailyPriceMonitoring();
-            
-            const duration = Date.now() - startTime;
-            
-            console.log(`✅ Job manuale completato in ${Math.round(duration/1000)}s`);
-            
-            // Risposta HTTP con risultati
-            return res.status(200).json({
-                success: true,
-                message: 'Monitoraggio prezzi completato',
-                data: {
-                    jobId: result.jobId,
-                    duration: Math.round(duration/1000),
-                    monitored: result.monitored,
-                    changes: result.changes,
-                    emailSent: result.emailData?.sent || false,
-                    recipients: result.emailData?.recipients || [],
-                    stats: result.stats,
-                    reportSaved: result.reportSaved
-                },
-                timestamp: new Date().toISOString()
-            });
-            
-        } catch (error) {
-            const duration = Date.now() - startTime;
-            
-            console.error('❌ Errore job manuale:', error.message);
-            
-            return res.status(500).json({
-                success: false,
-                error: error.message,
-                duration: Math.round(duration/1000),
-                timestamp: new Date().toISOString()
-            });
-        }
-    });
 
 
 

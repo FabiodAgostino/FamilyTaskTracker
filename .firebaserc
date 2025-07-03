@@ -1,5 +1,12 @@
 {
   "projects": {
     "default": "familytasktracker-c2dfe"
-  }
+  },
+  "targets": {},
+  "etags": {
+    "familytasktracker-c2dfe": {
+      "extensionInstances": {}
+    }
+  },
+  "dataconnectEmulatorConfig": {}
 }

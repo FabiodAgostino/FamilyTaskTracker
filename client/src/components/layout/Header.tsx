@@ -31,7 +31,8 @@ const RatIcon = ({ className }: { className?: string }) => (
 );
 
 export function Header({ onMenuToggle }: HeaderProps) {
-const { permission, requestPermission, isSupported, token, debug } = useNotifications();
+const { permission, requestPermission, isSupported, token, debug, isInitializing, disableNotifications, enableNotifications, isManuallyDisabled } = useNotifications();
+
 
   const { user, logout } = useAuthContext();
   const { theme, toggleTheme } = useTheme();
@@ -44,11 +45,13 @@ const { permission, requestPermission, isSupported, token, debug } = useNotifica
     { name: 'Spesa', path: '/shoppingfood' },
 
   ];
-    const getNotificationStatus = () => {
-    if (permission !== 'granted') return { icon: BellOff, text: 'Attiva Notifiche', color: 'text-muted-foreground' };
-    if (!token) return { icon: Bell, text: 'Configura FCM', color: 'text-orange-500' };
-    return { icon: Bell, text: 'Notifiche Attive', color: 'text-green-500' };
-  };
+  const getNotificationStatus = () => {
+  if (permission !== 'granted') return { icon: BellOff, text: 'Attiva Notifiche', color: 'text-muted-foreground' };
+  if (isInitializing) return { icon: Bell, text: 'Configurazione token in corso...', color: 'text-blue-500' };
+  if (token) return { icon: Bell, text: 'Notifiche Attive', color: 'text-green-500' };
+  if (isManuallyDisabled) return { icon: BellOff, text: 'Notifiche Disabilitate', color: 'text-red-500' };
+  return { icon: Bell, text: 'Configurazione token in corso...', color: 'text-blue-500' };
+};
   // ✅ NUOVO: Logica per il tema personalizzato
   const isTopiniTheme = user?.username === 'Fabio' || user?.username === 'Ludovica';
   // ✅ FIX: Controllo admin senza usare isAdmin()
@@ -200,22 +203,21 @@ const { permission, requestPermission, isSupported, token, debug } = useNotifica
   
   return (
     <DropdownMenuItem 
-      onClick={async () => {
-        try {
-          if (permission === 'granted') {
-            if (!token) {
-              console.log('🔄 Attivando token FCM...');
-              await debug.setupFCM();
-            } else {
-              await debug.runDiagnostics();
-            }
-          } else {
-            await requestPermission();
-          }
-        } catch (error) {
-          console.error('❌ Errore:', error);
-        }
-      }} 
+  onClick={async () => {
+  try {
+    if (permission === 'granted') {
+      if (token) {
+        await disableNotifications();
+      } else if (isManuallyDisabled) {
+        await enableNotifications();
+      }
+    } else {
+      await requestPermission();
+    }
+  } catch (error) {
+    console.error('❌ Errore:', error);
+  }
+}}
       className="flex items-center cursor-pointer"
     >
       <StatusIcon className={`mr-2 h-4 w-4 ${status.color}`} />
@@ -316,22 +318,21 @@ const { permission, requestPermission, isSupported, token, debug } = useNotifica
                   
                   return (
                     <DropdownMenuItem 
-                      onClick={async () => {
-                        try {
-                          if (permission === 'granted') {
-                            if (!token) {
-                              console.log('🔄 Attivando token FCM...');
-                              await debug.setupFCM();
-                            } else {
-                              await debug.runDiagnostics();
-                            }
-                          } else {
-                            await requestPermission();
+                    onClick={async () => {
+                      try {
+                        if (permission === 'granted') {
+                          if (token) {
+                            await disableNotifications();
+                          } else if (isManuallyDisabled) {
+                            await enableNotifications();
                           }
-                        } catch (error) {
-                          console.error('❌ Errore:', error);
+                        } else {
+                          await requestPermission();
                         }
-                      }} 
+                      } catch (error) {
+                        console.error('❌ Errore:', error);
+                      }
+                    }}
                       className="flex items-center cursor-pointer"
                     >
                       <StatusIcon className={`mr-2 h-4 w-4 ${status.color}`} />
