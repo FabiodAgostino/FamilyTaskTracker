@@ -1,13 +1,15 @@
+// client/src/components/admin/AdministratorPanel.tsx - Aggiornato con FCM Dashboard
 import React, { useState } from 'react';
-import { Users, BarChart3, Settings, Shield, Activity, Database, Mail, TrendingUp } from 'lucide-react';
+import { Users, BarChart3, Settings, Shield, Bell, TrendingUp } from 'lucide-react';
 import { useAuthContext } from '@/contexts/AuthContext';
 
 // Importa i componenti esistenti
 import { UserManagement } from '@/components/admin/UserManagement';
 import PriceMonitoringDashboard from './DashboardPrice';
+import { FCMDashboard } from './NotificationManager'; // 👈 NUOVO IMPORT
 
 // Tipi per le tabs
-type AdminTab = 'dashboard' | 'users' | 'system' | 'analytics';
+type AdminTab = 'dashboard' | 'users' | 'notifications' | 'system' | 'analytics'; // 👈 AGGIUNTO 'notifications'
 
 interface TabConfig {
   id: AdminTab;
@@ -17,7 +19,7 @@ interface TabConfig {
   component: React.ComponentType;
 }
 
-// Placeholder per future sezioni admin
+// Placeholder per future sezioni admin (mantenuto uguale)
 const SystemSettings = () => (
   <div className="p-6 space-y-6">
     <div className="bg-card border rounded-lg p-6">
@@ -47,18 +49,36 @@ const SystemSettings = () => (
           <h3 className="font-medium">Notifiche Email</h3>
           <div className="space-y-3">
             <div className="flex items-center justify-between p-3 border rounded-md">
-              <span className="text-sm">Email amministratori</span>
-              <span className="text-sm font-medium">Attive</span>
+              <span className="text-sm">Abilitate</span>
+              <span className="text-sm font-medium">Sì</span>
             </div>
             <div className="flex items-center justify-between p-3 border rounded-md">
-              <span className="text-sm">Report giornaliero</span>
-              <span className="text-sm font-medium">09:00</span>
-            </div>
-            <div className="flex items-center justify-between p-3 border rounded-md">
-              <span className="text-sm">Soglia errori alert</span>
-              <span className="text-sm font-medium">10%</span>
+              <span className="text-sm">Destinatario admin</span>
+              <span className="text-sm font-medium">admin@famiglia.it</span>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+    
+    <div className="bg-card border rounded-lg p-6">
+      <h2 className="text-xl font-semibold mb-4">Statistiche Sistema</h2>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="text-center p-4 border rounded-md">
+          <div className="text-2xl font-bold text-blue-600">156</div>
+          <div className="text-sm text-gray-600">Prodotti monitorati</div>
+        </div>
+        <div className="text-center p-4 border rounded-md">
+          <div className="text-2xl font-bold text-green-600">23</div>
+          <div className="text-sm text-gray-600">Sconti trovati</div>
+        </div>
+        <div className="text-center p-4 border rounded-md">
+          <div className="text-2xl font-bold text-orange-600">€847</div>
+          <div className="text-sm text-gray-600">Risparmio totale</div>
+        </div>
+        <div className="text-center p-4 border rounded-md">
+          <div className="text-2xl font-bold text-purple-600">12h</div>
+          <div className="text-sm text-gray-600">Ultimo check</div>
         </div>
       </div>
     </div>
@@ -72,52 +92,16 @@ const Analytics = () => (
         <TrendingUp className="w-5 h-5" />
         Analytics Avanzate
       </h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-          <h3 className="font-medium text-blue-900 dark:text-blue-300 mb-2">Performance Sistema</h3>
-          <div className="space-y-2 text-sm">
+      <div className="space-y-6">
+        <div>
+          <h3 className="font-medium mb-4">Performance Sistema</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="flex justify-between">
-              <span>Uptime</span>
-              <span className="font-medium">99.8%</span>
+              <span>CPU utilizzata</span>
+              <span className="font-medium">45%</span>
             </div>
             <div className="flex justify-between">
-              <span>Memoria utilizata</span>
-              <span className="font-medium">67%</span>
-            </div>
-            <div className="flex justify-between">
-              <span>CPU media</span>
-              <span className="font-medium">23%</span>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-          <h3 className="font-medium text-green-900 dark:text-green-300 mb-2">Efficienza API</h3>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span>Calls successo</span>
-              <span className="font-medium">94.2%</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Tempo risposta</span>
-              <span className="font-medium">1.2s</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Rate limiting</span>
-              <span className="font-medium">0.3%</span>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
-          <h3 className="font-medium text-purple-900 dark:text-purple-300 mb-2">Database</h3>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span>Documents</span>
-              <span className="font-medium">15.7K</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Storage utilizzato</span>
+              <span>Memoria utilizzata</span>
               <span className="font-medium">2.3 GB</span>
             </div>
             <div className="flex justify-between">
@@ -159,7 +143,7 @@ export default function AdminPanel() {
     );
   }
 
-  // Configurazione delle tabs
+  // Configurazione delle tabs - AGGIORNATA con FCM
   const tabs: TabConfig[] = [
     {
       id: 'dashboard',
@@ -174,6 +158,13 @@ export default function AdminPanel() {
       icon: Users,
       description: 'Amministrazione utenti e permessi',
       component: UserManagement
+    },
+    {
+      id: 'notifications', // 👈 NUOVA TAB
+      label: 'Notifiche FCM',
+      icon: Bell,
+      description: 'Gestione notifiche push e token FCM',
+      component: FCMDashboard
     },
     {
       id: 'system',
@@ -194,69 +185,68 @@ export default function AdminPanel() {
   const activeTabConfig = tabs.find(tab => tab.id === activeTab);
   const ActiveComponent = activeTabConfig?.component || PriceMonitoringDashboard;
 
-
-return (
-  <div className="min-h-screen bg-background">
-    {/* Header del pannello admin - FIX Z-INDEX */}
-    <header className="bg-card border-b sticky top-0 z-40">
-      <div className="px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <h1 className="text-2xl font-bold text-foreground flex items-center gap-3">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <Shield className="w-5 h-5 text-primary-foreground" />
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header del pannello admin - FIX Z-INDEX */}
+      <header className="bg-card border-b sticky top-0 z-40">
+        <div className="px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <h1 className="text-2xl font-bold text-foreground flex items-center gap-3">
+                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                  <Shield className="w-5 h-5 text-primary-foreground" />
+                </div>
+                Pannello Amministratore
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                {activeTabConfig?.description || 'Controllo e gestione del sistema'}
+              </p>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 px-3 py-1 rounded-md bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-xs font-medium">Admin: {user.displayName || user.username}</span>
               </div>
-              Pannello Amministratore
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              {activeTabConfig?.description || 'Controllo e gestione del sistema'}
-            </p>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-1 rounded-md bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-xs font-medium">Admin: {user.displayName || user.username}</span>
             </div>
           </div>
         </div>
-      </div>
-    </header>
+      </header>
 
-    {/* Navigation Tabs - FIX Z-INDEX */}
-    <nav className="bg-card border-b relative z-35">
-      <div className="px-6">
-        <div className="flex space-x-8 overflow-x-auto">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`
-                  flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap
-                  transition-colors duration-200
-                  ${isActive 
-                    ? 'border-primary text-primary' 
-                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
-                  }
-                `}
-              >
-                <Icon className="w-4 h-4" />
-                {tab.label}
-              </button>
-            );
-          })}
+      {/* Navigation Tabs - FIX Z-INDEX */}
+      <nav className="bg-card border-b relative z-35">
+        <div className="px-6">
+          <div className="flex space-x-8 overflow-x-auto">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                 className={`
+                    flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap
+                    transition-colors duration-200
+                    ${isActive 
+                      ? 'border-primary text-primary' 
+                      : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+                    }
+                  `}
+                >
+                  <Icon className="w-4 h-4" />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
-    </nav>
+      </nav>
 
-    {/* Main Content Area - FIX Z-INDEX */}
-    <main className="relative z-10">
-      <ActiveComponent />
-    </main>
-  </div>
-);
+      {/* Contenuto principale */}
+      <main className="relative z-10">
+        <ActiveComponent />
+      </main>
+    </div>
+  );
 }

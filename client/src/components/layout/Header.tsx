@@ -32,6 +32,7 @@ const RatIcon = ({ className }: { className?: string }) => (
 
 export function Header({ onMenuToggle }: HeaderProps) {
 const { permission, requestPermission, isSupported, token, debug } = useNotifications();
+
   const { user, logout } = useAuthContext();
   const { theme, toggleTheme } = useTheme();
   const [location] = useLocation();

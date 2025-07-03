@@ -17,6 +17,7 @@ import { useAuth } from './useAuth';
 import { Category, Note, CalendarEvent, User } from '@/lib/models/types';
 import { ShoppingItem } from '@/lib/models/shopping-item';
 import { ShoppingFood, CategoryFood, Supermarket } from '@/lib/models/food';
+import { FCMToken } from '@/lib/models/fcmtoken';
 
 // Type mapping per la deserializzazione
 type CollectionTypeMap = {
@@ -28,6 +29,7 @@ type CollectionTypeMap = {
   'shopping_food': ShoppingFood;
   'food_categories': CategoryFood;
   'supermarkets': Supermarket;
+  'fcm-tokens': FCMToken; 
 };
 
 // Funzione helper per deserializzare basata sul nome della collection
@@ -42,6 +44,8 @@ function deserializeDocument<T>(collectionName: string, docData: any): T {
     completedAt: docData.completedAt || undefined,
     lastLoginAt: docData.lastLoginAt || undefined,
     lastViewedAt: docData.lastViewedAt || undefined,
+     lastUsedAt: docData.lastUsedAt?.toDate() || undefined,
+    expiresAt: docData.expiresAt?.toDate() || undefined,
   };
   // Deserializza usando i metodi fromFirestore delle classi
   try {
@@ -62,6 +66,8 @@ function deserializeDocument<T>(collectionName: string, docData: any): T {
         return CategoryFood.fromFirestore(processedData) as T;
       case 'supermarkets':
         return Supermarket.fromFirestore(processedData) as T;
+      case 'fcm-tokens': 
+        return FCMToken.fromFirestore(processedData) as T;
       default:
         // Fallback per collection sconosciute - restituisce oggetto plain
         console.warn(`Collection "${collectionName}" non riconosciuta, usando deserializzazione di default`);
