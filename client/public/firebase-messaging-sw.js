@@ -5,6 +5,26 @@ console.log('🔥 FCM SW: Starting (iOS Compatible)...');
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 console.log('📱 Platform detected:', isIOS ? 'iOS' : 'Other');
 
+// 🔧 FIX: Determina il percorso corretto dell'icona in base al dominio
+const getIconPath = () => {
+  const hostname = self.location.hostname;
+  const pathname = self.location.pathname;
+  
+  if (hostname === 'fabiodagostino.github.io') {
+    // Produzione: GitHub Pages
+    return 'https://fabiodagostino.github.io/FamilyTaskTracker/icons/icon-192x192.png';
+  } else if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    // Sviluppo: localhost
+    return '/icon-192.png';
+  } else {
+    // Fallback per altri domini
+    return `${self.location.origin}/FamilyTaskTracker/icons/icon-192x192.png`;
+  }
+};
+
+const ICON_URL = getIconPath();
+console.log('🖼️ Icon URL determined:', ICON_URL);
+
 // 📦 Install event  
 self.addEventListener('install', (event) => {
   console.log('📦 SW: Install event');
@@ -48,8 +68,8 @@ self.addEventListener('push', (event) => {
   const title = notificationData.title || '🏠 Family Task Tracker';
   const options = {
     body: notificationData.body || 'Nuova attività',
-    icon: '/icons/icon-192x192.png',
-    badge: '/icons/icon-192x192.png',
+    icon: ICON_URL,  // ✅ URL completo assoluto
+    badge: ICON_URL, // ✅ URL completo assoluto
     tag: 'family-task',
     requireInteraction: isIOS, // 🍎 iOS richiede interazione
     data: {
@@ -63,7 +83,8 @@ self.addEventListener('push', (event) => {
     renotify: true
   };
 
-  console.log('🔔 Showing notification:', title, options);
+  console.log('🔔 Showing notification with icon:', ICON_URL);
+  console.log('🔔 Full options:', options);
   
   event.waitUntil(
     self.registration.showNotification(title, options)
@@ -77,15 +98,15 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   
   // 🍎 iOS: Gestione URL personalizzati
-  let targetUrl = '/';
+  let targetUrl = 'https://fabiodagostino.github.io/FamilyTaskTracker/';
   
   try {
     const data = event.notification.data || {};
-    targetUrl = data.url || data.click_action || '/';
+    targetUrl = data.url || data.click_action || 'https://fabiodagostino.github.io/FamilyTaskTracker/';
     
     // 🔧 Se abbiamo payload originale FCM
-    if (data.originalPayload?.data?.url) {
-      targetUrl = data.originalPayload.data.url;
+    if (data.originalPayload?.data?.click_action) {
+      targetUrl = data.originalPayload.data.click_action;
     }
     
     console.log('🎯 Target URL:', targetUrl);
@@ -98,7 +119,7 @@ self.addEventListener('notificationclick', (event) => {
       .then((clientList) => {
         // 🔍 Cerca finestra esistente
         for (const client of clientList) {
-          if (client.url.includes(location.origin) && 'focus' in client) {
+          if (client.url.includes('fabiodagostino.github.io/FamilyTaskTracker') && 'focus' in client) {
             console.log('👀 Focusing existing window');
             // 💬 Invia messaggio per navigazione custom
             client.postMessage({
@@ -130,4 +151,4 @@ self.addEventListener('message', (event) => {
   }
 });
 
-console.log('✅ SW: Ready (iOS Compatible)');
+console.log('✅ SW: Ready (iOS Compatible) with icon:', ICON_URL);
