@@ -3,26 +3,42 @@ console.log('🔥 FCM SW: Starting (iOS Compatible)...');
 
 // 📱 Rileva piattaforma
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-console.log('📱 Platform detected:', isIOS ? 'iOS' : 'Other');
 
 // 🔧 FIX: Determina il percorso corretto dell'icona in base al dominio
 const getIconPath = () => {
   const hostname = self.location.hostname;
-  const pathname = self.location.pathname;
-  
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+
+  // Scegli il nome file in base alla piattaforma
+  const fileName = isIOS
+    ? 'iconios.png'        // badge/notification icon iOS
+    : 'icon-192x192.png';     // icona standard Android/Web
+
   if (hostname === 'fabiodagostino.github.io') {
-    // Produzione: GitHub Pages
-    return 'https://fabiodagostino.github.io/FamilyTaskTracker/icons/icon-192x192.png';
+    return `https://fabiodagostino.github.io/FamilyTaskTracker/icons/${fileName}`;
   } else if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    // Sviluppo: localhost
-    return '/icon-192.png';
+    return `/${fileName}`;
   } else {
-    // Fallback per altri domini
-    return `${self.location.origin}/FamilyTaskTracker/icons/icon-192x192.png`;
+    return `${self.location.origin}/FamilyTaskTracker/icons/${fileName}`;
+  }
+};
+
+const getBadgePath = () => {
+  const hostname = self.location.hostname;
+
+  if (hostname === 'fabiodagostino.github.io') {
+    return `https://fabiodagostino.github.io/FamilyTaskTracker/icons/badge.png`;
+  } else if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return `/${fileName}`;
+  } else {
+    return `${self.location.origin}/FamilyTaskTracker/icons/badge.png`;
   }
 };
 
 const ICON_URL = getIconPath();
+
+const BADGE_URL = getBadgePath();
+
 console.log('🖼️ Icon URL determined:', ICON_URL);
 
 // 📦 Install event  
@@ -69,7 +85,7 @@ self.addEventListener('push', (event) => {
   const options = {
     body: notificationData.body || 'Nuova attività',
     icon: ICON_URL,  // ✅ URL completo assoluto
-    badge: ICON_URL, // ✅ URL completo assoluto
+    badge: BADGE_URL, // ✅ URL completo assoluto
     tag: 'family-task',
     requireInteraction: isIOS, // 🍎 iOS richiede interazione
     data: {
