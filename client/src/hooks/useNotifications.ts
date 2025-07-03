@@ -56,9 +56,10 @@ export function useNotifications() {
       // Trova token duplicati, scaduti o inattivi
       const tokensToDelete: string[] = [];
       const seenTokens = new Set<string>();
+      const deviceTokens = new Map<string, FCMToken>();
 
       for (const token of tokens) {
-        // Rimuovi token duplicati (mantieni il più recente)
+        // Rimuovi token duplicati (stesso token string)
         if (seenTokens.has(token.token)) {
           tokensToDelete.push(token.id);
           continue;
@@ -70,6 +71,22 @@ export function useNotifications() {
           continue;
         }
 
+        // Per ogni tipo di dispositivo, mantieni solo il più recente
+        const deviceKey = `${token.deviceType}`;
+        const existingTokenForDevice = deviceTokens.get(deviceKey);
+        
+        if (existingTokenForDevice) {
+          // Se c'è già un token per questo tipo di dispositivo, mantieni il più recente
+          if (token.createdAt > existingTokenForDevice.createdAt) {
+            tokensToDelete.push(existingTokenForDevice.id);
+            deviceTokens.set(deviceKey, token);
+          } else {
+            tokensToDelete.push(token.id);
+          }
+        } else {
+          deviceTokens.set(deviceKey, token);
+        }
+
         seenTokens.add(token.token);
       }
 
@@ -78,10 +95,10 @@ export function useNotifications() {
         await deleteDoc(doc(db, 'fcm-tokens', tokenId));
       }
 
-      // Mantieni solo gli ultimi 3 token attivi per utente
-      const activeTokens = tokens.filter(t => !tokensToDelete.includes(t.id));
-      if (activeTokens.length > 3) {
-        const tokensToRemove = activeTokens.slice(3);
+      // Assicurati di non avere più di 2 token per utente (1 mobile + 1 desktop)
+      const remainingValidTokens = tokens.filter(t => !tokensToDelete.includes(t.id));
+      if (remainingValidTokens.length > 2) {
+        const tokensToRemove = remainingValidTokens.slice(2);
         for (const token of tokensToRemove) {
           await deleteDoc(doc(db, 'fcm-tokens', token.id));
         }
@@ -127,9 +144,25 @@ export function useNotifications() {
         return existingToken;
       }
 
-      // Crea nuovo token
+      // Controlla se esiste già un token per questo userAgent (stesso dispositivo)
       const userAgent = navigator.userAgent;
       const deviceType = FCMToken.detectDeviceType(userAgent);
+      
+      const sameDeviceQuery = query(
+        tokensRef,
+        where('username', '==', user.username),
+        where('deviceType', '==', deviceType)
+      );
+
+      const sameDeviceSnapshot = await getDocs(sameDeviceQuery);
+      
+      // Se esiste già un token per lo stesso tipo di dispositivo, sostituiscilo
+      if (!sameDeviceSnapshot.empty) {
+        const oldDoc = sameDeviceSnapshot.docs[0];
+        await deleteDoc(doc(db, 'fcm-tokens', oldDoc.id));
+      }
+
+      // Crea nuovo token
       const expiresAt = FCMToken.getDefaultExpirationDate(30); // 30 giorni
 
       const newToken = new FCMToken(
@@ -304,10 +337,18 @@ export function useNotifications() {
         });
         
         if (Notification.permission === 'granted') {
+          // Determina il percorso corretto dell'icona
+          const iconPath = import.meta.env.PROD 
+            ? '/FamilyTaskTracker/icon-192.png'
+            : '/icon-192.png';
+            
           new Notification(payload.notification?.title || 'Family Task Tracker', {
             body: payload.notification?.body,
-            icon: '/FamilyTaskTracker/icon-192.png',
-            tag: 'foreground-notification'
+            icon: iconPath,
+            badge: iconPath, // Badge per PWA mobile
+            tag: 'foreground-notification',
+            requireInteraction: false, // Non bloccare l'utente
+            silent: false
           });
         }
       });
@@ -460,10 +501,18 @@ export function useNotifications() {
     }
 
     try {
+      // Determina il percorso corretto dell'icona
+      const iconPath = import.meta.env.PROD 
+        ? '/FamilyTaskTracker/icon-192.png'
+        : '/icon-192.png';
+
       new Notification('Test Notifica Locale', {
         body: 'Se vedi questa notifica, il sistema funziona!',
-        icon: '/FamilyTaskTracker/icon-192.png',
-        tag: 'test-notification'
+        icon: iconPath,
+        badge: iconPath, // Badge per PWA mobile
+        tag: 'test-notification',
+        requireInteraction: false,
+        silent: false
       });
 
       toast({
