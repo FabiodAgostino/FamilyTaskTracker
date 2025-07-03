@@ -209,65 +209,52 @@ jobs:
          
      - name: 🔧 Generate Service Worker with Version (Smart Detection)
        run: |
-         echo "🔄 Attempting to generate service worker with version ${{ steps.version.outputs.version }}..."
-         
-         # Prova a generare il service worker dal template
-         if node scripts/build-service-worker.js build; then
-           echo "✅ Service worker generated from Firebase template"
-           SW_TYPE="template"
-           
-           # Verifica che sia stato generato correttamente
-           if [ ! -f "client/public/firebase-messaging-sw.js" ]; then
-             echo "❌ Service worker not generated despite success!"
-             exit 1
-           fi
-           
-         else
-           echo "ℹ️  Template-based service worker generation skipped"
-           SW_TYPE="manual"
-           
-           # Verifica che esista comunque un service worker manuale
-           if [ ! -f "client/public/firebase-messaging-sw.js" ]; then
-             echo "❌ No service worker found (neither template nor manual)!"
-             echo "📂 Contents of client/public/:"
-             ls -la client/public/
-             exit 1
-           fi
-           
-           echo "✅ Using existing manual service worker"
-         fi
-         
-         # Info sul service worker
-         SW_SIZE=$(wc -c < client/public/firebase-messaging-sw.js)
-         echo "📊 Service Worker Info:"
-         echo "  - Type: $SW_TYPE"
-         echo "  - Size: $SW_SIZE bytes"
-         echo "  - Version: ${{ steps.version.outputs.version }}"
-         
-         # Salva il tipo per il prossimo step
-         echo "SW_TYPE=$SW_TYPE" >> $GITHUB_ENV
-         
-       env:
-         # Pass all environment variables to the build script
-         VITE_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
-         VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
-         VITE_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-         VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
-         VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
-         VITE_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
-         VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
-         VITE_FIREBASE_VAPID_KEY: ${{ secrets.FIREBASE_VAPID_KEY }}
-         VITE_PASSWORD_ENCRYPTION_KEY: "SuperTopoliniArrivano1234567890AB"
-         VITE_APP_NAME: "Family Task Tracker"
-         VITE_APP_VERSION: ${{ steps.version.outputs.version }}
-         VITE_APP_BUILD_NUMBER: ${{ steps.version.outputs.build_number }}
-         VITE_APP_BUILD_DATE: ${{ steps.version.outputs.build_date }}
-         VITE_APP_COMMIT_SHA: ${{ steps.version.outputs.short_sha }}
-         VITE_APP_DEPLOYMENT_ID: ${{ steps.version.outputs.deployment_id }}
-         VITE_DEEPSEEK_KEY: ${{ secrets.DEEPSEEK_KEY }}
-         VITE_APP_ENVIRONMENT: "production"
-         VITE_BASE_URL: "/FamilyTaskTracker/"
-         NODE_ENV: production
+        echo "🔄 Attempting to generate service worker with version ${{ steps.version.outputs.version }}..."
+        
+        # Controlla prima se esiste il template
+        if [ ! -f "client/public/firebase-messaging-sw.template.js" ]; then
+          echo "ℹ️  No template found - using manual service worker"
+          SW_TYPE="manual"
+          
+          # Verifica che esista il SW manuale
+          if [ ! -f "client/public/firebase-messaging-sw.js" ]; then
+            echo "❌ No service worker found (neither template nor manual)!"
+            echo "📂 Contents of client/public/:"
+            ls -la client/public/
+            exit 1
+          fi
+          
+          echo "✅ Using existing manual service worker"
+          
+        else
+          echo "🔥 Template found - attempting template-based generation"
+          
+          # Prova a generare dal template
+          if node scripts/build-service-worker.js build; then
+            echo "✅ Service worker generated from Firebase template"
+            SW_TYPE="template"
+            
+            # Verifica che sia stato generato correttamente
+            if [ ! -f "client/public/firebase-messaging-sw.js" ]; then
+              echo "❌ Service worker not generated despite success!"
+              exit 1
+            fi
+            
+          else
+            echo "❌ Template generation failed!"
+            exit 1
+          fi
+        fi
+        
+        # Info sul service worker
+        SW_SIZE=$(wc -c < client/public/firebase-messaging-sw.js)
+        echo "📊 Service Worker Info:"
+        echo "  - Type: $SW_TYPE"
+        echo "  - Size: $SW_SIZE bytes"
+        echo "  - Version: ${{ steps.version.outputs.version }}"
+        
+        # Salva il tipo per il prossimo step
+        echo "SW_TYPE=$SW_TYPE" >> $GITHUB_ENV
          
      - name: 🛡️ Security Check Service Worker (Intelligent)
        run: |
