@@ -36,7 +36,7 @@ const getBadgePath = () => {
 };
 
 const ICON_URL = getIconPath();
-
+const IMAGE_URL = "https://fabiodagostino.github.io/FamilyTaskTracker/icons/icon-512x512.png"
 const BADGE_URL = getBadgePath();
 
 console.log('🖼️ Icon URL determined:', ICON_URL);
@@ -86,6 +86,7 @@ self.addEventListener('push', (event) => {
     body: notificationData.body || 'Nuova attività',
     icon: ICON_URL,  // ✅ URL completo assoluto
     badge: BADGE_URL, // ✅ URL completo assoluto
+    image: IMAGE_URL,
     tag: 'family-task',
     requireInteraction: isIOS, // 🍎 iOS richiede interazione
     data: {
