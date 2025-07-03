@@ -337,9 +337,9 @@ export function useNotifications() {
         });
         
         if (Notification.permission === 'granted') {
-          // Determina il percorso corretto dell'icona
+          // Usa il percorso corretto dell'icona dal webmanifest
           const iconPath = import.meta.env.PROD 
-            ? '/FamilyTaskTracker/icon-192.png'
+            ? '/FamilyTaskTracker/icons/icon-192x192.png'
             : '/icon-192.png';
             
           new Notification(payload.notification?.title || 'Family Task Tracker', {
