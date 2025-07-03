@@ -8,6 +8,7 @@ import { UserManagement } from '@/components/admin/UserManagement';
 import { useAuthContext } from '@/contexts/AuthContext';
 import AdminPanel from '@/components/admin/AdministratorPanel';
 import { ShoppingFoodComponent } from '@/components/shoppingfood/ShoppingFood';
+import { AutoFCMManager } from '@/components/admin/AutoFCMManager';
 
 export default function Dashboard() {
   const { user } = useAuthContext();
@@ -20,6 +21,10 @@ export default function Dashboard() {
         <Route path="/calendar" component={Calendar} />
          <Route path="/shoppingfood">
           {() => <ShoppingFoodComponent />}
+        </Route>
+
+         <Route path="/notification">
+          {() => <AutoFCMManager />}
         </Route>
 
         

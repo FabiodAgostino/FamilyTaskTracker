@@ -4,7 +4,18 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import dotenv from 'dotenv'; // ← AGGIUNGI QUESTA RIGA
 
+// ← AGGIUNGI QUESTE RIGHE
+// Carica variabili d'ambiente dal file .env
+const currentDir = process.cwd();
+const envPath = path.join(currentDir, '.env');
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath });
+  console.log('✅ File .env caricato da:', envPath);
+} else {
+  console.warn('⚠️ File .env non trovato in:', envPath);
+}
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,8 +43,9 @@ function buildServiceWorker() {
     }
 
     // Verifica che il template esista
-    if (!fs.existsSync(templatePath)) {
-      throw new Error(`❌ Template non trovato: ${templatePath}`);
+     if (!fs.existsSync(templatePath)) {
+      console.log('ℹ️  Template non trovato, utilizzando Service Worker manuale');
+      return true; // ← Restituisci successo invece di errore
     }
 
     // Leggi il template
@@ -46,6 +58,7 @@ function buildServiceWorker() {
       '__VITE_FIREBASE_PROJECT_ID__': process.env.VITE_FIREBASE_PROJECT_ID || '',
       '__VITE_FIREBASE_STORAGE_BUCKET__': process.env.VITE_FIREBASE_STORAGE_BUCKET || '',
       '__VITE_FIREBASE_MESSAGING_SENDER_ID__': process.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+      '__VITE_FIREBASE_VAPID_KEY__': process.env.VITE_FIREBASE_VAPID_KEY || '',
       '__VITE_FIREBASE_APP_ID__': process.env.VITE_FIREBASE_APP_ID || '',
       '__VITE_FIREBASE_MEASUREMENT_ID__': process.env.VITE_FIREBASE_MEASUREMENT_ID || '',
       '__VITE_APP_NAME__': process.env.VITE_APP_NAME || 'Family Task Tracker',

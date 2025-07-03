@@ -1,113 +1,133 @@
-// 🔥 Generated Service Worker - DO NOT EDIT MANUALLY
-// Generated at: 2025-06-27T13:34:18.766Z
-// Environment: development
-// Version: 1.0.0
+// 🔥 Service Worker Ottimizzato per iOS
+console.log('🔥 FCM SW: Starting (iOS Compatible)...');
 
-// client/public/firebase-messaging-sw.template.js
-// 🔥 Template Service Worker - I placeholder verranno sostituiti durante il build
+// 📱 Rileva piattaforma
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+console.log('📱 Platform detected:', isIOS ? 'iOS' : 'Other');
 
-// 🔥 Aggiornato a Firebase 11
-importScripts('https://www.gstatic.com/firebasejs/11.9.1/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/11.9.1/firebase-messaging-compat.js');
+// 📦 Install event  
+self.addEventListener('install', (event) => {
+  console.log('📦 SW: Install event');
+  self.skipWaiting();
+});
 
-// 🔧 Configurazione Firebase da variabili d'ambiente (placeholder)
-const firebaseConfig = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: "",
-  measurementId: ""
-};
+// 🚀 Activate event
+self.addEventListener('activate', (event) => {
+  console.log('🚀 SW: Activate event');
+  event.waitUntil(clients.claim());
+});
 
-// 🔧 Configurazioni da variabili d'ambiente
-const APP_CONFIG = {
-  appName: "Family Task Tracker",
-  baseUrl: "/FamilyTaskTracker/",
-  environment: "development",
-  version: "1.0.0"
-};
-
-// 🍎 Try-catch per iOS Safari compatibility
-try {
-  firebase.initializeApp(firebaseConfig);
-  const messaging = firebase.messaging();
-
-
-  // Handler per notifiche in background
-  messaging.onBackgroundMessage((payload) => {
-    
-    const notificationTitle = payload.notification?.title || `🏠 ${APP_CONFIG.appName}`;
-    const notificationOptions = {
-      body: payload.notification?.body || 'Nuovi aggiornamenti disponibili',
-      tag: 'family-task-notification',
-      silent: false,
-      requireInteraction: false,
-      data: {
-        ...payload.data,
-        timestamp: Date.now(),
-        version: APP_CONFIG.version
+// 📬 Push event - Gestione Avanzata iOS
+self.addEventListener('push', (event) => {
+  console.log('📬 Push received:', event);
+  
+  let payload = {};
+  let notificationData = {};
+  
+  try {
+    if (event.data) {
+      // 🔧 Parse dati FCM
+      const text = event.data.text();
+      payload = JSON.parse(text);
+      console.log('📦 FCM payload:', payload);
+      
+      // 🍎 Gestione formato iOS/Android
+      notificationData = payload.notification || {};
+      if (payload.data) {
+        notificationData.data = payload.data;
       }
-    };
-
-
-    return self.registration.showNotification(notificationTitle, notificationOptions);
-  });
-
-  // 🍎 Gestione click notifiche
-  self.addEventListener('notificationclick', (event) => {
-    
-    event.notification.close();
-    
-    // 🔧 URL con base path da variabile d'ambiente
-    const targetUrl = event.notification.data?.url || APP_CONFIG.baseUrl;
-    
-    event.waitUntil(
-      clients.matchAll({ type: 'window', includeUncontrolled: true })
-        .then((clientList) => {
-          // Se c'è già una finestra aperta, focusla
-          for (const client of clientList) {
-            if (client.url.includes(APP_CONFIG.appName.replace(/\s+/g, '')) && 'focus' in client) {
-              return client.focus();
-            }
-          }
-          // Altrimenti apri nuova finestra
-          if (clients.openWindow) {
-            return clients.openWindow(targetUrl);
-          }
-        })
-        .catch(error => {
-          console.error('🚨 Errore apertura finestra:', error);
-        })
-    );
-  });
-
-  // 🔄 Gestione aggiornamenti service worker
-  self.addEventListener('message', (event) => {
-    if (event.data && event.data.type === 'SKIP_WAITING') {
-      self.skipWaiting();
     }
-  });
+  } catch (error) {
+    console.log('⚠️ Parse error, using fallback');
+    notificationData = {
+      title: '🏠 Family Task Tracker',
+      body: 'Nuova notifica famiglia'
+    };
+  }
 
-  // 📊 Service Worker installato
-  self.addEventListener('install', (event) => {
-    self.skipWaiting();
-  });
+  const title = notificationData.title || '🏠 Family Task Tracker';
+  const options = {
+    body: notificationData.body || 'Nuova attività',
+    icon: '/icons/icon-192x192.png',
+    badge: '/icons/icon-192x192.png',
+    tag: 'family-task',
+    requireInteraction: isIOS, // 🍎 iOS richiede interazione
+    data: {
+      ...notificationData.data,
+      timestamp: Date.now(),
+      platform: isIOS ? 'iOS' : 'other',
+      originalPayload: payload
+    },
+    // 🍎 iOS Settings
+    silent: false,
+    renotify: true
+  };
 
-  // 🔄 Service Worker attivato
-  self.addEventListener('activate', (event) => {
-    event.waitUntil(clients.claim());
-  });
-
-} catch (error) {
-  console.error('🚨 Firebase service worker error:', error);
+  console.log('🔔 Showing notification:', title, options);
   
-  self.addEventListener('install', () => {
-    self.skipWaiting();
-  });
+  event.waitUntil(
+    self.registration.showNotification(title, options)
+  );
+});
+
+// 🖱️ Notification click - Fix iOS URL
+self.addEventListener('notificationclick', (event) => {
+  console.log('🖱️ Notification clicked:', event.notification);
   
-  self.addEventListener('activate', () => {
+  event.notification.close();
+  
+  // 🍎 iOS: Gestione URL personalizzati
+  let targetUrl = '/';
+  
+  try {
+    const data = event.notification.data || {};
+    targetUrl = data.url || data.click_action || '/';
+    
+    // 🔧 Se abbiamo payload originale FCM
+    if (data.originalPayload?.data?.url) {
+      targetUrl = data.originalPayload.data.url;
+    }
+    
+    console.log('🎯 Target URL:', targetUrl);
+  } catch (error) {
+    console.log('⚠️ URL parsing error:', error);
+  }
+  
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        // 🔍 Cerca finestra esistente
+        for (const client of clientList) {
+          if (client.url.includes(location.origin) && 'focus' in client) {
+            console.log('👀 Focusing existing window');
+            // 💬 Invia messaggio per navigazione custom
+            client.postMessage({
+              type: 'NOTIFICATION_CLICK',
+              url: targetUrl
+            });
+            return client.focus();
+          }
+        }
+        
+        // 🆕 Apri nuova finestra
+        console.log('🆕 Opening new window:', targetUrl);
+        if (clients.openWindow) {
+          return clients.openWindow(targetUrl);
+        }
+      })
+      .catch(error => {
+        console.error('❌ Click handling error:', error);
+      })
+  );
+});
+
+// 💬 Message handler per navigazione custom
+self.addEventListener('message', (event) => {
+  console.log('💬 Message received:', event.data);
+  
+  if (event.data?.type === 'SKIP_WAITING') {
     self.skipWaiting();
-  });
-}
+  }
+});
+
+console.log('✅ SW: Ready (iOS Compatible)');

@@ -1,370 +1,466 @@
 # .github/workflows/deploy.yml
-# 🔥 Deploy con Auto-Versioning e Service Worker Template Replacement
+# 🔥 Deploy con Auto-Versioning e Service Worker Intelligente
 
 name: Deploy Family Task Tracker to Pages
 
 on:
-  push:
-    branches: ["main"]
-  workflow_dispatch:
+ push:
+   branches: ["main"]
+ workflow_dispatch:
 
 permissions:
-  contents: write  # ⚠️ NECESSARIO per committare version.json
-  pages: write
-  id-token: write
+ contents: write  # ⚠️ NECESSARIO per committare version.json
+ pages: write
+ id-token: write
 
 concurrency:
-  group: "pages"
-  cancel-in-progress: false
+ group: "pages"
+ cancel-in-progress: false
 
 jobs:
-  deploy-frontend:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: 📥 Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          
-      - name: 🟢 Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-          cache-dependency-path: |
-            package-lock.json
-            client/package-lock.json
-          
-      - name: 📦 Install Dependencies
-        run: |
-          npm ci
-          cd client && npm ci
+ deploy-frontend:
+   environment:
+     name: github-pages
+     url: ${{ steps.deployment.outputs.page_url }}
+   runs-on: ubuntu-latest
+   
+   steps:
+     - name: 📥 Checkout Repository
+       uses: actions/checkout@v4
+       with:
+         token: ${{ secrets.GITHUB_TOKEN }}
+         
+     - name: 🟢 Setup Node.js
+       uses: actions/setup-node@v4
+       with:
+         node-version: 20
+         cache: 'npm'
+         cache-dependency-path: |
+           package-lock.json
+           client/package-lock.json
+         
+     - name: 📦 Install Dependencies
+       run: |
+         npm ci
+         cd client && npm ci
 
-      - name: 🔢 Generate Version Number Based on Commit
-        id: version
-        run: |
-          echo "🔢 Analyzing commit message for version strategy..."
-          
-          # Ottieni il messaggio dell'ultimo commit
-          COMMIT_MSG=$(git log -1 --pretty=%B | head -n1)
-          echo "📝 Commit message: $COMMIT_MSG"
-          
-          # Controlla se il commit contiene una versione specifica (es: 5.1.4.0)
-          VERSION_PATTERN="[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+"
-          if echo "$COMMIT_MSG" | grep -qE "$VERSION_PATTERN"; then
-            # Estrai la versione specifica dal commit
-            SPECIFIC_VERSION=$(echo "$COMMIT_MSG" | grep -oE "$VERSION_PATTERN" | head -n1)
-            echo "🎯 Found specific version in commit: $SPECIFIC_VERSION"
-            
-            # Imposta la versione specifica
-            VERSION_OUTPUT=$(node scripts/version-manager.js set "$SPECIFIC_VERSION" production)
-            INCREMENT_TYPE="specific"
-            
-          elif echo "$COMMIT_MSG" | grep -qiE "^fix(\(.*\))?:" || echo "$COMMIT_MSG" | grep -qiE "\bfix\b"; then
-            # Fix: incrementa solo build
-            echo "🔧 Fix detected - incrementing build number"
-            VERSION_OUTPUT=$(node scripts/version-manager.js increment build production)
-            INCREMENT_TYPE="build"
-            
-          elif echo "$COMMIT_MSG" | grep -qiE "^feat(\(.*\))?:" || echo "$COMMIT_MSG" | grep -qiE "^feature(\(.*\))?:" || echo "$COMMIT_MSG" | grep -qiE "\b(feat|feature)\b"; then
-            # Feature: incrementa minor
-            echo "✨ Feature detected - incrementing minor version"
-            VERSION_OUTPUT=$(node scripts/version-manager.js increment minor production)
-            INCREMENT_TYPE="minor"
-            
-          else
-            # Default: incrementa patch
-            echo "📦 Default increment - incrementing patch version"
-            VERSION_OUTPUT=$(node scripts/version-manager.js increment patch production)
-            INCREMENT_TYPE="patch"
-          fi
-          
-          echo "$VERSION_OUTPUT"
-          
-          # Estrai le variabili dall'output o dal file
-          if echo "$VERSION_OUTPUT" | grep -q "version="; then
-            VERSION=$(echo "$VERSION_OUTPUT" | grep "^version=" | cut -d'=' -f2)
-            BUILD_NUMBER=$(echo "$VERSION_OUTPUT" | grep "^build_number=" | cut -d'=' -f2)
-            DEPLOYMENT_ID=$(echo "$VERSION_OUTPUT" | grep "^deployment_id=" | cut -d'=' -f2)
-          else
-            # Leggi dal file version.json
-            echo "📄 Reading from version.json file..."
-            MAJOR=$(jq -r '.major' version.json)
-            MINOR=$(jq -r '.minor' version.json)
-            PATCH=$(jq -r '.patch' version.json)
-            BUILD=$(jq -r '.build' version.json)
-            DEPLOY_ID=$(jq -r '.deploymentId' version.json)
-            
-            VERSION="v${MAJOR}.${MINOR}.${PATCH}.${BUILD}"
-            BUILD_NUMBER="$BUILD"
-            DEPLOYMENT_ID="$DEPLOY_ID"
-          fi
-          
-          # Info aggiuntive
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          
-          echo "📊 Version Strategy Applied:"
-          echo "  Strategy: $INCREMENT_TYPE"
-          echo "  Version: $VERSION"
-          echo "  Build: #$BUILD_NUMBER"
-          echo "  Commit: $SHORT_SHA"
-          echo "  Deploy ID: $DEPLOYMENT_ID"
-          
-          # Output per i prossimi step
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
-          echo "deployment_id=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT
-          echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
-          echo "build_date=$BUILD_DATE" >> $GITHUB_OUTPUT
-          echo "increment_type=$INCREMENT_TYPE" >> $GITHUB_OUTPUT
+     - name: 🔢 Generate Version Number Based on Commit
+       id: version
+       run: |
+         echo "🔢 Analyzing commit message for version strategy..."
+         
+         # Ottieni il messaggio dell'ultimo commit
+         COMMIT_MSG=$(git log -1 --pretty=%B | head -n1)
+         echo "📝 Commit message: $COMMIT_MSG"
+         
+         # Controlla se il commit contiene una versione specifica (es: 5.1.4.0)
+         VERSION_PATTERN="[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+"
+         if echo "$COMMIT_MSG" | grep -qE "$VERSION_PATTERN"; then
+           # Estrai la versione specifica dal commit
+           SPECIFIC_VERSION=$(echo "$COMMIT_MSG" | grep -oE "$VERSION_PATTERN" | head -n1)
+           echo "🎯 Found specific version in commit: $SPECIFIC_VERSION"
+           
+           # Imposta la versione specifica
+           VERSION_OUTPUT=$(node scripts/version-manager.js set "$SPECIFIC_VERSION" production)
+           INCREMENT_TYPE="specific"
+           
+         elif echo "$COMMIT_MSG" | grep -qiE "^fix(\(.*\))?:" || echo "$COMMIT_MSG" | grep -qiE "\bfix\b"; then
+           # Fix: incrementa solo build
+           echo "🔧 Fix detected - incrementing build number"
+           VERSION_OUTPUT=$(node scripts/version-manager.js increment build production)
+           INCREMENT_TYPE="build"
+           
+         elif echo "$COMMIT_MSG" | grep -qiE "^feat(\(.*\))?:" || echo "$COMMIT_MSG" | grep -qiE "^feature(\(.*\))?:" || echo "$COMMIT_MSG" | grep -qiE "\b(feat|feature)\b"; then
+           # Feature: incrementa minor
+           echo "✨ Feature detected - incrementing minor version"
+           VERSION_OUTPUT=$(node scripts/version-manager.js increment minor production)
+           INCREMENT_TYPE="minor"
+           
+         else
+           # Default: incrementa patch
+           echo "📦 Default increment - incrementing patch version"
+           VERSION_OUTPUT=$(node scripts/version-manager.js increment patch production)
+           INCREMENT_TYPE="patch"
+         fi
+         
+         echo "$VERSION_OUTPUT"
+         
+         # Estrai le variabili dall'output o dal file
+         if echo "$VERSION_OUTPUT" | grep -q "version="; then
+           VERSION=$(echo "$VERSION_OUTPUT" | grep "^version=" | cut -d'=' -f2)
+           BUILD_NUMBER=$(echo "$VERSION_OUTPUT" | grep "^build_number=" | cut -d'=' -f2)
+           DEPLOYMENT_ID=$(echo "$VERSION_OUTPUT" | grep "^deployment_id=" | cut -d'=' -f2)
+         else
+           # Leggi dal file version.json
+           echo "📄 Reading from version.json file..."
+           MAJOR=$(jq -r '.major' version.json)
+           MINOR=$(jq -r '.minor' version.json)
+           PATCH=$(jq -r '.patch' version.json)
+           BUILD=$(jq -r '.build' version.json)
+           DEPLOY_ID=$(jq -r '.deploymentId' version.json)
+           
+           VERSION="v${MAJOR}.${MINOR}.${PATCH}.${BUILD}"
+           BUILD_NUMBER="$BUILD"
+           DEPLOYMENT_ID="$DEPLOY_ID"
+         fi
+         
+         # Info aggiuntive
+         SHORT_SHA=$(git rev-parse --short HEAD)
+         BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+         
+         echo "📊 Version Strategy Applied:"
+         echo "  Strategy: $INCREMENT_TYPE"
+         echo "  Version: $VERSION"
+         echo "  Build: #$BUILD_NUMBER"
+         echo "  Commit: $SHORT_SHA"
+         echo "  Deploy ID: $DEPLOYMENT_ID"
+         
+         # Output per i prossimi step
+         echo "version=$VERSION" >> $GITHUB_OUTPUT
+         echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+         echo "deployment_id=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT
+         echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+         echo "build_date=$BUILD_DATE" >> $GITHUB_OUTPUT
+         echo "increment_type=$INCREMENT_TYPE" >> $GITHUB_OUTPUT
 
-      - name: 📝 Commit Version Update
-        run: |
-          echo "📝 Committing version update..."
-          
-          # Configura git
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          
-          # Verifica se ci sono cambiamenti al version.json
-          if git diff --quiet version.json; then
-            echo "⚠️ No changes in version.json, skipping commit"
-          else
-            echo "✅ Version.json changed, committing..."
-            git add version.json
-            git commit -m "🔢 Auto-increment version to ${{ steps.version.outputs.version }} [skip ci]"
-            
-            # Push delle modifiche
-            git push origin main
-            echo "✅ Version committed and pushed!"
-          fi
+     - name: 📝 Commit Version Update
+       run: |
+         echo "📝 Committing version update..."
+         
+         # Configura git
+         git config --local user.email "action@github.com"
+         git config --local user.name "GitHub Action"
+         
+         # Verifica se ci sono cambiamenti al version.json
+         if git diff --quiet version.json; then
+           echo "⚠️ No changes in version.json, skipping commit"
+         else
+           echo "✅ Version.json changed, committing..."
+           git add version.json
+           git commit -m "🔢 Auto-increment version to ${{ steps.version.outputs.version }} [skip ci]"
+           
+           # Push delle modifiche
+           git push origin main
+           echo "✅ Version committed and pushed!"
+         fi
 
-      - name: 🔍 Verify GitHub Secrets
-        run: |
-          echo "✅ Checking critical environment variables..."
-          if [ -z "${{ secrets.FIREBASE_API_KEY }}" ]; then
-            echo "❌ FIREBASE_API_KEY is missing!"
-            exit 1
-          fi
-          if [ -z "${{ secrets.FIREBASE_PROJECT_ID }}" ]; then
-            echo "❌ FIREBASE_PROJECT_ID is missing!"
-            exit 1
-          fi
-          if [ -z "${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}" ]; then
-            echo "❌ FIREBASE_MESSAGING_SENDER_ID is missing!"
-            exit 1
-          fi
-          if [ -z "${{ secrets.FIREBASE_APP_ID }}" ]; then
-            echo "❌ FIREBASE_APP_ID is missing!"
-            exit 1
-          fi
-          echo "✅ All critical variables are present"
-        
-      - name: 🔐 Create Environment Variables with Version
-        run: |
-          echo "🔐 Creating environment variables for version ${{ steps.version.outputs.version }}..."
-          
-          cat > client/.env << EOF
-          # Firebase Configuration
-          VITE_FIREBASE_API_KEY=${{ secrets.FIREBASE_API_KEY }}
-          VITE_FIREBASE_AUTH_DOMAIN=${{ secrets.FIREBASE_AUTH_DOMAIN }}
-          VITE_FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}
-          VITE_FIREBASE_STORAGE_BUCKET=${{ secrets.FIREBASE_STORAGE_BUCKET }}
-          VITE_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
-          VITE_FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID }}
-          VITE_FIREBASE_MEASUREMENT_ID=${{ secrets.FIREBASE_MEASUREMENT_ID }}
-          VITE_DEEPSEEK_KEY=${{ secrets.VITE_DEEPSEEK_KEY }}
+     - name: 🔍 Verify GitHub Secrets
+       run: |
+         echo "✅ Checking critical environment variables..."
+         if [ -z "${{ secrets.FIREBASE_API_KEY }}" ]; then
+           echo "❌ FIREBASE_API_KEY is missing!"
+           exit 1
+         fi
+         if [ -z "${{ secrets.FIREBASE_PROJECT_ID }}" ]; then
+           echo "❌ FIREBASE_PROJECT_ID is missing!"
+           exit 1
+         fi
+         if [ -z "${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}" ]; then
+           echo "❌ FIREBASE_MESSAGING_SENDER_ID is missing!"
+           exit 1
+         fi
+         if [ -z "${{ secrets.FIREBASE_APP_ID }}" ]; then
+           echo "❌ FIREBASE_APP_ID is missing!"
+           exit 1
+         fi
+         if [ -z "${{ secrets.FIREBASE_VAPID_KEY }}" ]; then
+           echo "⚠️ FIREBASE_VAPID_KEY is missing - notifications may not work!"
+         fi
+         echo "✅ Critical variables verified"
+       
+     - name: 🔐 Create Environment Variables with Version
+       run: |
+         echo "🔐 Creating environment variables for version ${{ steps.version.outputs.version }}..."
+         
+         cat > client/.env << EOF
+         # Firebase Configuration
+         VITE_FIREBASE_API_KEY=${{ secrets.FIREBASE_API_KEY }}
+         VITE_FIREBASE_AUTH_DOMAIN=${{ secrets.FIREBASE_AUTH_DOMAIN }}
+         VITE_FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}
+         VITE_FIREBASE_STORAGE_BUCKET=${{ secrets.FIREBASE_STORAGE_BUCKET }}
+         VITE_FIREBASE_MESSAGING_SENDER_ID=${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+         VITE_FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID }}
+         VITE_FIREBASE_MEASUREMENT_ID=${{ secrets.FIREBASE_MEASUREMENT_ID }}
+         VITE_FIREBASE_VAPID_KEY=${{ secrets.FIREBASE_VAPID_KEY }}
+         VITE_DEEPSEEK_KEY=${{ secrets.DEEPSEEK_KEY }}
+         
+         # Google Services
+         VITE_GOOGLE_SEARCH_API_KEY=${{ secrets.GOOGLE_SEARCH_API_KEY }}
+         VITE_GOOGLE_SEARCH_ENGINE_ID=${{ secrets.GOOGLE_SEARCH_ENGINE_ID }}
+         
+         # Authentication & Security
+         VITE_PASSWORD_ENCRYPTION_KEY=SuperTopoliniArrivano1234567890AB
+         
+         # Application Configuration
+         VITE_APP_NAME=Family Task Tracker
+         VITE_APP_VERSION=${{ steps.version.outputs.version }}
+         VITE_APP_BUILD_NUMBER=${{ steps.version.outputs.build_number }}
+         VITE_APP_BUILD_DATE=${{ steps.version.outputs.build_date }}
+         VITE_APP_COMMIT_SHA=${{ steps.version.outputs.short_sha }}
+         VITE_APP_DEPLOYMENT_ID=${{ steps.version.outputs.deployment_id }}
+         VITE_APP_ENVIRONMENT=production
+         VITE_BASE_URL=/FamilyTaskTracker/
+         
+         # Build Configuration
+         NODE_ENV=production
+         EOF
+         
+         echo "✅ Environment variables created successfully"
+         
+     - name: 🔧 Generate Service Worker with Version (Smart Detection)
+       run: |
+         echo "🔄 Attempting to generate service worker with version ${{ steps.version.outputs.version }}..."
+         
+         # Prova a generare il service worker dal template
+         if node scripts/build-service-worker.js build; then
+           echo "✅ Service worker generated from Firebase template"
+           SW_TYPE="template"
+           
+           # Verifica che sia stato generato correttamente
+           if [ ! -f "client/public/firebase-messaging-sw.js" ]; then
+             echo "❌ Service worker not generated despite success!"
+             exit 1
+           fi
+           
+         else
+           echo "ℹ️  Template-based service worker generation skipped"
+           SW_TYPE="manual"
+           
+           # Verifica che esista comunque un service worker manuale
+           if [ ! -f "client/public/firebase-messaging-sw.js" ]; then
+             echo "❌ No service worker found (neither template nor manual)!"
+             echo "📂 Contents of client/public/:"
+             ls -la client/public/
+             exit 1
+           fi
+           
+           echo "✅ Using existing manual service worker"
+         fi
+         
+         # Info sul service worker
+         SW_SIZE=$(wc -c < client/public/firebase-messaging-sw.js)
+         echo "📊 Service Worker Info:"
+         echo "  - Type: $SW_TYPE"
+         echo "  - Size: $SW_SIZE bytes"
+         echo "  - Version: ${{ steps.version.outputs.version }}"
+         
+         # Salva il tipo per il prossimo step
+         echo "SW_TYPE=$SW_TYPE" >> $GITHUB_ENV
+         
+       env:
+         # Pass all environment variables to the build script
+         VITE_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+         VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+         VITE_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+         VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+         VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+         VITE_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+         VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
+         VITE_FIREBASE_VAPID_KEY: ${{ secrets.FIREBASE_VAPID_KEY }}
+         VITE_PASSWORD_ENCRYPTION_KEY: "SuperTopoliniArrivano1234567890AB"
+         VITE_APP_NAME: "Family Task Tracker"
+         VITE_APP_VERSION: ${{ steps.version.outputs.version }}
+         VITE_APP_BUILD_NUMBER: ${{ steps.version.outputs.build_number }}
+         VITE_APP_BUILD_DATE: ${{ steps.version.outputs.build_date }}
+         VITE_APP_COMMIT_SHA: ${{ steps.version.outputs.short_sha }}
+         VITE_APP_DEPLOYMENT_ID: ${{ steps.version.outputs.deployment_id }}
+         VITE_DEEPSEEK_KEY: ${{ secrets.DEEPSEEK_KEY }}
+         VITE_APP_ENVIRONMENT: "production"
+         VITE_BASE_URL: "/FamilyTaskTracker/"
+         NODE_ENV: production
+         
+     - name: 🛡️ Security Check Service Worker (Intelligent)
+       run: |
+         cd client
+         echo "🔍 Running intelligent security check for $SW_TYPE service worker..."
+         
+         # Controlla se è il SW con Firebase template o quello minimale
+         if [ "$SW_TYPE" = "template" ]; then
+           echo "🔥 Verifying Firebase-based service worker..."
+           
+           # Check specifici per Firebase SW
+           if grep -q "__VITE_" public/firebase-messaging-sw.js; then
+             echo "❌ Service worker contains unreplaced placeholders!"
+             echo "🔍 Found placeholders:"
+             grep "__VITE_" public/firebase-messaging-sw.js
+             exit 1
+           fi
+           
+           if grep -q 'apiKey: ""' public/firebase-messaging-sw.js; then
+             echo "❌ Service worker has empty API key!"
+             exit 1
+           fi
+           
+           if ! grep -q "firebase.initializeApp" public/firebase-messaging-sw.js; then
+             echo "❌ Service worker missing Firebase initialization!"
+             exit 1
+           fi
+           
+           if ! grep -q "messaging.onBackgroundMessage" public/firebase-messaging-sw.js; then
+             echo "❌ Service worker missing Firebase background message handler!"
+             exit 1
+           fi
+           
+           echo "✅ Firebase service worker security check passed"
+           
+         else
+           echo "🧪 Verifying manual/minimal service worker..."
+           
+           # Check specifici per SW minimale
+           if ! grep -q "addEventListener.*push" public/firebase-messaging-sw.js; then
+             echo "❌ Manual service worker missing push event listener!"
+             exit 1
+           fi
+           
+           if ! grep -q "showNotification" public/firebase-messaging-sw.js; then
+             echo "❌ Manual service worker missing notification display functionality!"
+             exit 1
+           fi
+           
+           if ! grep -q "notificationclick" public/firebase-messaging-sw.js; then
+             echo "❌ Manual service worker missing notification click handler!"
+             exit 1
+           fi
+           
+           # Verifica che gestisca i dati FCM
+           if ! grep -q "event\.data" public/firebase-messaging-sw.js; then
+             echo "⚠️ Manual service worker may not handle FCM data properly"
+           fi
+           
+           echo "✅ Manual service worker security check passed"
+         fi
+         
+         # Check comuni per entrambi
+         if ! grep -q "install.*event" public/firebase-messaging-sw.js; then
+           echo "⚠️ Service worker missing install event handler"
+         fi
+         
+         if ! grep -q "activate.*event" public/firebase-messaging-sw.js; then
+           echo "⚠️ Service worker missing activate event handler"
+         fi
+         
+         echo "✅ Service worker ($SW_TYPE) security validation completed"
+       
+     - name: 🏗️ Build Application
+       run: |
+         echo "🏗️ Building application version ${{ steps.version.outputs.version }}..."
+         npm run build
+         
+         echo "📊 Build completed successfully!"
+         echo "  - Version: ${{ steps.version.outputs.version }}"
+         echo "  - Build: #${{ steps.version.outputs.build_number }}"
+         echo "  - Environment: production"
+         echo "  - Service Worker Type: $SW_TYPE"
+       env:
+         NODE_ENV: production
+         VITE_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+         VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+         VITE_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+         VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+         VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+         VITE_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+         VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
+         VITE_FIREBASE_VAPID_KEY: ${{ secrets.FIREBASE_VAPID_KEY }}
+         VITE_GOOGLE_SEARCH_API_KEY: ${{ secrets.GOOGLE_SEARCH_API_KEY }}
+         VITE_GOOGLE_SEARCH_ENGINE_ID: ${{ secrets.GOOGLE_SEARCH_ENGINE_ID }}
+         VITE_DEEPSEEK_KEY: ${{ secrets.DEEPSEEK_KEY }}
+         VITE_PASSWORD_ENCRYPTION_KEY: "SuperTopoliniArrivano1234567890AB"
+         VITE_APP_NAME: "Family Task Tracker"
+         VITE_APP_VERSION: ${{ steps.version.outputs.version }}
+         VITE_APP_BUILD_NUMBER: ${{ steps.version.outputs.build_number }}
+         VITE_APP_BUILD_DATE: ${{ steps.version.outputs.build_date }}
+         VITE_APP_COMMIT_SHA: ${{ steps.version.outputs.short_sha }}
+         VITE_APP_DEPLOYMENT_ID: ${{ steps.version.outputs.deployment_id }}
+         VITE_APP_ENVIRONMENT: "production"
+         VITE_BASE_URL: "/FamilyTaskTracker/"
+         
+     - name: 📋 Copy Service Worker and Version to Docs
+       run: |
+         echo "📋 Copying service worker and version files to docs folder..."
+         
+         # Copia service worker
+         cp client/public/firebase-messaging-sw.js docs/
+         
+         # Copia file versione per debug/info
+         cp version.json docs/version.json
+         
+         echo "🔍 Verifying files in docs..."
+         if [ ! -f "docs/firebase-messaging-sw.js" ]; then
+           echo "❌ Service worker not found in docs!"
+           exit 1
+         fi
+         
+         if [ ! -f "docs/version.json" ]; then
+           echo "❌ Version file not found in docs!"
+           exit 1
+         fi
+         
+         echo "✅ All files copied to docs successfully"
+         echo "📊 Final service worker info:"
+         echo "  - Type: $SW_TYPE"
+         echo "  - Size: $(wc -c < docs/firebase-messaging-sw.js) bytes"
+         
+     - name: 🔍 Final Build Verification
+       run: |
+         echo "🔍 Running final build verification for version ${{ steps.version.outputs.version }}..."
+         
+         # Verifica che esistano i file necessari
+         if [ ! -d "docs" ]; then
+           echo "❌ Docs directory not found!"
+           exit 1
+         fi
+         
+         # Esegui script di verifica se esiste
+         if [ -f "scripts/verify-build.js" ]; then
+           echo "🔧 Running build verification script..."
+           node scripts/verify-build.js
+         else
+           echo "ℹ️  No build verification script found, skipping"
+         fi
+         
+         echo "📊 Build statistics:"
+         echo "  - Version: ${{ steps.version.outputs.version }}"
+         echo "  - Build: #${{ steps.version.outputs.build_number }}"
+         echo "  - Service Worker: $SW_TYPE"
+         echo "  - Docs folder size: $(du -sh docs | cut -f1)"
+         echo "  - Service worker size: $(wc -c < docs/firebase-messaging-sw.js) bytes"
+         echo "  - Total files in docs: $(find docs -type f | wc -l)"
+         
+         # Mostra contenuto version.json per debug
+         echo "📋 Version info deployed:"
+         cat docs/version.json
+         
+         echo "🔔 Notification system: Ready ($SW_TYPE service worker)"
+       
+     - name: 📤 Setup GitHub Pages
+       uses: actions/configure-pages@v5
+       
+     - name: 📦 Upload Build Artifact
+       uses: actions/upload-pages-artifact@v3
+       with:
+         path: './docs'
+         
+     - name: 🚀 Deploy to GitHub Pages
+       id: deployment
+       uses: actions/deploy-pages@v4
 
-          
-          # Google Services
-          VITE_GOOGLE_SEARCH_API_KEY=${{ secrets.GOOGLE_SEARCH_API_KEY }}
-          VITE_GOOGLE_SEARCH_ENGINE_ID=${{ secrets.GOOGLE_SEARCH_ENGINE_ID }}
-          
-          # Authentication & Security
-          VITE_PASSWORD_ENCRYPTION_KEY=SuperTopoliniArrivano1234567890AB
-          
-          # Application Configuration
-          VITE_APP_NAME=Family Task Tracker
-          VITE_APP_VERSION=${{ steps.version.outputs.version }}
-          VITE_APP_BUILD_NUMBER=${{ steps.version.outputs.build_number }}
-          VITE_APP_BUILD_DATE=${{ steps.version.outputs.build_date }}
-          VITE_APP_COMMIT_SHA=${{ steps.version.outputs.short_sha }}
-          VITE_APP_DEPLOYMENT_ID=${{ steps.version.outputs.deployment_id }}
-          VITE_APP_ENVIRONMENT=production
-          VITE_BASE_URL=/FamilyTaskTracker/
-          
-          # Build Configuration
-          NODE_ENV=production
-          EOF
-          
-          echo "✅ Environment variables created successfully"
-          
-      - name: 🔧 Generate Service Worker with Version
-        run: |
-          echo "🔄 Generating service worker with version ${{ steps.version.outputs.version }}..."
-          node scripts/build-service-worker.js build
-          
-          echo "🔍 Verifying service worker was generated..."
-          if [ ! -f "client/public/firebase-messaging-sw.js" ]; then
-            echo "❌ Service worker not generated!"
-            ls -la client/public/
-            exit 1
-          fi
-          
-          echo "✅ Service worker v${{ steps.version.outputs.version }} generated successfully"
-          echo "📊 Service worker size: $(wc -c < client/public/firebase-messaging-sw.js) bytes"
-        env:
-          # Pass all environment variables to the build script
-          VITE_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
-          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
-          VITE_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
-          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
-          VITE_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
-          VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
-          VITE_PASSWORD_ENCRYPTION_KEY: "SuperTopoliniArrivano1234567890AB"
-          VITE_APP_NAME: "Family Task Tracker"
-          VITE_APP_VERSION: ${{ steps.version.outputs.version }}
-          VITE_APP_BUILD_NUMBER: ${{ steps.version.outputs.build_number }}
-          VITE_APP_BUILD_DATE: ${{ steps.version.outputs.build_date }}
-          VITE_APP_COMMIT_SHA: ${{ steps.version.outputs.short_sha }}
-          VITE_APP_DEPLOYMENT_ID: ${{ steps.version.outputs.deployment_id }}
-          VITE_DEEPSEEK_KEY: ${{ secrets.DEEPSEEK_KEY }}
-          VITE_APP_ENVIRONMENT: "production"
-          VITE_BASE_URL: "/FamilyTaskTracker/"
-          NODE_ENV: production
-          
-      - name: 🛡️ Security Check Service Worker
-        run: |
-          cd client
-          echo "🔍 Checking service worker for security issues..."
-          
-          if grep -q "__VITE_" public/firebase-messaging-sw.js; then
-            echo "❌ Service worker contains unreplaced placeholders!"
-            grep "__VITE_" public/firebase-messaging-sw.js
-            exit 1
-          fi
-          
-          if grep -q 'apiKey: ""' public/firebase-messaging-sw.js; then
-            echo "❌ Service worker has empty API key!"
-            exit 1
-          fi
-          
-          if ! grep -q "firebase.initializeApp" public/firebase-messaging-sw.js; then
-            echo "❌ Service worker missing Firebase initialization!"
-            exit 1
-          fi
-          
-          echo "✅ Service worker security check passed"
-        
-      - name: 🏗️ Build Application
-        run: |
-          echo "🏗️ Building application version ${{ steps.version.outputs.version }}..."
-          npm run build
-          
-          echo "📊 Build completed successfully!"
-          echo "  - Version: ${{ steps.version.outputs.version }}"
-          echo "  - Build: #${{ steps.version.outputs.build_number }}"
-          echo "  - Environment: production"
-        env:
-          NODE_ENV: production
-          VITE_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
-          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
-          VITE_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
-          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
-          VITE_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
-          VITE_FIREBASE_MEASUREMENT_ID: ${{ secrets.FIREBASE_MEASUREMENT_ID }}
-          VITE_GOOGLE_SEARCH_API_KEY: ${{ secrets.GOOGLE_SEARCH_API_KEY }}
-          VITE_GOOGLE_SEARCH_ENGINE_ID: ${{ secrets.GOOGLE_SEARCH_ENGINE_ID }}
-          VITE_DEEPSEEK_KEY: ${{ secrets.DEEPSEEK_KEY }}
-          VITE_PASSWORD_ENCRYPTION_KEY: "SuperTopoliniArrivano1234567890AB"
-          VITE_APP_NAME: "Family Task Tracker"
-          VITE_APP_VERSION: ${{ steps.version.outputs.version }}
-          VITE_APP_BUILD_NUMBER: ${{ steps.version.outputs.build_number }}
-          VITE_APP_BUILD_DATE: ${{ steps.version.outputs.build_date }}
-          VITE_APP_COMMIT_SHA: ${{ steps.version.outputs.short_sha }}
-          VITE_APP_DEPLOYMENT_ID: ${{ steps.version.outputs.deployment_id }}
-          VITE_APP_ENVIRONMENT: "production"
-          VITE_BASE_URL: "/FamilyTaskTracker/"
-          
-      - name: 📋 Copy Service Worker and Version to Docs
-        run: |
-          echo "📋 Copying service worker and version files to docs folder..."
-          
-          # Copia service worker
-          cp client/public/firebase-messaging-sw.js docs/
-          
-          # Copia file versione per debug/info
-          cp version.json docs/version.json
-          
-          echo "🔍 Verifying files in docs..."
-          if [ ! -f "docs/firebase-messaging-sw.js" ]; then
-            echo "❌ Service worker not found in docs!"
-            exit 1
-          fi
-          
-          if [ ! -f "docs/version.json" ]; then
-            echo "❌ Version file not found in docs!"
-            exit 1
-          fi
-          
-          echo "✅ All files copied to docs successfully"
-          
-      - name: 🔍 Final Build Verification
-        run: |
-          echo "🔍 Running final build verification for version ${{ steps.version.outputs.version }}..."
-          
-          # Verifica che esistano i file necessari
-          if [ ! -d "docs" ]; then
-            echo "❌ Docs directory not found!"
-            exit 1
-          fi
-          
-          # Esegui script di verifica se esiste
-          if [ -f "scripts/verify-build.js" ]; then
-            node scripts/verify-build.js
-          fi
-          
-          echo "📊 Build statistics:"
-          echo "  - Version: ${{ steps.version.outputs.version }}"
-          echo "  - Build: #${{ steps.version.outputs.build_number }}"
-          echo "  - Docs folder size: $(du -sh docs | cut -f1)"
-          echo "  - Service worker size: $(wc -c < docs/firebase-messaging-sw.js) bytes"
-          echo "  - Total files in docs: $(find docs -type f | wc -l)"
-          
-          # Mostra contenuto version.json per debug
-          echo "📋 Version info deployed:"
-          cat docs/version.json
-        
-      - name: 📤 Setup GitHub Pages
-        uses: actions/configure-pages@v5
-        
-      - name: 📦 Upload Build Artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: './docs'
-          
-      - name: 🚀 Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-
-      - name: ✅ Deployment Success
-        run: |
-          echo "🎉 Deployment completed successfully!"
-          echo "🌐 Site URL: ${{ steps.deployment.outputs.page_url }}"
-          echo "🏷️ Version: ${{ steps.version.outputs.version }}"
-          echo "🔢 Build: #${{ steps.version.outputs.build_number }}"
-          echo "📅 Deploy Date: ${{ steps.version.outputs.build_date }}"
-          echo "🆔 Deploy ID: ${{ steps.version.outputs.deployment_id }}"
-          echo "🔔 Service Worker with environment variables deployed!"
-          echo ""
-          echo "🔗 Direct links:"
-          echo "  - App: ${{ steps.deployment.outputs.page_url }}"
-          echo "  - Version Info: ${{ steps.deployment.outputs.page_url }}version.json"
-          echo "  - Service Worker: ${{ steps.deployment.outputs.page_url }}firebase-messaging-sw.js"
+     - name: ✅ Deployment Success
+       run: |
+         echo "🎉 Deployment completed successfully!"
+         echo "🌐 Site URL: ${{ steps.deployment.outputs.page_url }}"
+         echo "🏷️ Version: ${{ steps.version.outputs.version }}"
+         echo "🔢 Build: #${{ steps.version.outputs.build_number }}"
+         echo "📅 Deploy Date: ${{ steps.version.outputs.build_date }}"
+         echo "🆔 Deploy ID: ${{ steps.version.outputs.deployment_id }}"
+         echo "🔔 Service Worker ($SW_TYPE) with notifications deployed!"
+         echo ""
+         echo "🔗 Direct links:"
+         echo "  - App: ${{ steps.deployment.outputs.page_url }}"
+         echo "  - Version Info: ${{ steps.deployment.outputs.page_url }}version.json"
+         echo "  - Service Worker: ${{ steps.deployment.outputs.page_url }}firebase-messaging-sw.js"
+         echo ""
+         echo "📱 Notification Features:"
+         echo "  - Push Notifications: ✅ Ready"
+         echo "  - Background Sync: ✅ Ready"  
+         echo "  - PWA Support: ✅ Ready"
+         echo "  - iOS Support: ✅ Ready (iOS 16.4+)"

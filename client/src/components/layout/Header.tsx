@@ -31,7 +31,7 @@ const RatIcon = ({ className }: { className?: string }) => (
 );
 
 export function Header({ onMenuToggle }: HeaderProps) {
-  const { permission, requestPermission, isSupported } = useNotifications();
+const { permission, requestPermission, isSupported, token, debug } = useNotifications();
   const { user, logout } = useAuthContext();
   const { theme, toggleTheme } = useTheme();
   const [location] = useLocation();
@@ -43,7 +43,11 @@ export function Header({ onMenuToggle }: HeaderProps) {
     { name: 'Spesa', path: '/shoppingfood' },
 
   ];
-
+    const getNotificationStatus = () => {
+    if (permission !== 'granted') return { icon: BellOff, text: 'Attiva Notifiche', color: 'text-muted-foreground' };
+    if (!token) return { icon: Bell, text: 'Configura FCM', color: 'text-orange-500' };
+    return { icon: Bell, text: 'Notifiche Attive', color: 'text-green-500' };
+  };
   // ✅ NUOVO: Logica per il tema personalizzato
   const isTopiniTheme = user?.username === 'Fabio' || user?.username === 'Ludovica';
   // ✅ FIX: Controllo admin senza usare isAdmin()
@@ -189,18 +193,35 @@ export function Header({ onMenuToggle }: HeaderProps) {
                 </DropdownMenuItem>
 
                 {/* ✅ AGGIUNTO: Notifiche nel dropdown */}
-                {isSupported && (
-                  <DropdownMenuItem onClick={requestPermission} className="flex items-center cursor-pointer">
-                    {permission === 'granted' ? (
-                      <Bell className="mr-2 h-4 w-4" />
-                    ) : (
-                      <BellOff className="mr-2 h-4 w-4" />
-                    )}
-                    <span>
-                      {permission === 'granted' ? 'Notifiche Attive' : 'Attiva Notifiche'}
-                    </span>
-                  </DropdownMenuItem>
-                )}
+            {isSupported && (() => {
+  const status = getNotificationStatus();
+  const StatusIcon = status.icon;
+  
+  return (
+    <DropdownMenuItem 
+      onClick={async () => {
+        try {
+          if (permission === 'granted') {
+            if (!token) {
+              console.log('🔄 Attivando token FCM...');
+              await debug.setupFCM();
+            } else {
+              await debug.runDiagnostics();
+            }
+          } else {
+            await requestPermission();
+          }
+        } catch (error) {
+          console.error('❌ Errore:', error);
+        }
+      }} 
+      className="flex items-center cursor-pointer"
+    >
+      <StatusIcon className={`mr-2 h-4 w-4 ${status.color}`} />
+      <span className={status.color}>{status.text}</span>
+    </DropdownMenuItem>
+  );
+})()}
 
                 <DropdownMenuSeparator />
                 
@@ -277,28 +298,46 @@ export function Header({ onMenuToggle }: HeaderProps) {
                   
 
                   
-                  {/* 🆕 AGGIUNTO: Tema e notifiche su mobile */}
-                  <DropdownMenuItem onClick={toggleTheme} className="flex items-center cursor-pointer">
-                    {theme === 'light' ? (
-                      <Moon className="mr-2 h-4 w-4" />
-                    ) : (
-                      <Sun className="mr-2 h-4 w-4" />
-                    )}
-                    <span>{theme === 'light' ? 'Tema Scuro' : 'Tema Chiaro'}</span>
-                  </DropdownMenuItem>
-
-                  {isSupported && (
-                    <DropdownMenuItem onClick={requestPermission} className="flex items-center cursor-pointer">
-                      {permission === 'granted' ? (
-                        <Bell className="mr-2 h-4 w-4" />
-                      ) : (
-                        <BellOff className="mr-2 h-4 w-4" />
-                      )}
-                      <span>
-                        {permission === 'granted' ? 'Notifiche Attive' : 'Attiva Notifiche'}
-                      </span>
-                    </DropdownMenuItem>
+                 {/* 🆕 AGGIUNTO: Tema e notifiche su mobile */}
+                <DropdownMenuItem onClick={toggleTheme} className="flex items-center cursor-pointer">
+                  {theme === 'light' ? (
+                    <Moon className="mr-2 h-4 w-4" />
+                  ) : (
+                    <Sun className="mr-2 h-4 w-4" />
                   )}
+                  <span>{theme === 'light' ? 'Tema Scuro' : 'Tema Chiaro'}</span>
+                </DropdownMenuItem>
+
+                {/* ✅ MODIFICATO: Notifiche mobile con stato avanzato */}
+                {isSupported && (() => {
+                  const status = getNotificationStatus();
+                  const StatusIcon = status.icon;
+                  
+                  return (
+                    <DropdownMenuItem 
+                      onClick={async () => {
+                        try {
+                          if (permission === 'granted') {
+                            if (!token) {
+                              console.log('🔄 Attivando token FCM...');
+                              await debug.setupFCM();
+                            } else {
+                              await debug.runDiagnostics();
+                            }
+                          } else {
+                            await requestPermission();
+                          }
+                        } catch (error) {
+                          console.error('❌ Errore:', error);
+                        }
+                      }} 
+                      className="flex items-center cursor-pointer"
+                    >
+                      <StatusIcon className={`mr-2 h-4 w-4 ${status.color}`} />
+                      <span className={status.color}>{status.text}</span>
+                    </DropdownMenuItem>
+                  );
+                })()}
 
                   <DropdownMenuSeparator />
                   

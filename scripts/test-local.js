@@ -153,10 +153,10 @@ async function testFullBuild() {
         log('green', '✅ Build completato con successo');
         
         // Mostra l'output del build (solo ultime righe)
-        if (output) {
-          const lines = output.split('\n').slice(-10);
-          log('blue', '📝 Output build (ultime 10 righe):');
-          lines.forEach(line =>         }
+        // if (output) {
+        //   const lines = output.split('\n').slice(-10);
+        //   log('blue', '📝 Output build (ultime 10 righe):');
+        //   lines.forEach(line =>         }
         
         resolve();
       } else {
