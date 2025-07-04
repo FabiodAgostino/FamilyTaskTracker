@@ -203,7 +203,6 @@ export function useFirestore<T>(
         updatedAt: Timestamp.now(),
       };
       console.log(itemWithMetadata);
-      alert();
       const docRef = await addDoc(collection(db, collectionName), itemWithMetadata);
       return docRef.id;
     } catch (error) {

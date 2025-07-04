@@ -96,7 +96,7 @@ class ReminderService {
             console.log(`🔄 Aggiornamento promemoria: ${reminderId}`);
             
             const db = getFirestore();
-            const reminderRef = db.collection('reminders').doc(reminderId);
+            const reminderRef = db.collection('reminders-quequed').doc(reminderId);
             const reminderDoc = await reminderRef.get();
 
             if (!reminderDoc.exists) {
@@ -354,8 +354,8 @@ class ReminderService {
             }
 
             // 2. Prepara il messaggio
-            const notificationTitle = `⏰ ${reminderData.title}`;
-            const notificationBody = reminderData.message;
+            const notificationTitle = `⏰ Promemoria`;
+            const notificationBody = reminderData.title;
 
             // 3. Invia notifiche FCM
             await this.sendFCMNotifications(recipients, notificationTitle, notificationBody, reminderData);

@@ -241,7 +241,7 @@ export function AutoFCMManager() {
       
       if (issues.length > 0) {
         diagnosticMessage += `🚨 PROBLEMI (${issues.length}):\n`;
-        issues.forEach(issue => diagnosticMessage += `  ${issue}\n`);
+        issues.forEach((issue: any) => diagnosticMessage += `  ${issue}\n`);
       }
       
       alert(diagnosticMessage);
@@ -328,12 +328,6 @@ export function AutoFCMManager() {
           </div>
           <div>
             <strong>Sistema:</strong> {isEnabled ? '🟢 Attivo' : '🔴 Inattivo'}
-          </div>
-          <div>
-            <strong>SW Global:</strong> {debug.hasGlobalSW ? '✅' : '❌'}
-          </div>
-          <div>
-            <strong>Init Global:</strong> {debug.isInitialized ? '✅' : '❌'}
           </div>
         </div>
 

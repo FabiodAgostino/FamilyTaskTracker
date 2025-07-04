@@ -229,7 +229,6 @@ export function Calendar() {
       await updateEvent(editEvent.id, eventData);
       setEditEvent(null);
     } else {
-      alert();
       await addEvent(eventData);
     }
     setIsEventModalOpen(false);
