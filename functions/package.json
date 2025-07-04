@@ -19,7 +19,8 @@
     "firebase-admin": "^12.7.0",
     "firebase-functions": "6.3.2",
     "googleapis": "^150.0.1",
-    "nodemailer": "^7.0.3"
+    "nodemailer": "^7.0.3",
+    "@google-cloud/tasks": "^5.0.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.3",

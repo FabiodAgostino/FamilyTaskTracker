@@ -4,7 +4,7 @@
 
 const functions = require("firebase-functions/v1");  // 🔧 IMPORTA ESPLICITAMENTE V1
 const admin = require('firebase-admin');
-
+const { reminderService } = require('./services/reminder-service');
 // Assicurati che sia inizializzato
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -14,7 +14,6 @@ if (!admin.apps.length) {
 
 
 // Import dei servizi modulari
-const { unifiedNotificationService } = require('./services/notification-service');
 const { scraperService } = require('./services/scraping-service');
 const { priceMonitorService } = require('./services/price-monitor-service');
 const {
@@ -25,34 +24,6 @@ const {
 
 exports.onDocumentChange = onDocumentChange;
 
-/**
- * Funzione unificata che gestisce tutte le notifiche ogni 30 minuti
- * - FCM notifications (sempre)
- * - Email notifications (ogni 6 ore)
- * - Event reminders (ogni 6 ore)
- */
-exports.checkUpdatesUnified = functions
-    .region('europe-west1')
-    .runWith({
-        memory: '256MB',
-        timeoutSeconds: 540
-    })
-    .pubsub
-    .schedule('every 30 minutes')  // 🔧 CAMBIATO: ogni minuto per debug
-    .timeZone('Europe/Rome')
-    .onRun(async (context) => {
-        console.log("🔄 Avvio controllo unificato notifiche famiglia...");
-        
-        try {
-            await unifiedNotificationService.initializeEmailService();
-            await unifiedNotificationService.handleUnifiedCheck();
-            console.log("✅ Controllo unificato completato con successo");
-        } catch (error) {
-            console.error("❌ Errore nel controllo unificato:", error);
-        }
-        
-        return null;
-    });
 
 exports.scheduledPriceMonitoring = functions
     .region('europe-west1')  // Regione europea per migliori performance
@@ -72,41 +43,11 @@ exports.scheduledPriceMonitoring = functions
         console.log(`📅 Timestamp: ${context.timestamp}`);
         
         try {
-            // Inizializza il servizio di monitoraggio
-            
-            console.log('🔧 Inizializzazione servizio monitoraggio prezzi...');
-            
             // Esegui il monitoraggio completo
             const result = await priceMonitorService.runDailyPriceMonitoring();
             
             const duration = Date.now() - startTime;
             const durationFormatted = Math.round(duration / 1000);
-            
-            // Log risultati dettagliati
-            console.log('📊 ===== RISULTATI JOB MONITORAGGIO PREZZI =====');
-            console.log(`✅ Successo: ${result.success}`);
-            console.log(`⏱️ Durata totale: ${durationFormatted}s`);
-            console.log(`📦 Item monitorati: ${result.monitored || 0}`);
-            console.log(`💰 Cambiamenti rilevati: ${result.changes || 0}`);
-            console.log(`📧 Email inviate: ${result.emailData?.sent ? 'Sì' : 'No'}`);
-            
-            if (result.emailData?.sent) {
-                console.log(`📧 Destinatari email: ${result.emailData.recipientCount}`);
-                console.log(`📧 Recipients: ${result.emailData.recipients?.join(', ')}`);
-                console.log(`📧 Message ID: ${result.emailData.messageId}`);
-            }
-            
-            if (result.stats) {
-                console.log('📈 Statistiche dettagliate:');
-                console.log(`  • Totali: ${result.stats.total}`);
-                console.log(`  • Processati: ${result.stats.processed}`);
-                console.log(`  • Completati (saltati): ${result.stats.completed}`);
-                console.log(`  • Prezzi cambiati: ${result.stats.priceChanged}`);
-                console.log(`  • Disponibilità cambiate: ${result.stats.availabilityChanged}`);
-                console.log(`  • Errori: ${result.stats.errors}`);
-                console.log(`  • Chiamate DeepSeek: ${result.stats.deepseekCalls}`);
-                console.log(`  • Scritture DB: ${result.stats.dbWrites}`);
-            }
             
             if (result.changesSummary && result.changesSummary.length > 0) {
                 console.log('💰 Dettagli cambiamenti:');
@@ -140,12 +81,6 @@ exports.scheduledPriceMonitoring = functions
             const duration = Date.now() - startTime;
             const durationFormatted = Math.round(duration / 1000);
             
-            console.error('❌ ===== ERRORE JOB MONITORAGGIO PREZZI =====');
-            console.error(`❌ Errore: ${error.message}`);
-            console.error(`⏱️ Durata prima dell'errore: ${durationFormatted}s`);
-            console.error(`🆔 Job ID: ${context.eventId}`);
-            console.error('📋 Stack trace:', error.stack);
-            
             // Anche in caso di errore, ritorna informazioni utili
             return {
                 success: false,
@@ -158,7 +93,25 @@ exports.scheduledPriceMonitoring = functions
     });
 
 
-
+exports.manageReminders = functions
+    .region('europe-west1')
+    .runWith({
+        memory: '512MB',
+        timeoutSeconds: 300
+    })
+    .https
+    .onRequest(async (req, res) => {
+        try {
+            const result = await reminderService.handleRequest(req);
+            res.status(200).json(result);
+        } catch (error) {
+            console.error('❌ Errore manageReminders:', error);
+            res.status(500).json({
+                success: false,
+                error: error.message
+            });
+        }
+    });
 
 
 // ====================================

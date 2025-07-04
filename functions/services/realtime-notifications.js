@@ -6,7 +6,7 @@
 const functions = require("firebase-functions/v1");  // 🔧 IMPORTA ESPLICITAMENTE V1
 const { getFirestore } = require("firebase-admin/firestore");
 const admin = require('firebase-admin');
-
+const axios = require('axios');
 // Assicurati che sia inizializzato
 if (!admin.apps.length) {
   admin.initializeApp({
@@ -17,7 +17,8 @@ if (!admin.apps.length) {
 /**
  * Collezioni monitorate per le notifiche
  */
-const MONITORED_COLLECTIONS = ['shopping_items', 'notes', 'calendar_events'];
+const MONITORED_COLLECTIONS = ['shopping_items', 'notes', 'calendar_events', 'reminders'];
+
 
 /**
  * Servizio per gestire le notifiche real-time
@@ -58,6 +59,14 @@ class EfficientRealtimeNotificationService {
         if (!before && after) {
             const isPublic = after.isPublic === true;
             console.log(`🆕 Nuovo documento in ${collectionName} - pubblico: ${isPublic}`);
+
+            if (collectionName === 'shopping_items') {
+                const hasValidName = after.name && after.name.trim() !== '';
+                console.log(`🆕 Nuovo shopping item - pubblico: ${isPublic}, nome valido: ${hasValidName} (${after.name})`);
+                return isPublic && hasValidName;
+            }
+
+
             return isPublic;
         }
         
@@ -105,6 +114,14 @@ class EfficientRealtimeNotificationService {
                        before.eventType !== after.eventType ||
                        before.isAllDay !== after.isAllDay ||
                        before.location !== after.location;
+            case 'reminders':
+                    return before.title !== after.title || 
+                        before.message !== after.message ||
+                        before.scheduledTime?.seconds !== after.scheduledTime?.seconds ||
+                        before.isActive !== after.isActive ||
+                        before.priority !== after.priority ||
+                        before.reminderType !== after.reminderType ||
+                        before.isRecurring !== after.isRecurring;
             
             default:
                 return true; // Considera sempre significativo per collezioni sconosciute
@@ -191,7 +208,7 @@ class EfficientRealtimeNotificationService {
                 const itemName = data.name || 'Nuovo articolo';
                 if (operationType === 'created') {
                     title = `${emoji} Nuovo Articolo`;
-                    body = `${authorLabel} ha aggiunto "${itemName}" alla lista spesa`;
+                    body = `${authorLabel} ha aggiunto "${itemName}" alla shopping list`;
                 } else {
                     title = `${emoji} Articolo Aggiornato`;
                     body = `${authorLabel} ha modificato "${itemName}"`;
@@ -204,9 +221,10 @@ class EfficientRealtimeNotificationService {
             case 'notes':
                 emoji = '📝';
                 const noteTitle = data.title || 'Nota senza titolo';
+                
                 if (operationType === 'created') {
                     title = `${emoji} Nuova Nota`;
-                    body = `${authorLabel} ha aggiunto "${noteTitle}"`;
+                    body = `${authorLabel} ha scritto: "${noteTitle}"`;
                 } else {
                     title = `${emoji} Nota Aggiornata`;
                     body = `${authorLabel} ha modificato "${noteTitle}"`;
@@ -238,6 +256,42 @@ class EfficientRealtimeNotificationService {
                         body += ` (${dateStr})`;
                     } catch (e) {
                         // Ignora errori di parsing data
+                    }
+                }
+                break;
+
+            case 'reminders':
+                emoji = '⏰';
+                const reminderTitle = data.title || 'Nuovo promemoria';
+                
+                if (operationType === 'created') {
+                    title = `${emoji} Nuovo Promemoria`;
+                    body = `${authorLabel} ha creato: "${reminderTitle}"`;
+                    
+                    // Aggiungi info timing se disponibile
+                    if (data.scheduledTime) {
+                        try {
+                            const scheduledDate = new Date(data.scheduledTime.seconds * 1000);
+                            const dateStr = scheduledDate.toLocaleDateString('it-IT', { 
+                                day: 'numeric', 
+                                month: 'short',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            });
+                            body += ` (${dateStr})`;
+                        } catch (e) {
+                            // Ignora errori di parsing data
+                        }
+                    }
+                } else {
+                    title = `${emoji} Promemoria Aggiornato`;
+                    body = `${authorLabel} ha modificato "${reminderTitle}"`;
+                    
+                    if (data.priority === 'high') {
+                        body += ' (priorità alta)';
+                    }
+                    if (data.isRecurring) {
+                        body += ' (ricorrente)';
                     }
                 }
                 break;
@@ -369,6 +423,111 @@ async sendRealtimeNotifications(
   }
 }
 
+
+/**
+ * 🆕 Gestisce l'integrazione automatica con Cloud Tasks per i promemoria
+ */
+async handleReminderCloudTaskIntegration(change, context) {
+    try {
+        const documentId = context.params.documentId;
+        const before = change.before.exists ? change.before.data() : null;
+        const after = change.after.exists ? change.after.data() : null;
+        
+        console.log(`🔔 Gestione Cloud Task per promemoria: ${documentId}`);
+        
+        // Skip se è solo un update di cloudTaskId (per evitare loop)
+        if (before && after && 
+            before.cloudTaskId !== after.cloudTaskId && 
+            JSON.stringify({...before, cloudTaskId: null, updatedAt: null}) === 
+            JSON.stringify({...after, cloudTaskId: null, updatedAt: null})) {
+            console.log('⏭️ Skip: solo aggiornamento cloudTaskId');
+            return;
+        }
+        
+        const projectId = process.env.GCLOUD_PROJECT;
+        const functionUrl = `https://europe-west1-${projectId}.cloudfunctions.net/manageReminders`;
+        
+        // Caso 1: Nuovo promemoria creato
+        if (!before && after) {
+            console.log(`📝 Nuovo promemoria creato: ${after.title}`);
+            
+            if (after.isActive && after.scheduledTime && !after.cloudTaskId) {
+                const scheduledTime = new Date(after.scheduledTime.seconds * 1000);
+                
+                if (scheduledTime > new Date()) {
+                    console.log(`⏰ Creazione Cloud Task per: ${after.title}`);
+                    
+                    const payload = {
+                        action: 'create',
+                        reminderData: {
+                            id: documentId,
+                            ...after,
+                            scheduledTime: scheduledTime
+                        }
+                    };
+                    
+                    await axios.post(functionUrl, payload, {
+                        headers: { 'Content-Type': 'application/json' },
+                        timeout: 10000
+                    });
+                    
+                    console.log(`✅ Cloud Task request inviata per: ${documentId}`);
+                }
+            }
+        }
+        
+        // Caso 2: Promemoria aggiornato
+        if (before && after) {
+            const taskRelevantFieldsChanged = 
+                before.scheduledTime?.seconds !== after.scheduledTime?.seconds ||
+                before.isActive !== after.isActive ||
+                before.title !== after.title ||
+                before.message !== after.message;
+            
+            if (taskRelevantFieldsChanged) {
+                console.log(`🔧 Aggiornamento Cloud Task per: ${after.title}`);
+                
+                const payload = {
+                    action: 'update',
+                    reminderId: documentId,
+                    reminderData: {
+                        id: documentId,
+                        ...after,
+                        scheduledTime: new Date(after.scheduledTime.seconds * 1000)
+                    }
+                };
+                
+                await axios.post(functionUrl, payload, {
+                    headers: { 'Content-Type': 'application/json' },
+                    timeout: 10000
+                });
+                
+                console.log(`✅ Cloud Task update request inviata per: ${documentId}`);
+            }
+        }
+        
+        // Caso 3: Promemoria eliminato
+        if (before && !after) {
+            console.log(`🗑️ Promemoria eliminato: ${before.title}`);
+            
+            const payload = {
+                action: 'delete',
+                reminderId: documentId
+            };
+            
+            await axios.post(functionUrl, payload, {
+                headers: { 'Content-Type': 'application/json' },
+                timeout: 10000
+            });
+            
+            console.log(`✅ Cloud Task delete request inviata per: ${documentId}`);
+        }
+        
+    } catch (error) {
+        console.error('❌ Errore gestione Cloud Task promemoria:', error);
+        // Non far fallire le notifiche per errori Cloud Tasks
+    }
+}
     
     /**
      * Gestisce i token FCM falliti rimuovendoli dal database
@@ -440,7 +599,9 @@ exports.onDocumentChange = functions
             console.log(`⏭️ Collection ${collectionName} non monitorata - skip`);
             return null;
         }
-        
+         if (collectionName === 'reminders') {
+            await realtimeService.handleReminderCloudTaskIntegration(change, context);
+        }
         // Controlla se dovrebbe inviare notifiche
         if (!realtimeService.shouldSendNotification(change, collectionName)) {
             console.log(`⏭️ Notifica non necessaria per ${collectionName}/${documentId}`);
@@ -459,9 +620,16 @@ exports.onDocumentChange = functions
             operationType,
             authorUsername
         );
+
+       
         
         return null;
     });
+
+
+
+
+    
 
 /**
  * 🧪 Funzione di test per il sistema real-time

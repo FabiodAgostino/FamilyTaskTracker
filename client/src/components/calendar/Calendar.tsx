@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { 
   Plus, 
   ChevronLeft, 
@@ -9,12 +9,14 @@ import {
   Users,
   ChevronDown,
   ChevronUp,
-  Filter
+  Filter,
+  Bell
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -23,6 +25,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { EventModal } from './EventModal';
+import { RemindersTab } from './RemindersTab'; // Nuovo componente
 import { useFirestore } from '@/hooks/useFirestore';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -52,6 +55,9 @@ export function Calendar() {
   const { user } = useAuthContext();
   const isMobile = useIsMobile();
   
+  // ✅ NUOVO: Stato per tab attivo
+  const [activeTab, setActiveTab] = useState('calendar');
+  
   // ✅ NUOVO: Stato per filtri collassabili (chiusi di default su mobile)
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(!isMobile);
   
@@ -65,6 +71,8 @@ export function Calendar() {
   // ✅ NUOVO: Filtri
   const [eventTypeFilter, setEventTypeFilter] = useState('all');
   const [visibilityFilter, setVisibilityFilter] = useState('all');
+  const remindersTabRef = useRef<{ openModal: () => void }>(null);
+
 
   // ✅ NUOVO: Aggiorna stato filtri quando cambia mobile/desktop
   React.useEffect(() => {
@@ -221,6 +229,7 @@ export function Calendar() {
       await updateEvent(editEvent.id, eventData);
       setEditEvent(null);
     } else {
+      alert();
       await addEvent(eventData);
     }
     setIsEventModalOpen(false);
@@ -292,7 +301,7 @@ export function Calendar() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
-      {/* ✅ HEADER RESPONSIVE - MODIFICATO */}
+      {/* ✅ HEADER RESPONSIVE - MODIFICATO con TABS */}
       <div className={cn("mb-8", isMobile && "mb-6")}>
         <div className={cn(
           "flex sm:items-center sm:justify-between",
@@ -300,13 +309,15 @@ export function Calendar() {
         )}>
           <div className={cn(isMobile ? "w-full" : "")}>
             <div className="flex items-center gap-3 mb-3">
-              <FaCalendar  className="h-8 w-8 text-cambridge-newStyle" />
-              <h1 className="text-3xl font-bold text-delft-blue">Eventi</h1>
+              <FaCalendar className="h-8 w-8 text-cambridge-newStyle" />
+              <h1 className="text-3xl font-bold text-delft-blue">
+                {activeTab === 'calendar' ? 'Eventi' : 'Promemoria'}
+              </h1>
               
               {/* ✅ Bottone piccolo a fianco del titolo su mobile */}
               {isMobile && (
                 <Button
-                  onClick={() => setIsEventModalOpen(true)}
+                  onClick={() => activeTab === 'calendar' ? setIsEventModalOpen(true) : remindersTabRef.current?.openModal()}
                   size="sm"
                   className="ml-auto bg-cambridge-newStyle hover:bg-cambridge-newStyle/90 text-white p-2"
                 >
@@ -315,234 +326,260 @@ export function Calendar() {
               )}
             </div>
             
+            {/* ✅ TAB NAVIGATION */}
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full mb-4">
+              <TabsList className="grid w-full grid-cols-2 lg:w-auto">
+                <TabsTrigger value="calendar" className="flex items-center gap-2">
+                  <CalendarIcon className="h-4 w-4" />
+                  <span className={cn(isMobile && "text-sm")}>Eventi</span>
+                </TabsTrigger>
+                <TabsTrigger value="reminders" className="flex items-center gap-2">
+                  <Bell className="h-4 w-4" />
+                  <span className={cn(isMobile && "text-sm")}>Promemoria</span>
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            
             {/* ✅ Statistics Badges - Con più spazio su mobile */}
-            <div className={cn(
-              "flex flex-wrap gap-2",
-              isMobile && "mb-4"
-            )}>
-              <Badge variant="secondary" className="bg-cambridge-newStyle/10 text-cambridge-newStyle border-cambridge-newStyle/20">
-                {stats.total} {stats.total === 1 ? 'evento' : 'eventi'}
-              </Badge>
-              <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200">
-                {stats.publicEvents} {stats.publicEvents === 1 ? 'pubblico' : 'pubblici'}
-              </Badge>
-              <Badge variant="secondary" className="bg-orange-100 text-orange-700 border-orange-200">
-                {stats.privateEvents} {stats.privateEvents === 1 ? 'privato' : 'privati'}
-              </Badge>
-              {user?.role === 'admin' && (
-                <Badge variant="secondary" className="bg-purple-100 text-purple-700 border-purple-200">
-                  {stats.myEvents} {stats.myEvents === 1 ? 'mio' : 'miei'}
+            {activeTab === 'calendar' && (
+              <div className={cn(
+                "flex flex-wrap gap-2",
+                isMobile && "mb-4"
+              )}>
+                <Badge variant="secondary" className="bg-cambridge-newStyle/10 text-cambridge-newStyle border-cambridge-newStyle/20">
+                  {stats.total} {stats.total === 1 ? 'evento' : 'eventi'}
                 </Badge>
-              )}
-            </div>
+                <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200">
+                  {stats.publicEvents} {stats.publicEvents === 1 ? 'pubblico' : 'pubblici'}
+                </Badge>
+                <Badge variant="secondary" className="bg-orange-100 text-orange-700 border-orange-200">
+                  {stats.privateEvents} {stats.privateEvents === 1 ? 'privato' : 'privati'}
+                </Badge>
+                {user?.role === 'admin' && (
+                  <Badge variant="secondary" className="bg-purple-100 text-purple-700 border-purple-200">
+                    {stats.myEvents} {stats.myEvents === 1 ? 'mio' : 'miei'}
+                  </Badge>
+                )}
+              </div>
+            )}
           </div>
           
           {/* ✅ Bottone grande solo su schermi grandi */}
           {!isMobile && (
             <Button
-              onClick={() => setIsEventModalOpen(true)}
+              onClick={() => activeTab === 'calendar' ? setIsEventModalOpen(true) : remindersTabRef.current?.openModal()}
               className="bg-cambridge-newStyle hover:bg-cambridge-newStyle/90 text-white dark:text-black shadow-lg"
             >
               <Plus className="mr-2 h-4 w-4" />
-              Nuovo Evento
+              {activeTab === 'calendar' ? 'Nuovo Evento' : 'Nuovo Promemoria'}
             </Button>
           )}
         </div>
       </div>
 
-      {/* ✅ FILTRI COLLASSABILI */}
-      <Card className={cn("mb-6", isMobile && "mb-4")}>
-        <CardContent className={cn("p-6", isMobile && "p-4")}>
-          
-          {/* ✅ Header dei filtri su mobile */}
-          {isMobile && (
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-gray-500" />
-                <span className="font-medium text-sm">Filtri eventi</span>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={toggleFilters}
-              >
-                {isFiltersExpanded ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
-          )}
-
-          {/* ✅ Contenuto filtri - Controllo completo via JS */}
-          <div className={cn(
-            "flex flex-col gap-4",
-            isMobile && !isFiltersExpanded && "hidden"
-          )}>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Tipo Evento
-              </label>
-              <Select value={eventTypeFilter} onValueChange={setEventTypeFilter}>
-                <SelectTrigger className="w-full sm:w-48">
-                  <SelectValue placeholder="Seleziona tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tutti i Tipi</SelectItem>
-                  <SelectItem value="personal">Personale</SelectItem>
-                  <SelectItem value="family">Famiglia</SelectItem>
-                  <SelectItem value="work">Lavoro</SelectItem>
-                  <SelectItem value="appointment">Appuntamento</SelectItem>
-                  <SelectItem value="reminder">Promemoria</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Visibilità
-              </label>
-              <Select value={visibilityFilter} onValueChange={setVisibilityFilter}>
-                <SelectTrigger className="w-full sm:w-40">
-                  <SelectValue placeholder="Seleziona visibilità" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tutti</SelectItem>
-                  <SelectItem value="public">Pubblici</SelectItem>
-                  <SelectItem value="private">Privati</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ✅ Vista Calendario - Con padding responsivo */}
-      <Card className="mb-6">
-        <CardContent className={cn("p-6", isMobile && "p-4")}>
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-semibold text-delft-blue">
-              {format(currentDate, 'MMMM yyyy', { locale: it })}
-            </h3>
-            <div className="flex space-x-2">
-              <Button variant="outline" size="sm" onClick={prevMonth} className="p-2">
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="sm" onClick={nextMonth} className="p-2">
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Giorni della settimana */}
-          <div className={cn("flex flex-col", isMobile ? "h-90" : "h-98")}>
-            <div className="grid grid-cols-7 border-b border-gray-200 dark:border-gray-700">
-              {weekDays.map((day) => (
-                <div 
-                  key={day.name} 
-                  className={`p-3 text-center text-sm font-semibold ${
-                    day.isWeekend 
-                      ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20' 
-                      : 'text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800'
-                  }`}
-                >
-                  {day.name}
-                </div>
-              ))}
-            </div>
-            <div className="flex-1 overflow-hidden">
-              {rows}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ✅ Prossimi Eventi - Con padding responsivo */}
-      <Card>
-        <CardContent className={cn("p-6", isMobile && "p-4")}>
-          <h3 className="text-lg font-semibold text-delft-blue mb-4 flex items-center">
-            <Clock className="mr-2 h-5 w-5" />
-            Prossimi Eventi
-            {upcomingEvents.length > 0 && (
-              <Badge variant="secondary" className="ml-2 bg-cambridge-newStyle/10 text-cambridge-newStyle">
-                {upcomingEvents.length}
-              </Badge>
-            )}
-          </h3>
-          {upcomingEvents.length > 0 ? (
-            <div className={cn(
-              "space-y-3",
-              isMobile ? "max-h-48 overflow-y-auto" : "md:overflow-y-auto md:scrollbar-thin md:scrollbar-thumb-burnt-sienna md:scrollbar-track-gray-100",
-              !isMobile && "max-h-[165px]"
-            )}>
-              {upcomingEvents.map((event) => {
-                const typeInfo = getEventTypeInfo(event.eventType);
-                return (
-                  <div
-                    key={event.id}
-                    className="flex items-center space-x-4 p-4 rounded-lg cursor-pointer hover:shadow-md transition-all duration-200 border border-gray-100"
-                    style={{ backgroundColor: `${event.color}08` }}
-                    onClick={() => handleEditEvent(event)}
-                  >
-                    <div
-                      className="w-4 h-4 rounded-full flex-shrink-0 shadow-sm"
-                      style={{ backgroundColor: event.color }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-semibold text-delft-blue truncate">{event.title}</h4>
-                        <span className="text-lg">{typeInfo.icon}</span>
-                      </div>
-                      <div className={cn(
-                        "flex items-center gap-4 text-sm text-gray-600",
-                        isMobile && "flex-col items-start gap-1"
-                      )}>
-                        <div className="flex items-center">
-                          <Clock className="mr-1 h-3 w-3" />
-                          {format(event.startDate, 'd MMM yyyy', { locale: it })}
-                          {event.isAllDay ? '' : ` ${format(event.startDate, 'HH:mm')}`}
-                          {!isSameDay(event.startDate, event.endDate) && (
-                            <span> - {format(event.endDate, 'd MMM yyyy', { locale: it })}</span>
-                          )}
-                        </div>
-                        {event.location && (
-                          <div className="flex items-center">
-                            <MapPin className="mr-1 h-3 w-3" />
-                            <span className="truncate max-w-32">{event.location}</span>
-                          </div>
-                        )}
-                        {event.attendees && event.attendees.length > 0 && (
-                          <div className="flex items-center">
-                            <Users className="mr-1 h-3 w-3" />
-                            <span>{event.attendees.length}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <Badge
-                      variant="outline"
-                      className="capitalize text-xs border-2"
-                      style={{
-                        borderColor: event.color,
-                        color: event.color,
-                      }}
-                    >
-                      {typeInfo.label}
-                    </Badge>
+      {/* ✅ CONTENT TABS */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsContent value="calendar" className="space-y-6">
+          {/* ✅ FILTRI COLLASSABILI - SOLO PER EVENTI */}
+          <Card className={cn("mb-6", isMobile && "mb-4")}>
+            <CardContent className={cn("p-6", isMobile && "p-4")}>
+              
+              {/* ✅ Header dei filtri su mobile */}
+              {isMobile && (
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4 text-gray-500" />
+                    <span className="font-medium text-sm">Filtri eventi</span>
                   </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <Clock className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-              <p className="text-gray-600">Nessun evento in arrivo</p>
-              <p className="text-sm text-gray-500 mt-1">Aggiungi un evento per iniziare</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleFilters}
+                  >
+                    {isFiltersExpanded ? (
+                      <ChevronUp className="h-4 w-4" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              )}
+
+              {/* ✅ Contenuto filtri - Controllo completo via JS */}
+              <div className={cn(
+                "flex flex-col gap-4",
+                isMobile && !isFiltersExpanded && "hidden"
+              )}>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Tipo Evento
+                  </label>
+                  <Select value={eventTypeFilter} onValueChange={setEventTypeFilter}>
+                    <SelectTrigger className="w-full sm:w-48">
+                      <SelectValue placeholder="Seleziona tipo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tutti i Tipi</SelectItem>
+                      <SelectItem value="personal">Personale</SelectItem>
+                      <SelectItem value="family">Famiglia</SelectItem>
+                      <SelectItem value="work">Lavoro</SelectItem>
+                      <SelectItem value="appointment">Appuntamento</SelectItem>
+                      <SelectItem value="reminder">Promemoria</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Visibilità
+                  </label>
+                  <Select value={visibilityFilter} onValueChange={setVisibilityFilter}>
+                    <SelectTrigger className="w-full sm:w-40">
+                      <SelectValue placeholder="Seleziona visibilità" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tutti</SelectItem>
+                      <SelectItem value="public">Pubblici</SelectItem>
+                      <SelectItem value="private">Privati</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* ✅ Vista Calendario - Con padding responsivo */}
+          <Card className="mb-6">
+            <CardContent className={cn("p-6", isMobile && "p-4")}>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-semibold text-delft-blue">
+                  {format(currentDate, 'MMMM yyyy', { locale: it })}
+                </h3>
+                <div className="flex space-x-2">
+                  <Button variant="outline" size="sm" onClick={prevMonth} className="p-2">
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={nextMonth} className="p-2">
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Giorni della settimana */}
+              <div className={cn("flex flex-col", isMobile ? "h-90" : "h-98")}>
+                <div className="grid grid-cols-7 border-b border-gray-200 dark:border-gray-700">
+                  {weekDays.map((day) => (
+                    <div 
+                      key={day.name} 
+                      className={`p-3 text-center text-sm font-semibold ${
+                        day.isWeekend 
+                          ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20' 
+                          : 'text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800'
+                      }`}
+                    >
+                      {day.name}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex-1 overflow-hidden">
+                  {rows}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* ✅ Prossimi Eventi - Con padding responsivo */}
+          <Card>
+            <CardContent className={cn("p-6", isMobile && "p-4")}>
+              <h3 className="text-lg font-semibold text-delft-blue mb-4 flex items-center">
+                <Clock className="mr-2 h-5 w-5" />
+                Prossimi Eventi
+                {upcomingEvents.length > 0 && (
+                  <Badge variant="secondary" className="ml-2 bg-cambridge-newStyle/10 text-cambridge-newStyle">
+                    {upcomingEvents.length}
+                  </Badge>
+                )}
+              </h3>
+              {upcomingEvents.length > 0 ? (
+                <div className={cn(
+                  "space-y-3",
+                  isMobile ? "max-h-48 overflow-y-auto" : "md:overflow-y-auto md:scrollbar-thin md:scrollbar-thumb-burnt-sienna md:scrollbar-track-gray-100",
+                  !isMobile && "max-h-[165px]"
+                )}>
+                  {upcomingEvents.map((event) => {
+                    const typeInfo = getEventTypeInfo(event.eventType);
+                    return (
+                      <div
+                        key={event.id}
+                        className="flex items-center space-x-4 p-4 rounded-lg cursor-pointer hover:shadow-md transition-all duration-200 border border-gray-100"
+                        style={{ backgroundColor: `${event.color}08` }}
+                        onClick={() => handleEditEvent(event)}
+                      >
+                        <div
+                          className="w-4 h-4 rounded-full flex-shrink-0 shadow-sm"
+                          style={{ backgroundColor: event.color }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-semibold text-delft-blue truncate">{event.title}</h4>
+                            <span className="text-lg">{typeInfo.icon}</span>
+                          </div>
+                          <div className={cn(
+                            "flex items-center gap-4 text-sm text-gray-600",
+                            isMobile && "flex-col items-start gap-1"
+                          )}>
+                            <div className="flex items-center">
+                              <Clock className="mr-1 h-3 w-3" />
+                              {format(event.startDate, 'd MMM yyyy', { locale: it })}
+                              {event.isAllDay ? '' : ` ${format(event.startDate, 'HH:mm')}`}
+                              {!isSameDay(event.startDate, event.endDate) && (
+                                <span> - {format(event.endDate, 'd MMM yyyy', { locale: it })}</span>
+                              )}
+                            </div>
+                            {event.location && (
+                              <div className="flex items-center">
+                                <MapPin className="mr-1 h-3 w-3" />
+                                <span className="truncate max-w-32">{event.location}</span>
+                              </div>
+                            )}
+                            {event.attendees && event.attendees.length > 0 && (
+                              <div className="flex items-center">
+                                <Users className="mr-1 h-3 w-3" />
+                                <span>{event.attendees.length}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className="capitalize text-xs border-2"
+                          style={{
+                            borderColor: event.color,
+                            color: event.color,
+                          }}
+                        >
+                          {typeInfo.label}
+                        </Badge>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Clock className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-600">Nessun evento in arrivo</p>
+                  <p className="text-sm text-gray-500 mt-1">Aggiungi un evento per iniziare</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="reminders" className="space-y-6">
+          {/* ✅ COMPONENTE PROMEMORIA */}
+          <RemindersTab ref={remindersTabRef} />
+        </TabsContent>
+      </Tabs>
 
       {/* Modal Dettaglio Giorno */}
       <Dialog open={isDayDetailOpen} onOpenChange={handleCloseDayDetail}>
@@ -612,6 +649,7 @@ export function Calendar() {
         editEvent={editEvent}
         selectedDate={selectedDate}
       />
+      
     </div>
   );
 }

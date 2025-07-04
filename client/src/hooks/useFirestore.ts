@@ -18,6 +18,7 @@ import { Category, Note, CalendarEvent, User } from '@/lib/models/types';
 import { ShoppingItem } from '@/lib/models/shopping-item';
 import { ShoppingFood, CategoryFood, Supermarket } from '@/lib/models/food';
 import { FCMToken } from '@/lib/models/fcmtoken';
+import { Reminder } from '@/lib/models/reminder';
 
 // Type mapping per la deserializzazione
 type CollectionTypeMap = {
@@ -29,7 +30,9 @@ type CollectionTypeMap = {
   'shopping_food': ShoppingFood;
   'food_categories': CategoryFood;
   'supermarkets': Supermarket;
-  'fcm-tokens': FCMToken; 
+  'fcm-tokens': FCMToken;
+  'reminders': Reminder; 
+
 };
 
 // Funzione helper per deserializzare basata sul nome della collection
@@ -67,6 +70,8 @@ function deserializeDocument<T>(collectionName: string, docData: any): T {
       case 'supermarkets':
         return Supermarket.fromFirestore(processedData) as T;
       case 'fcm-tokens': 
+        return FCMToken.fromFirestore(processedData) as T;
+      case 'reminders': 
         return FCMToken.fromFirestore(processedData) as T;
       default:
         // Fallback per collection sconosciute - restituisce oggetto plain
@@ -197,7 +202,8 @@ export function useFirestore<T>(
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       };
-
+      console.log(itemWithMetadata);
+      alert();
       const docRef = await addDoc(collection(db, collectionName), itemWithMetadata);
       return docRef.id;
     } catch (error) {
