@@ -121,7 +121,8 @@ class EfficientRealtimeNotificationService {
                         before.isActive !== after.isActive ||
                         before.priority !== after.priority ||
                         before.reminderType !== after.reminderType ||
-                        before.isRecurring !== after.isRecurring;
+                        before.isRecurring !== after.isRecurring ||
+                        before.snoozeUntil !== after.snoozeUntil;
             
             default:
                 return true; // Considera sempre significativo per collezioni sconosciute
@@ -422,7 +423,123 @@ async sendRealtimeNotifications(
     return { success: false, error: error.message, sent: 0 };
   }
 }
+/**
+ * 🆕 Gestisce l'integrazione automatica con Cloud Tasks per gli eventi calendar
+ */
+async handleCalendarEventCloudTaskIntegration(change, context) {
+    try {
+        const documentId = context.params.documentId;
+        const before = change.before.exists ? change.before.data() : null;
+        const after = change.after.exists ? change.after.data() : null;
+        
+        console.log(`📅 Gestione Cloud Task per evento calendar: ${documentId}`);
+        
+        // Skip se è solo un update di cloudTaskId (per evitare loop)
+        if (before && after && 
+            before.cloudTaskId !== after.cloudTaskId && 
+            JSON.stringify({...before, cloudTaskId: null, updatedAt: null}) === 
+            JSON.stringify({...after, cloudTaskId: null, updatedAt: null})) {
+            console.log('⏭️ Skip: solo aggiornamento cloudTaskId');
+            return;
+        }
+        
+        const projectId = process.env.GCLOUD_PROJECT;
+        const functionUrl = `https://europe-west1-${projectId}.cloudfunctions.net/manageReminders`;
+        
+        // Caso 1: Nuovo evento creato
+        if (!before && after) {
+            console.log(`📝 Nuovo evento calendar creato: ${after.title}`);
+            console.warn(after.reminderMinutes && !after.reminderSent && after.startDate && !after.cloudTaskId);
+            if (after.reminderMinutes && !after.reminderSent && after.startDate && !after.cloudTaskId) {
+                const eventStartTime = new Date(after.startDate.seconds * 1000);
+                const reminderTime = new Date(eventStartTime.getTime() - (after.reminderMinutes * 60 * 1000));
+                
+                if (reminderTime > new Date()) {
+                    console.log(`⏰ Creazione Cloud Task per evento: ${after.title}`);
 
+                    const payload = {
+                        domain:"Calendar",
+                        action: 'create',
+                        eventData: {
+                            id: documentId,
+                            ...after,
+                            startDate: eventStartTime,
+                            reminderTime: reminderTime
+                        }
+                    };
+                    console.warn("PAYLOAAAAAAAD:")
+                    console.log(payload);
+                    var r = await axios.post(functionUrl, payload, {
+                        headers: { 'Content-Type': 'application/json' },
+                        timeout: 10000
+                    });
+                    
+                    console.log(`✅ Cloud Task request inviata per evento: ${documentId}`);
+                    console.warn(r);
+                }
+            }
+        }
+        
+        // Caso 2: Evento aggiornato
+        if (before && after) {
+            const taskRelevantFieldsChanged = 
+                before.startDate?.seconds !== after.startDate?.seconds ||
+                before.reminderMinutes !== after.reminderMinutes ||
+                before.title !== after.title ||
+                before.reminderSent !== after.reminderSent;
+            
+            if (taskRelevantFieldsChanged) {
+                console.log(`🔧 Aggiornamento Cloud Task per evento: ${after.title}`);
+                
+                const payload = {
+                    domain:'Calendar',
+                    action: 'update',
+                    eventId: documentId,
+                    eventData: {
+                        id: documentId,
+                        ...after,
+                        startDate: new Date(after.startDate.seconds * 1000),
+                        reminderTime: after.reminderMinutes ? 
+                            new Date(after.startDate.seconds * 1000 - (after.reminderMinutes * 60 * 1000)) : null
+                    }
+                };
+                
+                var r =await axios.post(functionUrl, payload, {
+                    headers: { 'Content-Type': 'application/json' },
+                    timeout: 10000
+                });
+                
+                console.log(`✅ Cloud Task update request inviata per evento: ${documentId}`);
+                console.warn(r);
+            }
+        }
+        
+        // Caso 3: Evento eliminato
+        if (before && !after) {
+            console.log(`🗑️ Evento calendar eliminato: ${before.title}`);
+            
+            if (before.cloudTaskId) {
+                const payload = {
+                    domain:'Calendar',
+                    action: 'delete',
+                    taskId: before.cloudTaskId
+                };
+                
+                var r =await axios.post(functionUrl, payload, {
+                    headers: { 'Content-Type': 'application/json' },
+                    timeout: 10000
+                });
+                
+                console.log(`✅ Cloud Task delete request inviata per evento: ${documentId}`);
+                console.warn(r);
+            }
+        }
+        
+    } catch (error) {
+        console.error('❌ Errore gestione Cloud Task evento calendar:', error);
+        // Non far fallire le notifiche per errori Cloud Tasks
+    }
+}
 
 /**
  * 🆕 Gestisce l'integrazione automatica con Cloud Tasks per i promemoria
@@ -458,6 +575,7 @@ async handleReminderCloudTaskIntegration(change, context) {
                     console.log(`⏰ Creazione Cloud Task per: ${after.title}`);
                     
                     const payload = {
+                        domain:'Reminder',
                         action: 'create',
                         reminderData: {
                             id: documentId,
@@ -482,12 +600,14 @@ async handleReminderCloudTaskIntegration(change, context) {
                 before.scheduledTime?.seconds !== after.scheduledTime?.seconds ||
                 before.isActive !== after.isActive ||
                 before.title !== after.title ||
-                before.message !== after.message;
+                before.message !== after.message ||
+                before.snoozeUntil !== after.snoozeUntil;
             
             if (taskRelevantFieldsChanged) {
                 console.log(`🔧 Aggiornamento Cloud Task per: ${after.title}`);
                 
                 const payload = {
+                    domain:'Reminder',
                     action: 'update',
                     reminderId: documentId,
                     reminderData: {
@@ -511,8 +631,9 @@ async handleReminderCloudTaskIntegration(change, context) {
             console.log(`🗑️ Promemoria eliminato: ${before.title}`);
             
             const payload = {
+                domain:'Reminder',
                 action: 'delete',
-                reminderId: documentId
+                taskId: before.cloudTaskId
             };
             
             await axios.post(functionUrl, payload, {
@@ -599,8 +720,14 @@ exports.onDocumentChange = functions
             console.log(`⏭️ Collection ${collectionName} non monitorata - skip`);
             return null;
         }
+        console.log(collectionName)
          if (collectionName === 'reminders') {
+            console.log("handleReminderCloudTaskIntegration")
             await realtimeService.handleReminderCloudTaskIntegration(change, context);
+        }
+        if (collectionName === 'calendar_events') {
+            console.log("handleCalendarEventCloudTaskIntegration")
+            await realtimeService.handleCalendarEventCloudTaskIntegration(change, context);
         }
         // Controlla se dovrebbe inviare notifiche
         if (!realtimeService.shouldSendNotification(change, collectionName)) {

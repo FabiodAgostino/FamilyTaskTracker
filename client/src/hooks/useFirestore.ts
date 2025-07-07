@@ -72,7 +72,7 @@ function deserializeDocument<T>(collectionName: string, docData: any): T {
       case 'fcm-tokens': 
         return FCMToken.fromFirestore(processedData) as T;
       case 'reminders': 
-        return FCMToken.fromFirestore(processedData) as T;
+        return Reminder.fromFirestore(processedData) as T;
       default:
         // Fallback per collection sconosciute - restituisce oggetto plain
         console.warn(`Collection "${collectionName}" non riconosciuta, usando deserializzazione di default`);
@@ -169,7 +169,6 @@ export function useFirestore<T>(
               filteredItems = items.filter((item: any) => !item.isDeleted);
             }
           }
-        
         setData(filteredItems);
         setLoading(false);
         setError(null);

@@ -12,16 +12,37 @@ class ReminderService {
         this.tasksClient = new CloudTasksClient();
         this.projectId = process.env.GCLOUD_PROJECT || 'familytasktracker-dev';
         this.location = 'europe-west1';
-        this.queueName = 'reminder-queue';
+        this.queueName = 'queue';
     }
 
     /**
      * Entry point principale - gestisce tutte le richieste
      */
-    async handleRequest(req) {
-        const { action, reminderId, reminderData } = req.body;
+     async handleRequest(req) {
+        const { domain } = req.body;
+        console.log("DOMINIO: "+domain);
+        // Capitalizza la prima lettera (se ti serve gestire 'reminder' o 'calendar' minuscoli)
+        const capDomain = domain.charAt(0).toUpperCase() + domain.slice(1);
 
-        console.log(`🎯 Reminder Service - Action: ${action}, ID: ${reminderId}`);
+        const supported = ['Reminder','Calendar'];
+        if (!supported.includes(capDomain)) {
+        throw new Error(`Dominio non supportato: ${domain}. Valori ammessi: ${supported.join(', ')}`);
+        }
+
+        const methodName = `handleRequest${capDomain}`;
+
+        if (typeof this[methodName] !== 'function') {
+        throw new Error(`Dominio non supportato: ${domain}`);
+        }
+
+        // Invoca in automatico handleRequestReminder o handleRequestCalendar
+        return await this[methodName](req);
+    }
+
+    async handleRequestReminder(req) {
+         const { action, reminderId, reminderData, taskId } = req.body;
+
+        console.log(`🎯 Reminder Task Service - Action: ${action}, ID: ${reminderId}`);
 
         switch (action) {
             case 'create':
@@ -31,41 +52,49 @@ class ReminderService {
                 return await this.updateReminder(reminderId, reminderData);
             
             case 'delete':
-                return await this.deleteReminder(reminderId);
+                return await this.deleteReminder(taskId);
             
-            case 'execute':
+            case 'executeReminderEvent':
                 return await this.executeReminder(reminderId);
             
             default:
                 throw new Error(`Action non supportata: ${action}`);
         }
     }
+    async handleRequestCalendar(req) {
+         const { action, eventId, eventData,taskId } = req.body;
 
+        console.log(`🎯 Calendar Task Service - Action: ${action}, ID: ${eventId}`);
+
+        switch (action) {
+            case 'create':
+                return await this.createCalendarEventReminder(eventData);
+            
+            case 'update':
+                return await this.updateCalendarEventReminder(eventId, eventData);
+            
+            case 'delete':
+                return await this.deleteCalendarEventReminder(taskId);
+            
+            case 'executeCalendarEvent':
+                return await this.executeCalendarEventReminder(eventId);
+            
+            default:
+                throw new Error(`Action non supportata: ${action}`);
+        }
+    }
     /**
      * Crea un nuovo promemoria e il relativo Cloud Task
      */
     async createReminder(reminderData) {
         try {
             console.log('📝 Creazione nuovo promemoria...');
-            
+
             const db = getFirestore();
-            
-            // 1. Salva il promemoria in Firestore
-            const reminderRef = await db.collection('reminders-quequed').add({
-                ...reminderData,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-                notificationSent: false,
-                triggerCount: 0
-            });
-
-            const reminderId = reminderRef.id;
-            console.log(`✅ Promemoria salvato con ID: ${reminderId}`);
-
-            // 2. Crea il Cloud Task solo se il promemoria è attivo e futuro
+            const reminderRef = db.collection('reminders').doc(reminderData.id);
             let taskId = null;
             if (reminderData.isActive && new Date(reminderData.scheduledTime) > new Date()) {
-                taskId = await this.createCloudTask(reminderId, reminderData.scheduledTime);
+                taskId = await this.createCloudTask(reminderData.id, reminderData.scheduledTime);
                 
                 // 3. Aggiorna il promemoria con l'ID del task
                 await reminderRef.update({
@@ -77,7 +106,7 @@ class ReminderService {
 
             return {
                 success: true,
-                reminderId: reminderId,
+                reminderId: reminderData.id,
                 taskId: taskId,
                 message: 'Promemoria creato con successo'
             };
@@ -96,7 +125,7 @@ class ReminderService {
             console.log(`🔄 Aggiornamento promemoria: ${reminderId}`);
             
             const db = getFirestore();
-            const reminderRef = db.collection('reminders-quequed').doc(reminderId);
+            const reminderRef = db.collection('reminders').doc(reminderId);
             const reminderDoc = await reminderRef.get();
 
             if (!reminderDoc.exists) {
@@ -111,22 +140,23 @@ class ReminderService {
                 console.log(`🗑️ Cloud Task precedente cancellato: ${currentData.cloudTaskId}`);
             }
 
-            // 2. Aggiorna i dati del promemoria
-            const updatedData = {
-                ...updateData,
-                updatedAt: new Date(),
-                notificationSent: false, // Reset notification flag
-                cloudTaskId: null // Reset task ID
-            };
-
-            await reminderRef.update(updatedData);
-
             // 3. Crea nuovo Cloud Task se necessario
             let newTaskId = null;
             const newScheduledTime = updateData.scheduledTime || currentData.scheduledTime;
             const isActive = updateData.isActive !== undefined ? updateData.isActive : currentData.isActive;
-
-            if (isActive && new Date(newScheduledTime) > new Date()) {
+            const isSnooze = updateData.snoozeUntil !== null && updateData.snoozeUntil !==undefined;
+            if ((isSnooze && new Date(updateData.snoozeUntil) > new Date())) {
+                newTaskId = await this.createCloudTask(reminderId, updateData.snoozeUntil);
+                
+                await reminderRef.update({
+                    cloudTaskId: newTaskId
+                });
+                
+                console.log(`✅ Nuovo Cloud Task creato (posticipato): ${newTaskId}`);
+            }
+            else
+            {
+            if ((isActive && new Date(newScheduledTime) > new Date())) {
                 newTaskId = await this.createCloudTask(reminderId, newScheduledTime);
                 
                 await reminderRef.update({
@@ -135,7 +165,7 @@ class ReminderService {
                 
                 console.log(`✅ Nuovo Cloud Task creato: ${newTaskId}`);
             }
-
+            }
             return {
                 success: true,
                 reminderId: reminderId,
@@ -152,36 +182,21 @@ class ReminderService {
     /**
      * Elimina (disattiva) un promemoria
      */
-    async deleteReminder(reminderId) {
+    async deleteReminder(cloudTaskId) {
         try {
-            console.log(`🗑️ Eliminazione promemoria: ${reminderId}`);
+            console.log(`🗑️ Eliminazione promemoria: ${cloudTaskId}`);
             
-            const db = getFirestore();
-            const reminderRef = db.collection('reminders').doc(reminderId);
-            const reminderDoc = await reminderRef.get();
-
-            if (!reminderDoc.exists) {
-                throw new Error('Promemoria non trovato');
-            }
-
-            const reminderData = reminderDoc.data();
+        
 
             // 1. Cancella il Cloud Task se esiste
-            if (reminderData.cloudTaskId) {
-                await this.deleteCloudTask(reminderData.cloudTaskId);
-                console.log(`🗑️ Cloud Task cancellato: ${reminderData.cloudTaskId}`);
+            if (cloudTaskId) {
+                await this.deleteCloudTask(cloudTaskId);
+                console.log(`🗑️ Cloud Task cancellato: ${cloudTaskId}`);
             }
-
-            // 2. Disattiva il promemoria (non eliminarlo fisicamente)
-            await reminderRef.update({
-                isActive: false,
-                cloudTaskId: null,
-                updatedAt: new Date()
-            });
 
             return {
                 success: true,
-                reminderId: reminderId,
+                reminderId: cloudTaskId,
                 message: 'Promemoria eliminato con successo'
             };
 
@@ -221,6 +236,7 @@ class ReminderService {
             await reminderRef.update({
                 notificationSent: true,
                 notificationSentAt: new Date(),
+                completedAt: new Date(),
                 lastTriggered: new Date(),
                 triggerCount: (reminderData.triggerCount || 0) + 1,
                 cloudTaskId: null, // Clear task ID after execution
@@ -264,7 +280,7 @@ class ReminderService {
             const functionUrl = `https://${this.location}-${this.projectId}.cloudfunctions.net/manageReminders`;
 
             const payload = JSON.stringify({
-                action: 'execute',
+                action: 'executeReminderEvent',
                 reminderId: reminderId
             });
 
@@ -301,6 +317,7 @@ class ReminderService {
             const [response] = await this.tasksClient.createTask({
                 parent: queuePath,
                 task: task,
+                domain:"Reminder"
             });
 
             console.log(`✅ Cloud Task creato: ${response.name}`);
@@ -517,6 +534,314 @@ class ReminderService {
         }
 
         return nextDate;
+    }
+
+        /**
+     * Crea un Cloud Task per un evento calendar
+     */
+    async createCalendarEventReminder(eventData) {
+        try {
+            console.log('📅 Creazione Cloud Task per evento calendar...');
+
+            const db = getFirestore();
+            const eventRef = db.collection('calendar_events').doc(eventData.id);
+            let taskId = null;
+
+            if (eventData.reminderMinutes && eventData.reminderTime && new Date(eventData.reminderTime) > new Date()) {
+                taskId = await this.createCloudTaskForEvent(eventData.id, eventData.reminderTime);
+                
+                // Aggiorna l'evento con l'ID del task
+                await eventRef.update({
+                    cloudTaskId: taskId
+                });
+                
+                console.log(`✅ Cloud Task creato per evento: ${taskId}`);
+            }
+
+            return {
+                success: true,
+                eventId: eventData.id,
+                taskId: taskId,
+                message: 'Cloud Task evento creato con successo'
+            };
+
+        } catch (error) {
+            console.error('❌ Errore creazione Cloud Task evento:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Aggiorna un Cloud Task per un evento calendar
+     */
+    async updateCalendarEventReminder(eventId, eventData) {
+        try {
+            console.log(`🔄 Aggiornamento Cloud Task per evento: ${eventId}`);
+            
+            const db = getFirestore();
+            const eventRef = db.collection('calendar_events').doc(eventId);
+            const eventDoc = await eventRef.get();
+
+            if (!eventDoc.exists) {
+                throw new Error('Evento non trovato');
+            }
+
+            const currentData = eventDoc.data();
+
+            // 1. Se ha un Cloud Task esistente, cancellalo
+            if (currentData.cloudTaskId) {
+                await this.deleteCloudTask(currentData.cloudTaskId);
+                console.log(`🗑️ Cloud Task precedente cancellato: ${currentData.cloudTaskId}`);
+            }
+
+            // 2. Crea nuovo Cloud Task se necessario
+            let newTaskId = null;
+            if (eventData.reminderMinutes && eventData.reminderTime && 
+                !eventData.reminderSent && new Date(eventData.reminderTime) > new Date()) {
+                
+                newTaskId = await this.createCloudTaskForEvent(eventId, eventData.reminderTime);
+                
+                await eventRef.update({
+                    cloudTaskId: newTaskId
+                });
+                
+                console.log(`✅ Nuovo Cloud Task creato per evento: ${newTaskId}`);
+            }
+
+            return {
+                success: true,
+                eventId: eventId,
+                taskId: newTaskId,
+                message: 'Cloud Task evento aggiornato con successo'
+            };
+
+        } catch (error) {
+            console.error('❌ Errore aggiornamento Cloud Task evento:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Elimina un Cloud Task per un evento calendar
+     */
+    async deleteCalendarEventReminder(taskId) {
+        try {
+            console.log(`🗑️ Eliminazione Cloud Task evento: ${taskId}`);
+
+            if (taskId) {
+                await this.deleteCloudTask(taskId);
+                console.log(`🗑️ Cloud Task evento cancellato: ${taskId}`);
+            }
+
+            return {
+                success: true,
+                taskId: taskId,
+                message: 'Cloud Task evento eliminato con successo'
+            };
+
+        } catch (error) {
+            console.error('❌ Errore eliminazione Cloud Task evento:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Esegue la notifica per un evento calendar
+     */
+    async executeCalendarEventReminder(eventId) {
+        try {
+            console.log(`📅 Esecuzione notifica per evento: ${eventId}`);
+            
+            const db = getFirestore();
+            const eventRef = db.collection('calendar_events').doc(eventId);
+            const eventDoc = await eventRef.get();
+
+            if (!eventDoc.exists) {
+                throw new Error('Evento non trovato');
+            }
+
+            const eventData = eventDoc.data();
+
+            // Verifica che la notifica non sia già stata inviata
+            if (eventData.reminderSent) {
+                console.log('⏭️ Notifica già inviata per questo evento, skip');
+                return { success: true, message: 'Notifica già inviata' };
+            }
+
+            // Calcola il tempo rimanente all'evento
+            const eventStartTime = new Date(eventData.startDate.seconds * 1000);
+            const now = new Date();
+            const hoursUntilEvent = Math.round((eventStartTime.getTime() - now.getTime()) / (1000 * 60 * 60));
+            const minutesUntilEvent = Math.round((eventStartTime.getTime() - now.getTime()) / (1000 * 60));
+
+            // Prepara il messaggio della notifica
+            let timeMessage;
+            if (hoursUntilEvent >= 24) {
+                const days = Math.round(hoursUntilEvent / 24);
+                timeMessage = `tra ${days} giorno${days > 1 ? 'i' : ''}`;
+            } else if (hoursUntilEvent >= 1) {
+                timeMessage = `tra ${hoursUntilEvent} or${hoursUntilEvent > 1 ? 'e' : 'a'}`;
+            } else {
+                timeMessage = `tra ${minutesUntilEvent} minut${minutesUntilEvent > 1 ? 'i' : 'o'}`;
+            }
+
+            const title = "📅 Promemoria Evento";
+            const body = `"${eventData.title}" inizia ${timeMessage}`;
+
+            // Invia le notifiche
+            await this.sendEventNotifications(eventId, eventData, title, body);
+
+            // Aggiorna l'evento come notificato
+            await eventRef.update({
+                reminderSent: true,
+                reminderSentAt: new Date(),
+                cloudTaskId: null,
+                updatedAt: new Date()
+            });
+
+            console.log(`✅ Notifica evento inviata: ${eventData.title}`);
+
+            return {
+                success: true,
+                eventId: eventId,
+                message: 'Notifica evento inviata con successo'
+            };
+
+        } catch (error) {
+            console.error('❌ Errore esecuzione notifica evento:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Crea un Cloud Task specifico per eventi
+     */
+    async createCloudTaskForEvent(eventId, reminderTime) {
+        try {
+            const queuePath = this.tasksClient.queuePath(
+                this.projectId,
+                this.location,
+                this.queueName
+            );
+
+            const functionUrl = `https://${this.location}-${this.projectId}.cloudfunctions.net/manageReminders`;
+
+            const payload = JSON.stringify({
+                domain: 'Calendar',
+                action: 'executeCalendarEvent',
+                eventId: eventId
+            });
+
+            const date = new Date(reminderTime);
+            date.setSeconds(0, 0);
+
+            const task = {
+                httpRequest: {
+                    httpMethod: 'POST',
+                    url: functionUrl,
+                    body: Buffer.from(payload).toString('base64'),
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                },
+                scheduleTime: {
+                    seconds: Math.floor(date.getTime() / 1000),
+                    nanos: 0,
+                },
+            };
+
+            const taskId = `event-${eventId}-${Date.now()}`;
+            const taskPath = this.tasksClient.taskPath(
+                this.projectId,
+                this.location,
+                this.queueName,
+                taskId
+            );
+
+            task.name = taskPath;
+
+            const [response] = await this.tasksClient.createTask({
+                domain:'Calendar',
+                parent: queuePath,
+                task: task,
+            });
+
+            console.log(`✅ Cloud Task per evento creato: ${response.name}`);
+            return taskId;
+
+        } catch (error) {
+            console.error('❌ Errore creazione Cloud Task per evento:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Invia notifiche per un evento (FCM)
+     */
+    async sendEventNotifications(eventId, eventData, title, body) {
+        try {
+            // 1. Ottieni i token FCM per gli utenti autorizzati
+            const tokens = await this.getEventRecipients(eventData);
+            
+            // 2. Invia notifica FCM
+            if (tokens.length > 0) {
+                await this.sendFCMNotifications(tokens, title, body, {
+                    type: 'event-reminder',
+                    eventId: eventId,
+                    ...eventData
+                });
+            }
+            
+        } catch (error) {
+            console.error('❌ Errore invio notifiche evento:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Determina i destinatari delle notifiche per eventi
+     */
+    /**
+ * Determina i destinatari delle notifiche per eventi
+ */
+    async getEventRecipients(eventData) {
+        try {
+            const db = getFirestore();
+            const tokens = [];
+
+            // Se è pubblico, invia a tutti (escluso admin) - STESSA LOGICA DEI PROMEMORIA
+            if (eventData.isPublic) {
+                const tokensSnapshot = await db.collection('fcm-tokens')
+                    .where('isActive', '==', true)
+                    .where('expiresAt', '>', new Date())
+                    .get();
+
+                tokensSnapshot.forEach(doc => {
+                    const tokenData = doc.data();
+                    // Escludi admin (stessa logica dei promemoria)
+                    if (tokenData.username !== 'admin') {
+                        tokens.push(tokenData.token);
+                    }
+                });
+            } else {
+                // Se è privato, invia solo al creatore - STESSA LOGICA DEI PROMEMORIA
+                const tokensSnapshot = await db.collection('fcm-tokens')
+                    .where('isActive', '==', true)
+                    .where('expiresAt', '>', new Date())
+                    .where('username', '==', eventData.createdBy)
+                    .get();
+
+                tokensSnapshot.forEach(doc => {
+                    tokens.push(doc.data().token);
+                });
+            }
+
+            return tokens;
+
+        } catch (error) {
+            console.error('❌ Errore recupero destinatari evento:', error);
+            return [];
+        }
     }
 }
 

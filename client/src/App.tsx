@@ -83,6 +83,7 @@ function App() {
               {/* 🔄 RIPRISTINO: Router con useHashLocation */}
               <Router hook={useHashLocation}>
                 <AppContent />
+                <Toaster />
               </Router>
             </UserPreferencesProvider>
           </AuthProvider>

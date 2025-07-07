@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Loader2, Globe, Lock, Calendar as CalendarIcon, MapPin, Clock, Users, Plus, X, Trash2 } from 'lucide-react';
+import { Loader2, Globe, Lock, Calendar as CalendarIcon, MapPin, Clock, Users, Plus, X, Trash2, Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -30,6 +30,7 @@ interface EventFormData {
   color: string;
   location?: string;
   attendees: string[];
+  reminderMinutes?: number; // NUOVO CAMPO
 }
 
 interface EventModalProps {
@@ -54,24 +55,24 @@ export function EventModal({ isOpen, onClose, onSave, onDelete, editEvent, selec
     { value: 'family' as EventType, label: 'Famiglia', color: '#E07A5F', icon: '👨‍👩‍👧‍👦' },
     { value: 'work' as EventType, label: 'Lavoro', color: '#3D405B', icon: '💼' },
     { value: 'appointment' as EventType, label: 'Appuntamento', color: '#F4A261', icon: '📅' },
-    { value: 'reminder' as EventType, label: 'Promemoria', color: '#2A9D8F', icon: '⏰' },
   ];
 
-  const form = useForm<EventFormData>({
-    defaultValues: {
-      title: '',
-      description: '',
-      startDate: selectedDate || new Date(),
-      endDate: selectedDate || new Date(),
-      isAllDay: false,
-      isPublic: false,
-      createdBy: user?.username || '',
-      eventType: 'personal',
-      color: '#E07A5F',
-      location: '',
-      attendees: [],
-    },
-  });
+ const form = useForm<EventFormData>({
+  defaultValues: {
+    title: '',
+    description: '',
+    startDate: selectedDate || new Date(),
+    endDate: selectedDate || new Date(),
+    isAllDay: false,
+    isPublic: false,
+    createdBy: user?.username || '',
+    eventType: 'personal',
+    color: '#E07A5F',
+    location: '',
+    attendees: [],
+    reminderMinutes: undefined, // NUOVO CAMPO
+  },
+});
 
   const watchedStartDate = form.watch('startDate');
   const watchedIsAllDay = form.watch('isAllDay');
@@ -95,8 +96,9 @@ export function EventModal({ isOpen, onClose, onSave, onDelete, editEvent, selec
           color: editEvent.color,
           location: editEvent.location || '',
           attendees: editEvent.attendees || [],
+          reminderMinutes: editEvent.reminderMinutes || undefined, // NUOVO CAMPO
         });
-      } else {
+              } else {
         const defaultDate = selectedDate || new Date();
         const endDate = new Date(defaultDate);
         endDate.setHours(defaultDate.getHours() + 1);
@@ -113,6 +115,7 @@ export function EventModal({ isOpen, onClose, onSave, onDelete, editEvent, selec
           color: '#E07A5F',
           location: '',
           attendees: [],
+          reminderMinutes: undefined
         });
       }
       setAttendeeInput('');
@@ -211,6 +214,7 @@ export function EventModal({ isOpen, onClose, onSave, onDelete, editEvent, selec
           calendarEvent.location = eventData.location;
           calendarEvent.attendees = eventData.attendees;
           calendarEvent.updatedAt = new Date();
+          calendarEvent.reminderMinutes = eventData.reminderMinutes;
           
           calendarEvent.validate();
           
@@ -240,6 +244,7 @@ export function EventModal({ isOpen, onClose, onSave, onDelete, editEvent, selec
             color: eventData.color,
             location: eventData.location,
             attendees: eventData.attendees,
+            reminderMinutes: eventData.reminderMinutes
           });
         } catch (validationError) {
           if (validationError instanceof ValidationError) {
@@ -279,6 +284,28 @@ export function EventModal({ isOpen, onClose, onSave, onDelete, editEvent, selec
     if (type) {
       form.setValue('eventType', eventType as EventType);
       form.setValue('color', type.color);
+    }
+  };
+
+    const handleSetReminder = (reminder: string) => {
+    const value = reminder === 'none' ? undefined : parseInt(reminder);
+    if(value)
+    {
+      form.setValue('reminderMinutes',value);
+      var startDate=form.getValues("startDate");
+
+      var dateReminder = new Date();
+      dateReminder.setMinutes(new Date().getMinutes()+value)
+      if(startDate<=dateReminder)
+      {
+        var newDate = new Date(dateReminder);
+        newDate.setMinutes(newDate.getMinutes()+value);
+        form.setValue("startDate",newDate);
+        toast({
+        title: 'Ora inizio cambiata',
+        description: 'Ho spostato di '+value+" minuti l'ora inizio per adattare il promemoria.",
+      });
+      }
     }
   };
 
@@ -635,6 +662,41 @@ export function EventModal({ isOpen, onClose, onSave, onDelete, editEvent, selec
               )}
             />
 
+            {/* Campo Notifica - NUOVO */}
+            <FormField
+              control={form.control}
+              name="reminderMinutes"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium text-delft-blue flex items-center">
+                    <Bell className="mr-2 h-4 w-4" />
+                    Notifica Prima dell'Evento
+                  </FormLabel>
+                  <Select 
+                    onValueChange={handleSetReminder}
+                    value={field.value?.toString() || 'none'}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleziona quando ricevere la notifica" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">Nessuna notifica</SelectItem>
+                      <SelectItem value="5">5 minuti prima</SelectItem>
+                      <SelectItem value="15">15 minuti prima</SelectItem>
+                      <SelectItem value="30">30 minuti prima</SelectItem>
+                      <SelectItem value="60">1 ora prima</SelectItem>
+                      <SelectItem value="120">2 ore prima</SelectItem>
+                      <SelectItem value="1440">1 giorno prima</SelectItem>
+                      <SelectItem value="10080">1 settimana prima</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             {/* Luogo */}
             <FormField
               control={form.control}
@@ -655,53 +717,6 @@ export function EventModal({ isOpen, onClose, onSave, onDelete, editEvent, selec
                 </FormItem>
               )}
             />
-
-            {/* Partecipanti */}
-            <div className="space-y-3">
-              <label className="text-sm font-medium text-delft-blue flex items-center">
-                <Users className="mr-2 h-4 w-4" />
-                Partecipanti {form.watch('attendees').length > 0 && 
-                  <span className="ml-2 text-xs text-gray-500">({form.watch('attendees').length}/20)</span>
-                }
-              </label>
-              <div className="flex space-x-2">
-                <Input
-                  placeholder="Aggiungi email o nome partecipante..."
-                  value={attendeeInput}
-                  onChange={(e) => setAttendeeInput(e.target.value)}
-                  onKeyDown={handleAttendeeInputKeyPress}
-                  className="flex-1"
-                  disabled={form.watch('attendees').length >= 20}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={addAttendee}
-                  disabled={!attendeeInput.trim() || form.watch('attendees').length >= 20}
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-              {form.watch('attendees').length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {form.watch('attendees').map((attendee, index) => (
-                    <div
-                      key={index}
-                      className="bg-cambridge-newStyle/10 text-cambridge-newStyle px-3 py-1 rounded-full text-sm flex items-center border border-cambridge-newStyle/20"
-                    >
-                      {attendee}
-                      <button
-                        type="button"
-                        onClick={() => removeAttendee(attendee)}
-                        className="ml-2 text-cambridge-newStyle hover:text-red-500 transition-colors"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
 
             {/* Visibilità */}
             <FormField

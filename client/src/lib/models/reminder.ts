@@ -212,7 +212,8 @@ export class Reminder implements FirestoreSerializable {
   }
 
   snooze(minutes: number): void {
-    this.snoozeUntil = new Date(Date.now() + minutes * 60 * 1000);
+    this.snoozeUntil = new Date(this.scheduledTime);
+    this.snoozeUntil.setMinutes(this.snoozeUntil.getMinutes()+minutes);
     this.updatedAt = new Date();
   }
 

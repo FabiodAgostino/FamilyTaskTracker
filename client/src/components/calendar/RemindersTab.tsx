@@ -14,12 +14,12 @@ import {
   Trash2,
   Edit3,
   Globe,
-  Lock
+  Lock,
+  MoreHorizontal
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -27,7 +27,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ReminderModal } from './ReminderModal'; // Componente che creeremo dopo
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { ReminderModal } from './ReminderModal';
 import { useFirestore } from '@/hooks/useFirestore';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -35,27 +41,8 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { format, isAfter, isBefore, isToday, isTomorrow } from 'date-fns';
 import { it } from 'date-fns/locale';
+import { RecurrencePattern, Reminder } from '@/lib/models/reminder';
 
-// Tipo temporaneo - sostituire con il modello Reminder
-interface Reminder {
-  id: string;
-  title: string;
-  message: string;
-  scheduledTime: Date;
-  createdBy: string;
-  createdAt: Date;
-  updatedAt: Date;
-  isActive: boolean;
-  isPublic: boolean;
-  isRecurring: boolean;
-  reminderType: 'personal' | 'family' | 'work' | 'health' | 'shopping' | 'event' | 'other';
-  priority: 'low' | 'medium' | 'high';
-  notificationSent: boolean;
-  tags?: string[];
-  notes?: string;
-  snoozeUntil?: Date;
-  completedAt?: Date;
-}
 
 export const RemindersTab = React.forwardRef<{ openModal: () => void }>((props, ref) => {
   const { user } = useAuthContext();
@@ -68,7 +55,7 @@ export const RemindersTab = React.forwardRef<{ openModal: () => void }>((props, 
   const [editReminder, setEditReminder] = useState<Reminder | null>(null);
   
   // ✅ Filtri
-  const [statusFilter, setStatusFilter] = useState('active'); // active, completed, all
+  const [statusFilter, setStatusFilter] = useState('all'); // Cambiato da 'active' a 'all'
   const [typeFilter, setTypeFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [visibilityFilter, setVisibilityFilter] = useState('all');
@@ -170,7 +157,7 @@ export const RemindersTab = React.forwardRef<{ openModal: () => void }>((props, 
     return groups;
   }, [visibleReminders]);
 
-  // ✅ Handlers
+  // ✅ Handlers (mantengono la stessa logica)
   const handleSaveReminder = async (reminderData: any) => {
     try {
       if (editReminder) {
@@ -237,27 +224,55 @@ export const RemindersTab = React.forwardRef<{ openModal: () => void }>((props, 
     }
   };
 
-  const handleSnoozeReminder = async (reminder: Reminder, minutes: number) => {
-    try {
-      const snoozeUntil = new Date(Date.now() + minutes * 60 * 1000);
-      await updateReminder(reminder.id, {
-        ...reminder,
-        snoozeUntil,
-        updatedAt: new Date()
-      });
-      toast({
-        title: 'Promemoria posticipato',
-        description: `Promemoria posticipato di ${minutes} minuti`,
-      });
-    } catch (error) {
-      console.error('Errore nel posticipare il promemoria:', error);
-      toast({
-        title: 'Errore',
-        description: 'Impossibile posticipare il promemoria',
-        variant: 'destructive',
-      });
-    }
-  };
+ const handleSnoozeReminder = async (reminder: Reminder, minutes: number) => {
+  try {
+    const snoozeUntil = new Date(Date.now() + minutes * 60 * 1000);
+    
+    // ✅ Usa il metodo della classe Reminder per aggiornare correttamente
+    const reminderInstance = new Reminder(
+      reminder.id,
+      reminder.title,
+      reminder.message,
+      reminder.scheduledTime,
+      reminder.createdBy,
+      reminder.createdAt,
+      reminder.updatedAt,
+      reminder.isActive,
+      reminder.isPublic,
+      reminder.isRecurring,
+      reminder.recurrencePattern,
+      reminder.reminderType,
+      reminder.notificationSent,
+      reminder.notificationSentAt,
+      reminder.cloudTaskId,
+      reminder.lastTriggered,
+      reminder.triggerCount,
+      reminder.priority,
+      reminder.tags,
+      reminder.notes,
+      reminder.snoozeUntil,
+      reminder.completedAt
+    );
+    
+    // Usa il metodo snooze della classe
+    reminderInstance.snooze(minutes);
+    
+    // Aggiorna con i dati serializzati per Firestore
+    await updateReminder(reminder.id, reminderInstance.toFirestore());
+    
+    toast({
+      title: 'Promemoria posticipato',
+      description: `Promemoria posticipato di ${minutes} minuti`,
+    });
+  } catch (error) {
+    console.error('Errore nel posticipare il promemoria:', error);
+    toast({
+      title: 'Errore',
+      description: 'Impossibile posticipare il promemoria',
+      variant: 'destructive',
+    });
+  }
+};
 
   const handleEditReminder = (reminder: Reminder) => {
     setEditReminder(reminder);
@@ -298,19 +313,21 @@ export const RemindersTab = React.forwardRef<{ openModal: () => void }>((props, 
 
   const formatReminderTime = (date: Date) => {
     if (isToday(date)) {
-      return `Oggi alle ${format(date, 'HH:mm')}`;
+      return `${format(date, 'HH:mm')}`;
     } else if (isTomorrow(date)) {
-      return `Domani alle ${format(date, 'HH:mm')}`;
+      return `Dom. ${format(date, 'HH:mm')}`;
     } else {
-      return format(date, "d MMM yyyy 'alle' HH:mm", { locale: it });
+      return format(date, "d/M HH:mm", { locale: it });
     }
   };
-const openModal = () => setIsReminderModalOpen(true);
+
+  const openModal = () => setIsReminderModalOpen(true);
 
   useImperativeHandle(ref, () => ({
     openModal
   }));
-  // ✅ Render componente promemoria
+
+  // ✅ Render componente promemoria COMPATTO
   const renderReminderCard = (reminder: Reminder) => {
     const typeInfo = getReminderTypeInfo(reminder.reminderType);
     const isOverdue = reminder.isActive && !reminder.completedAt && reminder.scheduledTime < new Date();
@@ -318,287 +335,246 @@ const openModal = () => setIsReminderModalOpen(true);
     const canEdit = reminder.createdBy === user?.username || user?.role === 'admin';
 
     return (
-      <Card 
+      <div 
         key={reminder.id} 
         className={cn(
-          "transition-all duration-200 hover:shadow-md",
-          isOverdue && "border-red-200 bg-red-50/50",
-          isSnoozed && "border-blue-200 bg-blue-50/50",
-          reminder.completedAt && "border-green-200 bg-green-50/50 opacity-75"
+          "group flex items-center gap-3 p-3 rounded-lg border transition-all duration-200 hover:shadow-sm",
+          isOverdue && "border-red-200 bg-red-50/30",
+          isSnoozed && "border-blue-200 bg-blue-50/30",
+          reminder.completedAt && "border-green-200 bg-green-50/30 opacity-60"
         )}
       >
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex items-start gap-3 flex-1 min-w-0">
-              <div 
-                className="w-3 h-3 rounded-full mt-1 flex-shrink-0"
-                style={{ backgroundColor: typeInfo.color }}
-              />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <h4 className={cn(
-                    "font-semibold text-delft-blue truncate",
-                    reminder.completedAt && "line-through text-gray-500"
-                  )}>
-                    {reminder.title}
-                  </h4>
-                  <span className="text-lg">{typeInfo.icon}</span>
-                  {reminder.isRecurring && <Repeat className="h-4 w-4 text-blue-500" />}
-                  {!reminder.isPublic && <Lock className="h-4 w-4 text-orange-500" />}
-                </div>
-                
-                <p className={cn(
-                  "text-sm text-gray-600 mb-2",
-                  reminder.completedAt && "line-through"
-                )}>
-                  {reminder.message}
-                </p>
-                
-                <div className="flex items-center gap-4 text-xs text-gray-500">
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {formatReminderTime(reminder.scheduledTime)}
-                  </div>
-                  {isOverdue && (
-                    <div className="flex items-center gap-1 text-red-600">
-                      <AlertCircle className="h-3 w-3" />
-                      In ritardo
-                    </div>
-                  )}
-                  {isSnoozed && (
-                    <div className="flex items-center gap-1 text-blue-600">
-                      <Pause className="h-3 w-3" />
-                      Posticipato
-                    </div>
-                  )}
-                  {reminder.completedAt && (
-                    <div className="flex items-center gap-1 text-green-600">
-                      <CheckCircle className="h-3 w-3" />
-                      Completato
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+        {/* Indicatore colorato tipo + priorità */}
+        <div className="flex flex-col items-center gap-1 flex-shrink-0">
+          <div 
+            className="w-3 h-3 rounded-full"
+            style={{ backgroundColor: typeInfo.color }}
+          />
+          <div className={cn(
+            "w-2 h-2 rounded-full",
+            reminder.priority === 'high' ? 'bg-red-500' :
+            reminder.priority === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
+          )} />
+        </div>
+
+        {/* Contenuto principale */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <h4 className={cn(
+              "font-medium text-sm text-delft-blue truncate",
+              reminder.completedAt && "line-through text-gray-500"
+            )}>
+              {reminder.title}
+            </h4>
             
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <Badge 
-                variant="outline" 
-                className={cn("text-xs", getPriorityColor(reminder.priority))}
-              >
-                {reminder.priority === 'high' ? 'Alta' : 
-                 reminder.priority === 'medium' ? 'Media' : 'Bassa'}
-              </Badge>
-              
-              <Badge variant="outline" className="text-xs">
-                {typeInfo.label}
-              </Badge>
+            {/* Icone di stato compatte */}
+            <div className="flex items-center gap-1">
+              {reminder.isRecurring && <Repeat className="h-3 w-3 text-blue-500" />}
+              {!reminder.isPublic && <Lock className="h-3 w-3 text-orange-500" />}
             </div>
           </div>
           
-          {/* Azioni promemoria */}
-          {canEdit && (
-            <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
+          {/* Messaggio (solo se non vuoto) */}
+          {reminder.message && (
+            <p className={cn(
+              "text-xs text-gray-600 mb-1 truncate",
+              reminder.completedAt && "line-through"
+            )}>
+              {reminder.message}
+            </p>
+          )}
+        </div>
+
+        {/* Tempo e stato */}
+        <div className="flex items-center gap-2 text-xs flex-shrink-0">
+          <div className="flex items-center gap-1 text-gray-500">
+            <Clock className="h-3 w-3" />
+            {formatReminderTime(reminder.scheduledTime)}
+          </div>
+          
+          {/* Indicatori di stato */}
+          {isOverdue && (
+            <Badge variant="destructive" className="text-xs px-1 py-0">
+              Ritardo
+            </Badge>
+          )}
+          {isSnoozed && (
+            <Badge variant="secondary" className="text-xs px-1 py-0 bg-blue-100 text-blue-700">
+              Posticipato
+            </Badge>
+            
+          )}
+         {
+          isSnoozed && (
+              <div className="flex items-center gap-1 text-gray-500">
+            <Clock className="h-3 w-3" />
+            {formatReminderTime(reminder.snoozeUntil as Date)}
+          </div>
+          )
+         }
+          {reminder.completedAt && (
+            <Badge variant="secondary" className="text-xs px-1 py-0 bg-green-100 text-green-700">
+              ✓
+            </Badge>
+          )}
+        </div>
+
+        {/* Menu azioni compatto */}
+        {canEdit && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
               {!reminder.completedAt && reminder.isActive && (
                 <>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleCompleteReminder(reminder)}
-                    className="text-green-600 hover:bg-green-50"
-                  >
-                    <CheckCircle className="h-3 w-3 mr-1" />
+                  <DropdownMenuItem onClick={() => handleCompleteReminder(reminder)}>
+                    <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
                     Completa
-                  </Button>
-                  
-                  <Select onValueChange={(value) => handleSnoozeReminder(reminder, parseInt(value))}>
-                    <SelectTrigger className="h-8 w-24">
-                      <SelectValue placeholder="Posponi" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="15">15 min</SelectItem>
-                      <SelectItem value="30">30 min</SelectItem>
-                      <SelectItem value="60">1 ora</SelectItem>
-                      <SelectItem value="240">4 ore</SelectItem>
-                      <SelectItem value="1440">1 giorno</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  </DropdownMenuItem>
                 </>
               )}
-              
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => handleEditReminder(reminder)}
-                className="text-blue-600 hover:bg-blue-50"
-              >
-                <Edit3 className="h-3 w-3" />
-              </Button>
-              
-              <Button
-                size="sm"
-                variant="ghost"
+              <DropdownMenuItem onClick={() => handleEditReminder(reminder)}>
+                <Edit3 className="h-4 w-4 mr-2 text-blue-600" />
+                Modifica
+              </DropdownMenuItem>
+              <DropdownMenuItem 
                 onClick={() => handleDeleteReminder(reminder.id)}
-                className="text-red-600 hover:bg-red-50"
+                className="text-red-600"
               >
-                <Trash2 className="h-3 w-3" />
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Elimina
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
     );
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-burnt-newStyle"></div>
-        <span className="ml-3 text-delft-blue font-medium">Caricamento promemoria...</span>
+      <div className="flex items-center justify-center py-8">
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-burnt-newStyle"></div>
+        <span className="ml-3 text-delft-blue text-sm">Caricamento promemoria...</span>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* ✅ Statistics Badges */}
-      <div className={cn(
-        "flex flex-wrap gap-2",
-        isMobile && "mb-4"
-      )}>
-        <Badge variant="secondary" className="bg-cambridge-newStyle/10 text-cambridge-newStyle border-cambridge-newStyle/20">
-          {stats.total} {stats.total === 1 ? 'promemoria' : 'promemoria'}
+    <div className="space-y-4">
+      {/* ✅ Statistics Badges - più compatti */}
+      <div className="flex flex-wrap gap-2">
+        <Badge variant="secondary" className="text-xs bg-cambridge-newStyle/10 text-cambridge-newStyle">
+          {stats.total} totali
         </Badge>
-        <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200">
-          {stats.active} {stats.active === 1 ? 'attivo' : 'attivi'}
-        </Badge>
-        <Badge variant="secondary" className="bg-red-100 text-red-700 border-red-200">
-          {stats.overdue} in ritardo
-        </Badge>
-        <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-200">
-          {stats.upcoming} {stats.upcoming === 1 ? 'prossimo' : 'prossimi'}
-        </Badge>
-        <Badge variant="secondary" className="bg-gray-100 text-gray-700 border-gray-200">
-          {stats.completed} {stats.completed === 1 ? 'completato' : 'completati'}
-        </Badge>
+        {stats.active > 0 && (
+          <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">
+            {stats.active} attivi
+          </Badge>
+        )}
+        {stats.overdue > 0 && (
+          <Badge variant="destructive" className="text-xs">
+            {stats.overdue} in ritardo
+          </Badge>
+        )}
+        {stats.upcoming > 0 && (
+          <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
+            {stats.upcoming} prossimi
+          </Badge>
+        )}
       </div>
 
-      {/* ✅ FILTRI COLLASSABILI */}
-      <Card className={cn("mb-6", isMobile && "mb-4")}>
-        <CardContent className={cn("p-6", isMobile && "p-4")}>
-          
-          {/* ✅ Header dei filtri su mobile */}
-          {isMobile && (
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-gray-500" />
-                <span className="font-medium text-sm">Filtri promemoria</span>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={toggleFilters}
-              >
-                {isFiltersExpanded ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
-              </Button>
+      {/* ✅ FILTRI COLLASSABILI - più compatti */}
+      <Card>
+        <CardContent className="p-3">
+          {/* Header dei filtri */}
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-cambridge-newStyle" />
+              <span className="font-medium text-sm">Filtri</span>
             </div>
-          )}
+            {isMobile && (
+              <Button variant="ghost" size="sm" onClick={toggleFilters}>
+                {isFiltersExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </Button>
+            )}
+          </div>
 
-          {/* ✅ Contenuto filtri */}
+          {/* Contenuto filtri */}
           <div className={cn(
-            "grid grid-cols-1 md:grid-cols-4 gap-4",
+            "grid grid-cols-2 md:grid-cols-4 gap-2",
             isMobile && !isFiltersExpanded && "hidden"
           )}>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Stato
-              </label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleziona stato" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tutti</SelectItem>
-                  <SelectItem value="active">Attivi</SelectItem>
-                  <SelectItem value="completed">Completati</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tutti</SelectItem>
+                <SelectItem value="active">Attivi</SelectItem>
+                <SelectItem value="completed">Completati</SelectItem>
+              </SelectContent>
+            </Select>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Tipo
-              </label>
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleziona tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tutti i Tipi</SelectItem>
-                  <SelectItem value="personal">Personale</SelectItem>
-                  <SelectItem value="family">Famiglia</SelectItem>
-                  <SelectItem value="work">Lavoro</SelectItem>
-                  <SelectItem value="health">Salute</SelectItem>
-                  <SelectItem value="shopping">Shopping</SelectItem>
-                  <SelectItem value="event">Evento</SelectItem>
-                  <SelectItem value="other">Altro</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tutti i Tipi</SelectItem>
+                <SelectItem value="personal">Personale</SelectItem>
+                <SelectItem value="family">Famiglia</SelectItem>
+                <SelectItem value="work">Lavoro</SelectItem>
+                <SelectItem value="health">Salute</SelectItem>
+                <SelectItem value="shopping">Shopping</SelectItem>
+                <SelectItem value="event">Evento</SelectItem>
+                <SelectItem value="other">Altro</SelectItem>
+              </SelectContent>
+            </Select>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Priorità
-              </label>
-              <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleziona priorità" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tutte</SelectItem>
-                  <SelectItem value="high">Alta</SelectItem>
-                  <SelectItem value="medium">Media</SelectItem>
-                  <SelectItem value="low">Bassa</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tutte</SelectItem>
+                <SelectItem value="high">Alta</SelectItem>
+                <SelectItem value="medium">Media</SelectItem>
+                <SelectItem value="low">Bassa</SelectItem>
+              </SelectContent>
+            </Select>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Visibilità
-              </label>
-              <Select value={visibilityFilter} onValueChange={setVisibilityFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleziona visibilità" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tutti</SelectItem>
-                  <SelectItem value="public">Pubblici</SelectItem>
-                  <SelectItem value="private">Privati</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <Select value={visibilityFilter} onValueChange={setVisibilityFilter}>
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tutti</SelectItem>
+                <SelectItem value="public">Pubblici</SelectItem>
+                <SelectItem value="private">Privati</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
 
-      {/* ✅ SEZIONI PROMEMORIA RAGGRUPPATE */}
-      <div className="space-y-6">
+      {/* ✅ SEZIONI PROMEMORIA RAGGRUPPATE - design compatto */}
+      <div className="space-y-4">
         {/* In Ritardo */}
         {groupedReminders.overdue.length > 0 && (
           <div>
-            <h3 className="text-lg font-semibold text-red-600 mb-4 flex items-center">
-              <AlertCircle className="mr-2 h-5 w-5" />
-              In Ritardo
-              <Badge variant="destructive" className="ml-2">
-                {groupedReminders.overdue.length}
-              </Badge>
+            <h3 className="text-sm font-semibold text-red-600 mb-2 flex items-center">
+              <AlertCircle className="mr-1 h-4 w-4" />
+              In Ritardo ({groupedReminders.overdue.length})
             </h3>
-            <div className="space-y-3">
+            <div className="space-y-2">
               {groupedReminders.overdue.map(renderReminderCard)}
             </div>
           </div>
@@ -607,14 +583,11 @@ const openModal = () => setIsReminderModalOpen(true);
         {/* Oggi */}
         {groupedReminders.today.length > 0 && (
           <div>
-            <h3 className="text-lg font-semibold text-delft-blue mb-4 flex items-center">
-              <Clock className="mr-2 h-5 w-5" />
-              Oggi
-              <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-700">
-                {groupedReminders.today.length}
-              </Badge>
+            <h3 className="text-sm font-semibold text-delft-blue mb-2 flex items-center">
+              <Clock className="mr-1 h-4 w-4" />
+              Oggi ({groupedReminders.today.length})
             </h3>
-            <div className="space-y-3">
+            <div className="space-y-2">
               {groupedReminders.today.map(renderReminderCard)}
             </div>
           </div>
@@ -623,14 +596,11 @@ const openModal = () => setIsReminderModalOpen(true);
         {/* Domani */}
         {groupedReminders.tomorrow.length > 0 && (
           <div>
-            <h3 className="text-lg font-semibold text-delft-blue mb-4 flex items-center">
-              <CalendarIcon className="mr-2 h-5 w-5" />
-              Domani
-              <Badge variant="secondary" className="ml-2 bg-cambridge-newStyle/10 text-cambridge-newStyle">
-                {groupedReminders.tomorrow.length}
-              </Badge>
+            <h3 className="text-sm font-semibold text-delft-blue mb-2 flex items-center">
+              <CalendarIcon className="mr-1 h-4 w-4" />
+              Domani ({groupedReminders.tomorrow.length})
             </h3>
-            <div className="space-y-3">
+            <div className="space-y-2">
               {groupedReminders.tomorrow.map(renderReminderCard)}
             </div>
           </div>
@@ -639,34 +609,28 @@ const openModal = () => setIsReminderModalOpen(true);
         {/* Prossimi */}
         {groupedReminders.upcoming.length > 0 && (
           <div>
-            <h3 className="text-lg font-semibold text-delft-blue mb-4 flex items-center">
-              <Bell className="mr-2 h-5 w-5" />
-              Prossimi
-              <Badge variant="secondary" className="ml-2 bg-gray-100 text-gray-700">
-                {groupedReminders.upcoming.length}
-              </Badge>
+            <h3 className="text-sm font-semibold text-delft-blue mb-2 flex items-center">
+              <Bell className="mr-1 h-4 w-4" />
+              Prossimi ({groupedReminders.upcoming.length})
             </h3>
-            <div className="space-y-3">
+            <div className="space-y-2">
               {groupedReminders.upcoming.map(renderReminderCard)}
             </div>
           </div>
         )}
 
-        {/* Completati */}
+        {/* Completati (solo primi 3) */}
         {statusFilter === 'all' && groupedReminders.completed.length > 0 && (
           <div>
-            <h3 className="text-lg font-semibold text-green-600 mb-4 flex items-center">
-              <CheckCircle className="mr-2 h-5 w-5" />
-              Completati
-              <Badge variant="secondary" className="ml-2 bg-green-100 text-green-700">
-                {groupedReminders.completed.length}
-              </Badge>
+            <h3 className="text-sm font-semibold text-green-600 mb-2 flex items-center">
+              <CheckCircle className="mr-1 h-4 w-4" />
+              Completati ({groupedReminders.completed.length})
             </h3>
-            <div className="space-y-3">
-              {groupedReminders.completed.slice(0, 5).map(renderReminderCard)}
-              {groupedReminders.completed.length > 5 && (
-                <p className="text-sm text-gray-500 text-center">
-                  ... e altri {groupedReminders.completed.length - 5} completati
+            <div className="space-y-2">
+              {groupedReminders.completed.slice(0, 3).map(renderReminderCard)}
+              {groupedReminders.completed.length > 3 && (
+                <p className="text-xs text-gray-500 text-center py-2">
+                  ... e altri {groupedReminders.completed.length - 3} completati
                 </p>
               )}
             </div>
@@ -675,14 +639,15 @@ const openModal = () => setIsReminderModalOpen(true);
 
         {/* Empty State */}
         {stats.total === 0 && (
-          <div className="text-center py-12">
-            <Bell className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Nessun promemoria</h3>
-            <p className="text-gray-500 mb-6">
-              Crea il tuo primo promemoria per iniziare a organizzarti meglio!
+          <div className="text-center py-8">
+            <Bell className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+            <h3 className="text-sm font-medium text-gray-900 mb-2">Nessun promemoria</h3>
+            <p className="text-xs text-gray-500 mb-4">
+              Crea il tuo primo promemoria per iniziare!
             </p>
             <Button
               onClick={() => setIsReminderModalOpen(true)}
+              size="sm"
               className="bg-cambridge-newStyle hover:bg-cambridge-newStyle/90 text-white"
             >
               <Plus className="mr-2 h-4 w-4" />
@@ -702,5 +667,4 @@ const openModal = () => setIsReminderModalOpen(true);
       />
     </div>
   );
-  
 });

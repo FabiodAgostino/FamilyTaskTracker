@@ -386,7 +386,12 @@ export class CalendarEvent implements FirestoreSerializable {
     public location?: string,
     public attendees: string[] = [],
     public createdAt: Date = new Date(),
-    public updatedAt: Date = new Date()
+    public updatedAt: Date = new Date(),
+    // NUOVI CAMPI PER LE NOTIFICHE
+    public reminderMinutes?: number,  // Minuti prima dell'evento per la notifica
+    public reminderSent?: boolean,    // Flag se la notifica è stata inviata
+    public reminderSentAt?: Date,     // Timestamp di quando è stata inviata
+    public cloudTaskId?: string       // ID del Cloud Task creato
   ) {
     // Validazione nel costruttore
     this.validate();
@@ -428,42 +433,51 @@ export class CalendarEvent implements FirestoreSerializable {
   }
 
   static fromFirestore(data: any): CalendarEvent {
-    return new CalendarEvent(
-      data.id,
-      data.title,
-      data.startDate?.toDate() || new Date(),
-      data.endDate?.toDate() || new Date(),
-      data.createdBy,
-      data.description,
-      data.isAllDay || false,
-      data.isPublic || false,
-      data.eventType || "personal",
-      data.color || "#E07A5F",
-      data.location,
-      data.attendees || [],
-      data.createdAt?.toDate() || new Date(),
-      data.updatedAt?.toDate() || new Date()
-    );
-  }
-
+  return new CalendarEvent(
+    data.id,
+    data.title,
+    data.startDate?.toDate() || new Date(),
+    data.endDate?.toDate() || new Date(),
+    data.createdBy,
+    data.description,
+    data.isAllDay || false,
+    data.isPublic || false,
+    data.eventType || "personal",
+    data.color || "#E07A5F",
+    data.location,
+    data.attendees || [],
+    data.createdAt?.toDate() || new Date(),
+    data.updatedAt?.toDate() || new Date(),
+    // AGGIUNGI I NUOVI CAMPI
+    data.reminderMinutes,
+    data.reminderSent || false,
+    data.reminderSentAt?.toDate(),
+    data.cloudTaskId
+  );
+}
   toFirestore() {
-    const data = {
-      title: this.title,
-      startDate: this.startDate,
-      endDate: this.endDate,
-      createdBy: this.createdBy,
-      description: this.description,
-      isAllDay: this.isAllDay,
-      isPublic: this.isPublic,
-      eventType: this.eventType,
-      color: this.color,
-      location: this.location,
-      attendees: this.attendees,
-      createdAt: this.createdAt,
-      updatedAt: this.updatedAt,
-    };
-    return removeUndefinedFields(data);
-  }
+  const data = {
+    title: this.title,
+    startDate: this.startDate,
+    endDate: this.endDate,
+    createdBy: this.createdBy,
+    description: this.description,
+    isAllDay: this.isAllDay,
+    isPublic: this.isPublic,
+    eventType: this.eventType,
+    color: this.color,
+    location: this.location,
+    attendees: this.attendees,
+    createdAt: this.createdAt,
+    updatedAt: this.updatedAt,
+    // AGGIUNGI I NUOVI CAMPI
+    reminderMinutes: this.reminderMinutes,
+    reminderSent: this.reminderSent,
+    reminderSentAt: this.reminderSentAt,
+    cloudTaskId: this.cloudTaskId,
+  };
+  return removeUndefinedFields(data);
+}
 
   getDuration(): number {
     return this.endDate.getTime() - this.startDate.getTime();
@@ -695,7 +709,8 @@ export class ModelFactory {
         data.location,
         data.attendees || [],
         data.createdAt || new Date(),
-        data.updatedAt || new Date()
+        data.updatedAt || new Date(),
+        data.reminderMinutes
       );
     } catch (error) {
       if (error instanceof ValidationError) {

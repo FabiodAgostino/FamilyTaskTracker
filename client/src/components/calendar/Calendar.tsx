@@ -329,11 +329,11 @@ export function Calendar() {
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full mb-4">
               <TabsList className="grid w-full grid-cols-2 lg:w-auto">
                 <TabsTrigger value="calendar" className="flex items-center gap-2">
-                  <CalendarIcon className="h-4 w-4" />
+                  <CalendarIcon className="h-4 w-4 text-cambridge-newStyle" />
                   <span className={cn(isMobile && "text-sm")}>Eventi</span>
                 </TabsTrigger>
                 <TabsTrigger value="reminders" className="flex items-center gap-2">
-                  <Bell className="h-4 w-4" />
+                  <Bell className="h-4 w-4 text-cambridge-newStyle" />
                   <span className={cn(isMobile && "text-sm")}>Promemoria</span>
                 </TabsTrigger>
               </TabsList>
@@ -387,8 +387,8 @@ export function Calendar() {
               {isMobile && (
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
-                    <Filter className="h-4 w-4 text-gray-500" />
-                    <span className="font-medium text-sm">Filtri eventi</span>
+                    <Filter className="h-4 w-4 text-cambridge-newStyle" />
+                    <span className="font-medium text-sm">Filtri</span>
                   </div>
                   <Button
                     variant="ghost"
@@ -406,10 +406,12 @@ export function Calendar() {
 
               {/* ✅ Contenuto filtri - Controllo completo via JS */}
               <div className={cn(
-                "flex flex-col gap-4",
+                "flex gap-4",
                 isMobile && !isFiltersExpanded && "hidden"
               )}>
+                
                 <div className="space-y-2">
+                  
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     Tipo Evento
                   </label>
@@ -427,7 +429,6 @@ export function Calendar() {
                     </SelectContent>
                   </Select>
                 </div>
-
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     Visibilità

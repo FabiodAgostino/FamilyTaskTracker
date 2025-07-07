@@ -18,57 +18,13 @@ import { format, addDays, addHours, addMinutes } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
-// Tipi temporanei - sostituire con il modello Reminder
-interface ReminderFormData {
-  title: string;
-  message: string;
-  scheduledTime: Date;
-  createdBy: string;
-  isActive: boolean;
-  isPublic: boolean;
-  isRecurring: boolean;
-  reminderType: 'personal' | 'family' | 'work' | 'health' | 'shopping' | 'event' | 'other';
-  priority: 'low' | 'medium' | 'high';
-  tags: string[];
-  notes?: string;
-  recurrencePattern?: {
-    type: 'daily' | 'weekly' | 'monthly' | 'yearly';
-    interval: number;
-    endDate?: Date;
-    maxOccurrences?: number;
-  };
-}
-
-interface Reminder {
-  id: string;
-  title: string;
-  message: string;
-  scheduledTime: Date;
-  createdBy: string;
-  createdAt: Date;
-  updatedAt: Date;
-  isActive: boolean;
-  isPublic: boolean;
-  isRecurring: boolean;
-  reminderType: 'personal' | 'family' | 'work' | 'health' | 'shopping' | 'event' | 'other';
-  priority: 'low' | 'medium' | 'high';
-  notificationSent: boolean;
-  tags?: string[];
-  notes?: string;
-  snoozeUntil?: Date;
-  completedAt?: Date;
-  recurrencePattern?: {
-    type: 'daily' | 'weekly' | 'monthly' | 'yearly';
-    interval: number;
-    endDate?: Date;
-    maxOccurrences?: number;
-  };
-}
+// ✅ IMPORTA SOLO DAL MODELLO REALE - NESSUNA INTERFACCIA INTERNA
+import { Reminder, ReminderType, RecurrencePattern, RecurrenceType } from '@/lib/models/reminder';
 
 interface ReminderModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (reminder: ReminderFormData) => Promise<void>;
+  onSave: (reminder: Omit<Reminder, 'id' | 'createdAt' | 'updatedAt' | 'notificationSent' | 'notificationSentAt' | 'cloudTaskId' | 'lastTriggered' | 'triggerCount'>) => Promise<void>;
   onDelete?: (reminderId: string) => Promise<void>;
   editReminder?: Reminder | null;
 }
@@ -80,15 +36,32 @@ export function ReminderModal({ isOpen, onClose, onSave, onDelete, editReminder 
   const [isDeleting, setIsDeleting] = useState(false);
   const [tagInput, setTagInput] = useState('');
 
-  // Tipi di promemoria con colori e icone
-  const reminderTypes = [
-    { value: 'personal' as const, label: 'Personale', color: '#81B29A', icon: '👤' },
-    { value: 'family' as const, label: 'Famiglia', color: '#E07A5F', icon: '👨‍👩‍👧‍👦' },
-    { value: 'work' as const, label: 'Lavoro', color: '#3D405B', icon: '💼' },
-    { value: 'health' as const, label: 'Salute', color: '#F4A261', icon: '🏥' },
-    { value: 'shopping' as const, label: 'Shopping', color: '#2A9D8F', icon: '🛒' },
-    { value: 'event' as const, label: 'Evento', color: '#E76F51', icon: '🎉' },
-    { value: 'other' as const, label: 'Altro', color: '#6C757D', icon: '📝' },
+  // ✅ Tipi di promemoria basati su ReminderType del modello
+  const reminderTypes: Array<{
+    value: ReminderType;
+    label: string;
+    color: string;
+    icon: string;
+  }> = [
+    { value: 'personal', label: 'Personale', color: '#81B29A', icon: '👤' },
+    { value: 'family', label: 'Famiglia', color: '#E07A5F', icon: '👨‍👩‍👧‍👦' },
+    { value: 'work', label: 'Lavoro', color: '#3D405B', icon: '💼' },
+    { value: 'health', label: 'Salute', color: '#F4A261', icon: '🏥' },
+    { value: 'shopping', label: 'Shopping', color: '#2A9D8F', icon: '🛒' },
+    { value: 'event', label: 'Evento', color: '#E76F51', icon: '🎉' },
+    { value: 'other', label: 'Altro', color: '#6C757D', icon: '📝' },
+  ];
+
+  // ✅ Tipi di ricorrenza basati su RecurrenceType del modello
+  const recurrenceTypes: Array<{
+    value: RecurrenceType;
+    label: string;
+  }> = [
+    { value: 'daily', label: 'Giornaliera' },
+    { value: 'weekly', label: 'Settimanale' },
+    { value: 'monthly', label: 'Mensile' },
+    { value: 'yearly', label: 'Annuale' },
+    { value: 'custom', label: 'Personalizzata' },
   ];
 
   // Quick time presets
@@ -101,11 +74,25 @@ export function ReminderModal({ isOpen, onClose, onSave, onDelete, editReminder 
     { label: 'Domani sera', hours: 24, setTime: '20:00' },
   ];
 
-  const form = useForm<ReminderFormData>({
+  // ✅ FORM che usa direttamente i tipi del modello Reminder
+  const form = useForm<{
+    title: string;
+    message: string;
+    scheduledTime: Date;
+    createdBy: string;
+    isActive: boolean;
+    isPublic: boolean;
+    isRecurring: boolean;
+    reminderType: ReminderType;
+    priority: "low" | "medium" | "high";
+    tags: string[];
+    notes: string;
+    recurrencePattern?: RecurrencePattern;
+  }>({
     defaultValues: {
       title: '',
       message: '',
-      scheduledTime: addHours(new Date(), 1), // Default: tra 1 ora
+      scheduledTime: addHours(new Date(), 1),
       createdBy: user?.username || '',
       isActive: true,
       isPublic: false,
@@ -118,11 +105,12 @@ export function ReminderModal({ isOpen, onClose, onSave, onDelete, editReminder 
   });
 
   const watchedIsRecurring = form.watch('isRecurring');
+  const watchedRecurrenceType = form.watch('recurrencePattern.type');
 
   // Controllo permessi per delete
   const canDelete = editReminder && (user?.username === editReminder.createdBy || user?.role === 'admin');
 
-  // Reset form quando cambia promemoria
+  // ✅ Reset form quando cambia promemoria - USA TUTTI I CAMPI DEL MODELLO
   useEffect(() => {
     if (isOpen) {
       if (editReminder) {
@@ -192,54 +180,71 @@ export function ReminderModal({ isOpen, onClose, onSave, onDelete, editReminder 
     }
   };
 
-  const onSubmit = async (data: ReminderFormData) => {
-    if (!data.title.trim()) {
-      toast({
-        title: 'Errore',
-        description: 'Il titolo del promemoria è obbligatorio',
-        variant: 'destructive',
-      });
-      return;
+  // ✅ Submit che passa TUTTI i campi necessari al modello
+  const onSubmit = async (data:any) => {
+  if (!data.title.trim()) {
+    toast({
+      title: 'Errore',
+      description: 'Il titolo del promemoria è obbligatorio',
+      variant: 'destructive',
+    });
+    return;
+  }
+
+  if (!data.message.trim()) {
+    data.message = "Non specificato";
+  }
+
+  if (data.scheduledTime <= new Date()) {
+    toast({
+      title: 'Errore',
+      description: 'L\'orario del promemoria deve essere nel futuro',
+      variant: 'destructive',
+    });
+    return;
+  }
+
+  setIsLoading(true);
+  
+  try {
+    // ✅ Crea oggetto pulito senza campi undefined
+    var scheduledTime:Date = data.scheduledTime;
+    scheduledTime.setSeconds(0);
+    const reminderData: any = {
+      title: data.title.trim(),
+      message: data.message.trim(),
+      scheduledTime: scheduledTime,
+      createdBy: data.createdBy,
+      isActive: data.isActive,
+      isPublic: data.isPublic,
+      isRecurring: data.isRecurring,
+      reminderType: data.reminderType,
+      priority: data.priority,
+      tags: (data.tags as string[]).filter(tag => tag.trim() !== ''),
+    };
+
+    // ✅ Aggiungi solo campi opzionali che hanno valore
+    if (data.notes && data.notes.trim()) {
+      reminderData.notes = data.notes.trim();
     }
 
-    if (!data.message.trim()) {
-     data.message="Non specificato";
+    if (data.recurrencePattern && data.isRecurring) {
+      reminderData.recurrencePattern = data.recurrencePattern;
     }
 
-    if (data.scheduledTime <= new Date()) {
-      toast({
-        title: 'Errore',
-        description: 'L\'orario del promemoria deve essere nel futuro',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setIsLoading(true);
-    
-    try {
-      const reminderData = {
-        ...data,
-        title: data.title.trim(),
-        message: data.message.trim(),
-        notes: data.notes?.trim(),
-        tags: data.tags.filter(tag => tag.trim() !== ''),
-        updatedAt: new Date(),
-      };
-
-      await onSave(reminderData);
-      handleClose();
-    } catch (error) {
-      console.error('Errore nel salvare il promemoria:', error);
-      toast({
-        title: 'Errore',
-        description: editReminder ? 'Impossibile aggiornare il promemoria' : 'Impossibile creare il promemoria',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    await onSave(reminderData);
+    handleClose();
+  } catch (error) {
+    console.error('Errore nel salvare il promemoria:', error);
+    toast({
+      title: 'Errore',
+      description: editReminder ? 'Impossibile aggiornare il promemoria' : 'Impossibile creare il promemoria',
+      variant: 'destructive',
+    });
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   // Quick time handlers
   const handleQuickTime = (preset: typeof quickTimes[0]) => {
@@ -247,7 +252,6 @@ export function ReminderModal({ isOpen, onClose, onSave, onDelete, editReminder 
     let newTime: Date;
 
     if (preset.setTime) {
-      // Imposta orario specifico (es. domani mattina alle 09:00)
       newTime = addHours(now, preset.hours || 0);
       const [hours, minutes] = preset.setTime.split(':');
       newTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
@@ -306,7 +310,6 @@ export function ReminderModal({ isOpen, onClose, onSave, onDelete, editReminder 
               )}
             </DialogTitle>
             
-            {/* Pulsante Delete in alto a destra */}
             {editReminder && canDelete && onDelete && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
@@ -685,10 +688,11 @@ export function ReminderModal({ isOpen, onClose, onSave, onDelete, editReminder 
                             <SelectValue placeholder="Seleziona frequenza" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="daily">Giornaliera</SelectItem>
-                            <SelectItem value="weekly">Settimanale</SelectItem>
-                            <SelectItem value="monthly">Mensile</SelectItem>
-                            <SelectItem value="yearly">Annuale</SelectItem>
+                            {recurrenceTypes.map((recType) => (
+                              <SelectItem key={recType.value} value={recType.value}>
+                                {recType.label}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </FormItem>
@@ -709,10 +713,11 @@ export function ReminderModal({ isOpen, onClose, onSave, onDelete, editReminder 
                             {Array.from({ length: 10 }, (_, i) => i + 1).map(num => (
                               <SelectItem key={num} value={num.toString()}>
                                 {num} {
-                                  form.watch('recurrencePattern.type') === 'daily' ? (num === 1 ? 'giorno' : 'giorni') :
-                                  form.watch('recurrencePattern.type') === 'weekly' ? (num === 1 ? 'settimana' : 'settimane') :
-                                  form.watch('recurrencePattern.type') === 'monthly' ? (num === 1 ? 'mese' : 'mesi') :
-                                  (num === 1 ? 'anno' : 'anni')
+                                  watchedRecurrenceType === 'daily' ? (num === 1 ? 'giorno' : 'giorni') :
+                                  watchedRecurrenceType === 'weekly' ? (num === 1 ? 'settimana' : 'settimane') :
+                                  watchedRecurrenceType === 'monthly' ? (num === 1 ? 'mese' : 'mesi') :
+                                  watchedRecurrenceType === 'yearly' ? (num === 1 ? 'anno' : 'anni') :
+                                  'unità'
                                 }
                               </SelectItem>
                             ))}
