@@ -71,8 +71,7 @@ export function AutoFCMManager() {
       localStorage.setItem('fcm_bridge_tokens', JSON.stringify(existingBridge));
       sessionStorage.setItem('fcm_latest_token', JSON.stringify(tokenData));
 
-      console.log('🌉 Token registrato nel bridge:', fcmToken.substring(0, 20) + '...');
-      setBridgeStatus('connected');
+            setBridgeStatus('connected');
       
       return true;
     } catch (error) {
@@ -95,8 +94,7 @@ export function AutoFCMManager() {
         // requestPermission chiama già setupFCM() internamente
       } else {
         // 2. Se i permessi sono già granted, dobbiamo chiamare setupFCM() manualmente
-        console.log('🔑 Permessi già granted, chiamando setupFCM direttamente...');
-        
+                
         try {
           // Chiama setupFCM per ottenere il token
           await debug.setupFCM();
@@ -116,8 +114,7 @@ export function AutoFCMManager() {
         // Se React state non aggiornato, controlla il debug
         const debugInfo = await debug.getDebugInfo();
         if (debugInfo.global.hasGlobalToken) {
-          console.log('✅ Token trovato nei globals, React state non ancora aggiornato');
-          currentToken = "token-exists-in-global"; // Placeholder per procedere
+                    currentToken = "token-exists-in-global"; // Placeholder per procedere
         }
       }
       
@@ -244,8 +241,6 @@ export function AutoFCMManager() {
         issues.forEach((issue: any) => diagnosticMessage += `  ${issue}\n`);
       }
       
-      alert(diagnosticMessage);
-      
     } catch (error) {
       console.error('❌ Errore diagnostica:', error);
     }
@@ -263,13 +258,7 @@ export function AutoFCMManager() {
     });
 
     console.group('📊 FCM Bridge Stats');
-    console.log('Token registrati:', bridgeTokens.length);
-    console.log('Token corrente:', token ? token.substring(0, 20) + '...' : 'Nessuno');
-    console.log('Stato bridge:', bridgeStatus);
-    console.log('Sistema attivo:', isEnabled);
-    console.log('Debug info:', debug);
-    console.log('Tutti i token:', bridgeTokens);
-    console.groupEnd();
+                            console.groupEnd();
   };
 
   /**

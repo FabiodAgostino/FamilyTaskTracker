@@ -13,8 +13,7 @@ const __dirname = path.dirname(__filename);
  * Verifica che tutti i file necessari siano stati generati
  */
 function verifyBuild() {
-  console.log('🔍 Verificando build...');
-
+  
   const errors = [];
   const warnings = [];
 
@@ -30,8 +29,7 @@ function verifyBuild() {
     if (!fs.existsSync(fullPath)) {
       errors.push(`❌ File mancante: ${filePath}`);
     } else {
-      console.log(`✅ File presente: ${filePath}`);
-    }
+          }
   });
 
   // Verifica contenuto service worker
@@ -52,8 +50,7 @@ function verifyBuild() {
 
     // Verifica dimensione ragionevole
     const sizeKB = (swContent.length / 1024).toFixed(2);
-    console.log(`📊 Service worker dimensione: ${sizeKB} KB`);
-    
+        
     if (swContent.length < 1000) {
       warnings.push('⚠️  Service worker sembra troppo piccolo');
     }
@@ -63,8 +60,7 @@ function verifyBuild() {
   const docsPath = path.join(__dirname, '../docs');
   if (fs.existsSync(docsPath)) {
     const files = fs.readdirSync(docsPath);
-    console.log(`📁 File in docs: ${files.length}`);
-    
+        
     // Verifica che ci siano file JS e CSS
     const jsFiles = files.filter(f => f.endsWith('.js'));
     const cssFiles = files.filter(f => f.endsWith('.css'));
@@ -73,8 +69,7 @@ function verifyBuild() {
       errors.push('❌ Nessun file JavaScript trovato in docs');
     }
     
-    console.log(`📊 Build contenuto: ${jsFiles.length} JS, ${cssFiles.length} CSS`);
-  }
+      }
 
   // Verifica variabili d'ambiente critiche
   const criticalEnvVars = [
@@ -93,23 +88,17 @@ function verifyBuild() {
   });
 
   // Stampa risultati
-  console.log('\n📋 RISULTATI VERIFICA:');
-  
+    
   if (warnings.length > 0) {
-    console.log('\n⚠️  WARNINGS:');
-    warnings.forEach(warning => console.log(`  ${warning}`));
+        warnings.forEach(warning => console.log(`  ${warning}`));
   }
 
   if (errors.length > 0) {
-    console.log('\n❌ ERRORI:');
-    errors.forEach(error => console.log(`  ${error}`));
-    console.log('\n💥 Build verification FAILED!');
-    return false;
+        errors.forEach(error => console.log(`  ${error}`));
+        return false;
   } else {
-    console.log('\n✅ Build verification PASSED!');
-    if (warnings.length > 0) {
-      console.log(`⚠️  Con ${warnings.length} warning(s)`);
-    }
+        if (warnings.length > 0) {
+          }
     return true;
   }
 }

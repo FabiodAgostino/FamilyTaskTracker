@@ -21,6 +21,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { NoteDetail } from './NoteDetail';
 import { FaNoteSticky } from 'react-icons/fa6';
+import { LoadingScreen, useLoadingTransition } from '../ui/loading-screen';
 
 export function NotesList() {
   const { user } = useAuthContext();
@@ -36,10 +37,13 @@ export function NotesList() {
   const [sortBy, setSortBy] = useState('newest');
  const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+
   // Aggiorna stato filtri quando cambia mobile/desktop
-  React.useEffect(() => {
-    setIsFiltersExpanded(!isMobile);
-  }, [isMobile]);
+React.useEffect(() => {
+  setIsFiltersExpanded(!isMobile);
+}, [isMobile]);
+
+
 
   const { 
     data: notes, 
@@ -48,6 +52,10 @@ export function NotesList() {
     update: updateNote, 
     remove: deleteNote 
   } = useFirestore<Note>('notes');
+
+  const {showLoading } = useLoadingTransition(loading, notes);
+
+
 
   // Statistiche e filtri
   const { filteredNotes, stats } = useMemo(() => {
@@ -124,17 +132,13 @@ export function NotesList() {
 
   const toggleFilters = () => setIsFiltersExpanded(!isFiltersExpanded);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-burnt-newStyle"></div>
-        <span className="ml-3 text-delft-blue font-medium">Loading...</span>
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+  <LoadingScreen
+    isVisible={showLoading}
+    title="Caricamento Note"
+    subtitle="Recupero delle note..."
+  >
+     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
       {/* Header Section - RESPONSIVE */}
       <div className={cn("mb-6", isMobile ? "space-y-4" : "mb-8")}>
         <div className={cn(
@@ -201,7 +205,7 @@ export function NotesList() {
           {isMobile && (
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-gray-500" />
+               <Filter className="h-4 w-4 text-cambridge-newStyle" />
                 <span className="font-medium text-sm">Filtri di ricerca</span>
               </div>
               <Button
@@ -342,5 +346,7 @@ export function NotesList() {
     />
       
     </div>
-  );
+  </LoadingScreen>
+);
+
 }

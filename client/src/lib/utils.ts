@@ -11,8 +11,23 @@ export function removeUndefinedFields<T extends Record<string, any>>(obj: T): Pa
   
   for (const [key, value] of Object.entries(obj)) {
     if (value !== undefined) {
+      // 🔧 FIX: Gestione array
+      if (Array.isArray(value)) {
+        const cleanedArray = value
+          .map(item => {
+            if (item && typeof item === 'object' && !(item instanceof Date)) {
+              return removeUndefinedFields(item);
+            }
+            return item;
+          })
+          .filter(item => item !== undefined);
+        
+        if (cleanedArray.length > 0) {
+          (cleaned as any)[key] = cleanedArray;
+        }
+      }
       // Se il valore è un oggetto, applica ricorsivamente la pulizia
-      if (value && typeof value === 'object' && !(value instanceof Date)) {
+      else if (value && typeof value === 'object' && !(value instanceof Date)) {
         const cleanedValue = removeUndefinedFields(value);
         // Solo se l'oggetto non è vuoto dopo la pulizia
         if (Object.keys(cleanedValue).length > 0) {
@@ -23,7 +38,8 @@ export function removeUndefinedFields<T extends Record<string, any>>(obj: T): Pa
       }
     }
   }
-    return cleaned;
+  
+  return cleaned;
 }
 
 /**

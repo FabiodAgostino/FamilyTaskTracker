@@ -22,24 +22,25 @@ export class GoogleSearchService {
   async searchProductImages(
     url: string,
     name: string,
+    brand: string,
     maxResults: number = 10
   ): Promise<ProcessedImageResult[]> {
     try {
-      let searchQuery = getPathAfterDomain(url);
-      searchQuery += " " + name;
+      var searchQuery = `"${name}"`;
+      if(brand)
+        searchQuery+= ` "${brand}"`
+      alert(searchQuery)
       if (searchQuery === null)
         throw "searchQuery null";
-
      const params = new URLSearchParams({
   key: this.apiKey,
   cx: this.searchEngineId,
   q: searchQuery,
   searchType: 'image',
-  num: Math.min(maxResults, 10).toString(),
+  num: Math.min(maxResults, 20).toString(),
   fileType: 'jpg,png,webp',
   
   // ✅ PARAMETRI PER IMMAGINI DI QUALITÀ
-  imgSize: 'medium',           // Evita immagini troppo piccole
   imgColorType: 'color',       // Prioritizza immagini a colori
   safe: 'off',                 // Più risultati disponibili
   

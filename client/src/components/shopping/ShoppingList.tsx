@@ -45,6 +45,7 @@ import { useDynamicCategories } from '@/hooks/useDynamicCategories';
 import { CategorySelectWithAdd } from '../common/CategorySelectWithAdd';
 import { ShoppingItem } from '@/lib/models/shopping-item';
 import { FaShoppingBag } from 'react-icons/fa';
+import { LoadingScreen, useLoadingTransition } from '../ui/loading-screen';
 
 export function ShoppingList() {
   const { user } = useAuthContext();
@@ -73,7 +74,7 @@ export function ShoppingList() {
   // ✅ NUOVO: Stati per il modale di dettaglio
   const [selectedItem, setSelectedItem] = useState<ShoppingItem | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  
+
   // ✅ AGGIORNATO: Filtri con valori iniziali dalle preferenze salvate
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState(preferences.defaultCategory);
@@ -102,7 +103,8 @@ export function ShoppingList() {
     update: updateItem, 
     remove: deleteItem 
   } = useFirestore<ShoppingItem>('shopping_items');
-  
+  console.log('itemsLoading:', itemsLoading, 'items:', items?.length);
+
 const { data: categories } = useDynamicCategories();
 
 
@@ -117,8 +119,11 @@ const { data: categories } = useDynamicCategories();
 
   // ✅ FIX 3: useEffect dopo la dichiarazione di items
   React.useEffect(() => {
-    setLocalItems(items || []);
-  }, [items]);
+  setLocalItems(items || []);
+  
+}, [items, itemsLoading]);
+
+const {showLoading } = useLoadingTransition(itemsLoading, items);
 
   // ✅ CORRETTO: Filtri con logica di visibilità
   const { filteredItems, visibleItems } = useMemo(() => {
@@ -372,19 +377,13 @@ const { data: categories } = useDynamicCategories();
   const toggleFilters = () => setIsFiltersExpanded(!isFiltersExpanded);
 
   // Loading state
-  if (itemsLoading) {
-    return (
+return (
+  <LoadingScreen
+    isVisible={showLoading}
+    title="Caricamento Shopping"
+    subtitle="Preparazione della lista..."
+  >
       <div className="container mx-auto p-6 max-w-7xl">
-        <div className="flex justify-center items-center py-20">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cambridge-newStyle"></div>
-          <span className="ml-3 text-gray-600">Caricamento Shopping...</span>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="container mx-auto p-6 max-w-7xl">
       {/* ✅ HEADER RESPONSIVE - MODIFICATO */}
       <div className={cn(
         "flex justify-between items-start gap-6 mb-8",
@@ -487,7 +486,7 @@ const { data: categories } = useDynamicCategories();
           {isMobile && (
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-gray-500" />
+                <Filter className="h-4 w-4 text-cambridge-newStyle" />
                 <span className="font-medium text-sm">Filtri di ricerca</span>
                 {activeFiltersCount > 0 && (
                   <Badge variant="secondary" className="bg-cambridge-newStyle/10 text-cambridge-newStyle text-xs">
@@ -626,7 +625,8 @@ const { data: categories } = useDynamicCategories();
       </Card>
 
       {/* ✅ LISTA ELEMENTI con grid corretta e padding responsivo */}
-      <div className={cn("space-y-8", isMobile && "px-1")}>
+      {!itemsLoading && (
+  <div className={cn("space-y-8", isMobile && "px-1")}>
         {/* Elementi da comprare */}
         {stats.pendingItems.length > 0 && (
           <div>
@@ -677,7 +677,7 @@ const { data: categories } = useDynamicCategories();
           </div>
         )}
 
-       {stats.pendingItems.length === 0 && stats.completedItems.length === 0 && (
+      {stats.pendingItems.length === 0 && stats.completedItems.length === 0 && !showLoading && (
           <Card className="text-center py-16">
             <CardContent>
               <ShoppingCart className="mx-auto h-16 w-16 text-gray-300 mb-4" />
@@ -704,6 +704,7 @@ const { data: categories } = useDynamicCategories();
           </Card>
         )}
       </div>
+      )}
 
       {/* ✅ NUOVO: Modale di dettaglio elemento shopping */}
       <ShoppingItemDetail
@@ -727,5 +728,7 @@ const { data: categories } = useDynamicCategories();
       />
       
     </div>
-  );
+  </LoadingScreen>
+);
+
 }

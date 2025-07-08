@@ -201,8 +201,7 @@ export function useFirestore<T>(
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       };
-      console.log(itemWithMetadata);
-      const docRef = await addDoc(collection(db, collectionName), itemWithMetadata);
+            const docRef = await addDoc(collection(db, collectionName), itemWithMetadata);
       return docRef.id;
     } catch (error) {
       console.error('Errore durante l\'aggiunta:', error);

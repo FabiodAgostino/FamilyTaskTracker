@@ -5,6 +5,9 @@ import { FirestoreSerializable, ValidationResult, ValidationError } from "./type
 // ===== SHOPPING ITEM CLASS =====
 
 export class ShoppingItem implements FirestoreSerializable {
+  public priceSelection?: PriceSelectionData;
+  
+  public needsPriceSelection: boolean = false;
   constructor(
     public id: string,
     public category: string,        
@@ -33,12 +36,101 @@ export class ShoppingItem implements FirestoreSerializable {
     
     // STORICO PREZZI CON DATE
     public historicalPriceWithDates?: PriceHistoryEntry[]
+    
   ) {
     if (this.validate) {
       this.validate();
     }
   }
+updateWithMultiplePrices(detectedPrices: DetectedPrice[]): void {
+    if (detectedPrices.length === 0) {
+      // Nessun prezzo trovato
+      this.priceSelection = {
+        status: 'error',
+        detectedPrices: [],
+        detectionErrors: ['Nessun prezzo rilevato nella pagina'],
+        lastDetectionAttempt: new Date()
+      };
+      this.needsPriceSelection = false;
+      
+    } else if (detectedPrices.length === 1) {
+      // Un solo prezzo trovato - selezione automatica
+      const price = detectedPrices[0];
+      this.estimatedPrice = price.numericValue;
+      this.priceSelection = {
+        status: 'single_price',
+        detectedPrices: detectedPrices,
+        selectedPriceIndex: 0,
+        selectedCssSelector: price.cssSelector,
+        selectionTimestamp: new Date(),
+        lastDetectionAttempt: new Date()
+      };
+      this.needsPriceSelection = false;
+      
+    } else {
+      // Prezzi multipli - necessita selezione utente
+      this.priceSelection = {
+        status: 'needs_selection',
+        detectedPrices: detectedPrices,
+        lastDetectionAttempt: new Date()
+      };
+      this.needsPriceSelection = true;
+      // Non impostiamo estimatedPrice finché l'utente non sceglie
+    }
+    
+    this.updatedAt = new Date();
+  }
 
+  selectPrice(priceIndex: number): void {
+    if (!this.priceSelection || !this.priceSelection.detectedPrices[priceIndex]) {
+      throw new Error('Prezzo non valido selezionato');
+    }
+    
+    const selectedPrice = this.priceSelection.detectedPrices[priceIndex];
+    
+    this.estimatedPrice = selectedPrice.numericValue;
+    this.priceSelection.status = 'selected';
+    this.priceSelection.selectedPriceIndex = priceIndex;
+    this.priceSelection.selectedCssSelector = selectedPrice.cssSelector;
+    this.priceSelection.selectionTimestamp = new Date();
+    this.needsPriceSelection = false;
+    this.updatedAt = new Date();
+    
+    // Aggiungi al historical price
+    this.addPriceToHistoryWithDate(selectedPrice.numericValue, new Date());
+    
+      }
+  
+  getSelectedCssSelector(): string | null {
+    return this.priceSelection?.selectedCssSelector || null;
+  }
+  
+  hasValidPriceSelector(): boolean {
+    return this.priceSelection?.status === 'selected' || 
+           this.priceSelection?.status === 'single_price';
+  }
+  
+  canBeMonitored(): boolean {
+    return this.hasValidPriceSelector() && !this.needsPriceSelection;
+  }
+  
+  getPriceSelectionSummary(): string {
+    if (!this.priceSelection) return 'Nessun dato prezzi';
+    
+    switch (this.priceSelection.status) {
+      case 'needs_selection':
+        return `${this.priceSelection.detectedPrices.length} prezzi trovati - necessita selezione`;
+      case 'selected':
+        const selected = this.priceSelection.detectedPrices[this.priceSelection.selectedPriceIndex!];
+        return `Prezzo selezionato: ${selected.value}`;
+      case 'single_price':
+        return `Prezzo unico: ${this.priceSelection.detectedPrices[0].value}`;
+      case 'error':
+        return `Errore rilevamento: ${this.priceSelection.detectionErrors?.join(', ')}`;
+      default:
+        return 'Stato sconosciuto';
+    }
+  }
   // ===== VALIDAZIONE =====
 
   validate(): ValidationResult {
@@ -190,6 +282,37 @@ export class ShoppingItem implements FirestoreSerializable {
           analysisText: data.priceMonitoring.analysisText
         };
       }
+ if (data.priceSelection && typeof data.priceSelection === 'object') {
+  // 🔧 FIX: Parsing corretto dei detectedPrices da Firestore
+  let detectedPrices = [];
+  
+  if (data.priceSelection.detectedPrices) {
+    // Caso 1: detectedPrices è già un array
+    if (Array.isArray(data.priceSelection.detectedPrices)) {
+      detectedPrices = data.priceSelection.detectedPrices;
+    }
+    // Caso 2: detectedPrices è un oggetto (mappa Firestore)
+    else if (typeof data.priceSelection.detectedPrices === 'object') {
+      detectedPrices = Object.values(data.priceSelection.detectedPrices);
+    }
+  }
+
+  item.priceSelection = {
+    status: data.priceSelection.status || 'error',
+    detectedPrices: detectedPrices, // 🔧 Usa l'array parsato correttamente
+    selectedPriceIndex: data.priceSelection.selectedPriceIndex,
+    selectedCssSelector: data.priceSelection.selectedCssSelector,
+    selectionTimestamp: data.priceSelection.selectionTimestamp 
+      ? parseDate(data.priceSelection.selectionTimestamp) 
+      : undefined,
+    lastDetectionAttempt: data.priceSelection.lastDetectionAttempt 
+      ? parseDate(data.priceSelection.lastDetectionAttempt) 
+      : undefined,
+    detectionErrors: data.priceSelection.detectionErrors
+  };
+}
+
+item.needsPriceSelection = data.needsPriceSelection || false;
 
       // Validazione condizionale per dati esistenti
       if (link && category && createdBy) {
@@ -227,34 +350,70 @@ export class ShoppingItem implements FirestoreSerializable {
   }
 
   toFirestore() {
-    const data = {
-      category: this.category,
-      createdBy: this.createdBy,
-      link: this.link,
-      name: this.name,
-      createdAt: this.createdAt,
-      completed: this.completed,
-      completedBy: this.completedBy,
-      completedAt: this.completedAt,
-      priority: this.priority,
-      estimatedPrice: this.estimatedPrice,
-      notes: this.notes,
-      updatedAt: new Date(),
-      isPublic: this.isPublic,
-      scrapingData: this.scrapingData,
-      brandName: this.brandName,
-      imageUrl: this.imageUrl,
-      imageUpdated: this.imageUpdated,
-      
-      // Campi monitoraggio prezzi
-      available: this.available,
-      historicalPrice: this.historicalPrice,
-      lastPriceCheck: this.lastPriceCheck,
-      priceMonitoring: this.priceMonitoring,
-      historicalPriceWithDates: this.historicalPriceWithDates
-    };
-    return removeUndefinedFields(data);
-  }
+  // 🔧 FIX: Pulizia ricorsiva degli oggetti annidati
+  const cleanObjectRecursive = (obj: any): any => {
+    if (obj === null || obj === undefined) {
+      return undefined; // Sarà rimosso da removeUndefinedFields
+    }
+    
+    if (obj instanceof Date) {
+      return obj; // Le date sono OK
+    }
+    
+    if (Array.isArray(obj)) {
+      // Pulisci array ricorsivamente
+      return obj.map(item => cleanObjectRecursive(item)).filter(item => item !== undefined);
+    }
+    
+    if (typeof obj === 'object') {
+      const cleaned: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        const cleanedValue = cleanObjectRecursive(value);
+        if (cleanedValue !== undefined) {
+          cleaned[key] = cleanedValue;
+        }
+      }
+      return Object.keys(cleaned).length > 0 ? cleaned : undefined;
+    }
+    
+    return obj; // Valori primitivi (string, number, boolean)
+  };
+
+  const data = {
+    category: this.category,
+    createdBy: this.createdBy,
+    link: this.link,
+    name: this.name,
+    createdAt: this.createdAt,
+    completed: this.completed,
+    completedBy: this.completedBy,
+    completedAt: this.completedAt,
+    priority: this.priority,
+    estimatedPrice: this.estimatedPrice,
+    notes: this.notes,
+    updatedAt: new Date(),
+    isPublic: this.isPublic,
+    scrapingData: this.scrapingData,
+    brandName: this.brandName,
+    imageUrl: this.imageUrl,
+    imageUpdated: this.imageUpdated,
+    
+    // Campi monitoraggio prezzi
+    available: this.available,
+    historicalPrice: this.historicalPrice,
+    lastPriceCheck: this.lastPriceCheck,
+    priceMonitoring: this.priceMonitoring,
+    historicalPriceWithDates: this.historicalPriceWithDates,
+    
+    // 🔧 FIX: Pulizia speciale per priceSelection
+    priceSelection: this.priceSelection ? cleanObjectRecursive(this.priceSelection) : undefined,
+    
+    needsPriceSelection: this.needsPriceSelection
+  };
+
+  // Applica la pulizia finale (che ora funziona anche su oggetti annidati)
+  return removeUndefinedFields(data);
+}
 
   // ===== METODI GESTIONE STATO =====
 
@@ -716,6 +875,34 @@ export class ShoppingItem implements FirestoreSerializable {
     };
   }
 }
+
+export interface DetectedPrice {
+  value: string;           // "€29.99", "25,50 EUR", etc.
+  numericValue: number;    // 29.99, 25.50, etc.
+  cssSelector: string;     // CSS selector per trovare questo prezzo
+  parentClasses: string[]; // Classi CSS dei 4 div parent
+  elementText: string;     // Testo completo dell'elemento che contiene il prezzo
+  confidence: number;      // 0-1, confidence che sia un prezzo valido
+  position: {              // Posizione nell'HTML per ranking
+    index: number;         // Ordine di apparizione nella pagina
+    depth: number;         // Profondità nell'HTML
+  };
+  context: {               // Contesto per aiutare l'utente a scegliere
+    nearbyText: string;    // Testo vicino al prezzo (es: "Prezzo scontato:", "Spedizione:")
+    isProminent: boolean;  // Se il prezzo è visualmente prominente
+  };
+}
+
+export interface PriceSelectionData {
+  status: 'needs_selection' | 'selected' | 'single_price' | 'error' | 'skipped';
+  detectedPrices: DetectedPrice[];
+  selectedPriceIndex?: number;         // Indice del prezzo scelto dall'utente
+  selectedCssSelector?: string;        // Selector CSS da usare nel monitoraggio
+  selectionTimestamp?: Date;           // Quando l'utente ha fatto la selezione
+  lastDetectionAttempt?: Date;         // Ultimo tentativo di rilevamento prezzi
+  detectionErrors?: string[];          // Eventuali errori durante il rilevamento
+}
+
 
 export interface ScrapingData {
   lastScraped: Date;

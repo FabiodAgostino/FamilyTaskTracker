@@ -2,7 +2,6 @@ const { WebScraper } = require('./web-scraper');
 const { DeepSeekClient } = require('./deepseek-client');
 const { ContentExtractor } = require('./content-extractor');
 const { getFirestore } = require('firebase-admin/firestore');
-
 class ScrapingService {
 
     constructor() {
@@ -12,25 +11,57 @@ class ScrapingService {
         this.db.settings({
             ignoreUndefinedProperties: true
         });
-    
-    // resto del codice...
 }
+
+    logFinalResultWithPrices(result, processingTime) {
+    const status = result.success ? '✅' : '❌';
+    const mode = result.mode || 'unknown';
+    const site = result.site || 'unknown';
+    
+    console.log(`${status} Final result [${mode}] for ${site}:`);
+    console.log(`   Product: ${result.name}`);
+    console.log(`   Brand: ${result.brandName || 'N/A'}`);
+    console.log(`   Category: ${result.category}`);
+    console.log(`   Processing time: ${processingTime}ms`);
+    
+    // 🔴 Logging prezzi multipli
+    if (result.priceDetectionResult) {
+        const priceInfo = result.priceDetectionResult;
+        console.log(`   💰 Price detection: ${priceInfo.status}`);
+        console.log(`   💰 Detected prices: ${priceInfo.detectedPrices.length}`);
+        
+        if (priceInfo.selectedPrice) {
+            console.log(`   💰 Selected price: ${priceInfo.selectedPrice.value}`);
+        }
+        
+        if (priceInfo.needsSelection) {
+            console.log(`   ⚠️ Needs user price selection`);
+        }
+    } else if (result.estimatedPrice) {
+        console.log(`   💰 Price: ${result.estimatedPrice}`);
+    } else {
+        console.log(`   💸 No price detected`);
+    }
+    
+    if (result.error) {
+        console.log(`   Error: ${typeof result.error === 'object' ? result.error.message : result.error}`);
+    }
+}
+
 
     /**
      * Scraping completo con aggiornamento automatico Firestore
      */
     async ScrapingAndRefine(url, options = {}) {
-        console.log(`🚀 Starting scraping pipeline for: ${url}`);
+        console.log(`🚀 Starting scraping pipeline with multiple price detection for: ${url}`);
         const startTime = Date.now();
         
-        // Opzioni configurabili
         const {
-            updateFirestore = true,      // Aggiorna automaticamente Firestore
-            collectionName = 'shopping_items',  // Nome collezione
-            returnUpdatedDoc = true      // Ritorna il documento aggiornato
+            updateFirestore = true,
+            collectionName = 'shopping_items',
+            returnUpdatedDoc = true
         } = options;
 
-        // Inizializza scraper con configurazione ottimale
         const scraper = new WebScraper({
             useRealHeaders: true,
             enableDelays: true,
@@ -40,27 +71,66 @@ class ScrapingService {
         let finalResult;
 
         try {
-            // STEP 1: Tentativo di scraping principale
+            // STEP 1: Scraping principale
             console.log('🌐 Tentativo di scraping...');
             
             const scrapingResult = await scraper.scrapeComplete(url, {
                 useNavigation: false,
                 fallbackToAggressive: true
             });
-            
+            const detectedPrices = scrapingResult.content.detectedPrices;
+
             if (scrapingResult.success) {
-                // STEP 2: Analisi con DeepSeek
-                console.log('🤖 Analizzando contenuto con DeepSeek...');
+                console.log('✅ Scraping completato, analizzando prezzi...');
                 
-                const analysisResult = await DeepSeekClient.callDeepSeekWithRetry(
-                    scrapingResult.content.text, 
-                    true, // modalità HTML
-                    url,
-                    2     // max 2 retry
-                );
+               
+
                 
-                // STEP 3: Verifica qualità risultato
-                finalResult = enhanceResult(analysisResult, scrapingResult);
+                console.log(`💰 Rilevati ${detectedPrices.length} prezzi nella pagina`);
+                
+                // 🔴 STEP 3: NUOVO - Decisione su come procedere
+                if (detectedPrices.length === 0) {
+                    // Nessun prezzo trovato - procedura normale con DeepSeek
+                    console.log('❌ Nessun prezzo rilevato, usando DeepSeek per analisi completa...');
+                    finalResult = await this.processWithDeepSeek(scrapingResult, url);
+                    finalResult.priceDetectionResult = {
+                        detectedPrices: [],
+                        status: 'no_prices_detected',
+                        needsSelection: false
+                    };
+                    
+                } else if (detectedPrices.length === 1) {
+                    // Un solo prezzo - selezione automatica + DeepSeek per altri dati
+                    console.log('✅ Un solo prezzo rilevato, procedura automatica...');
+                    const singlePrice = detectedPrices[0];
+                    
+                    // Usa DeepSeek ma senza fargli estrarre il prezzo
+                    finalResult = await this.processWithDeepSeekNoPriceExtraction(scrapingResult, url);
+                    
+                    // Sovrascrivi con il prezzo rilevato automaticamente
+                    finalResult.estimatedPrice = singlePrice.numericValue;
+                    finalResult.priceDetectionResult = {
+                        detectedPrices: detectedPrices,
+                        status: 'single_price',
+                        needsSelection: false,
+                        selectedPrice: singlePrice
+                    };
+                    
+                } else {
+                    // Prezzi multipli - NO DeepSeek, necessita selezione utente
+                    console.log(`⚠️ ${detectedPrices.length} prezzi rilevati, necessita selezione utente`);
+                    
+                    // Estrai solo metadati base con DeepSeek (senza prezzo)
+                    finalResult = await this.processWithDeepSeekNoPriceExtraction(scrapingResult, url);
+                    
+                    // Non impostare estimatedPrice, sarà impostato quando l'utente seleziona
+                    finalResult.estimatedPrice = null;
+                    finalResult.priceDetectionResult = {
+                        detectedPrices: detectedPrices,
+                        status: 'multiple_prices',
+                        needsSelection: true
+                    };
+                }
                 
                 console.log(`✅ Scraping completato con successo in ${Date.now() - startTime}ms`);
                 
@@ -69,7 +139,7 @@ class ScrapingService {
             }
             
         } catch (scrapingError) {
-            // STEP 4: Fallback completo - DeepSeek con URL
+            // STEP 4: Fallback completo - DeepSeek con URL (logica esistente)
             console.log('❌ Scraping fallito, usando fallback URL con DeepSeek...');
             console.log(`Errore: ${scrapingError.message}`);
             
@@ -78,51 +148,55 @@ class ScrapingService {
                     url, 
                     false, // modalità URL
                     url,
-                    1      // solo 1 retry per fallback
+                    1
                 );
                 
-                // Arricchisci con info dall'URL
                 const urlInfo = ContentExtractor.extractInfoFromUrl(url);
                 finalResult = {
                     ...urlFallbackResult,
                     ...urlInfo,
                     fallbackReason: scrapingError.message,
-                    processingTime: Date.now() - startTime
+                    processingTime: Date.now() - startTime,
+                    priceDetectionResult: {
+                        detectedPrices: [],
+                        status: 'fallback_mode',
+                        needsSelection: false
+                    }
                 };
                 
                 console.log(`⚠️ Fallback URL completato in ${Date.now() - startTime}ms`);
                 
             } catch (deepseekError) {
-                // STEP 5: Fallback manuale finale
                 console.error('❌ Anche DeepSeek fallback è fallito:', deepseekError.message);
                 
                 finalResult = createManualFallback(url, scrapingError.message, deepseekError.message);
                 finalResult.processingTime = Date.now() - startTime;
-                
-                console.log(`🔧 Fallback manuale in ${Date.now() - startTime}ms`);
+                finalResult.priceDetectionResult = {
+                    detectedPrices: [],
+                    status: 'error',
+                    needsSelection: false
+                };
             }
         }
 
-        // STEP 6: Post-processing e validazione finale
+        // STEP 5: Post-processing finale
         finalResult = postProcessResult(finalResult, url);
         
-        // STEP 7: Aggiornamento Firestore (se abilitato)
+        // 🔴 STEP 6: NUOVO - Aggiornamento Firestore con nuova struttura
         let updatedDocument = null;
         if (updateFirestore) {
             try {
-                updatedDocument = await this.updateFirestoreDocument(url, finalResult, collectionName);
+                updatedDocument = await this.updateFirestoreDocumentWithPrices(url, finalResult, collectionName);
                 console.log(`📝 Documento Firestore aggiornato: ${updatedDocument.id}`);
             } catch (firestoreError) {
                 console.error('❌ Errore aggiornamento Firestore:', firestoreError.message);
-                // Non bloccare la risposta per errori Firestore
                 finalResult.firestoreError = firestoreError.message;
             }
         }
         
-        // STEP 8: Logging finale per monitoring
-        logFinalResult(finalResult, Date.now() - startTime);
+        // STEP 7: Logging finale
+        this.logFinalResultWithPrices(finalResult, Date.now() - startTime);
 
-        // STEP 9: Risposta
         return {
             scrapingResult: finalResult,
             firestoreDocument: returnUpdatedDoc ? updatedDocument : null,
@@ -131,14 +205,75 @@ class ScrapingService {
         };
     }
 
+
+    /**
+     * 🆕 Processa con DeepSeek ma escludendo estrazione prezzo
+     */
+    async processWithDeepSeekNoPriceExtraction(scrapingResult, url) {
+        const modifiedPrompt = `Sei un estrattore JSON esperto. Il tuo compito è analizzare contenuti HTML di pagine prodotto e restituire solo JSON valido senza commenti, markdown o testo aggiuntivo.
+
+Per questa pagina prodotto, estrai queste informazioni in formato JSON (ESCLUDI IL PREZZO):
+- name (string): il nome/titolo del prodotto
+- brandName (string): il nome del brand con iniziali maiuscole  
+- site (string): il nome del sito web (es: "Amazon", "eBay", "AliExpress")
+- url (string): l'URL completo della pagina
+- imageUrl (string): URL dell'immagine principale del prodotto (solo se presente e valido)
+- category (string): categoria del prodotto (es: "Elettronica", "Casa", "Abbigliamento")
+
+IMPORTANTE: NON estrarre il prezzo, sarà gestito separatamente.
+
+Regole:
+1. Restituisci SOLO JSON valido, niente altro
+2. Se un campo non è disponibile, usa stringa vuota ""
+3. Il nome deve essere il titolo principale del prodotto`;
+
+        try {
+            // Usa il sistema DeepSeek esistente ma con prompt modificato
+            const conversationId = DeepSeekClient.generateConversationId(url);
+            await DeepSeekClient.initializeConversation(conversationId, url);
+            
+            const result = await DeepSeekClient.analyzeHtmlWithContext(
+                conversationId,
+                scrapingResult.content.text,
+                url
+            );
+            
+            return result;
+            
+        } catch (error) {
+            console.error('❌ Errore DeepSeek no-price:', error);
+            
+            // Fallback con estrazione manuale base
+            const urlInfo = ContentExtractor.extractInfoFromUrl(url);
+            return {
+                ...urlInfo,
+                error: error.message,
+                mode: 'manual_extraction',
+                timestamp: new Date().toISOString(),
+                success: false
+            };
+        }
+    }
+
+    /**
+     * 🆕 Processa con DeepSeek normale (per retrocompatibilità)
+     */
+    async processWithDeepSeek(scrapingResult, url) {
+        return await DeepSeekClient.callDeepSeekWithRetry(
+            scrapingResult.content.text, 
+            true,
+            url,
+            2
+        );
+    }
+
     /**
      * Aggiorna il documento Firestore con i risultati del scraping
      */
-    async updateFirestoreDocument(url, scrapingResult, collectionName = 'shopping_items') {
+     async updateFirestoreDocumentWithPrices(url, scrapingResult, collectionName = 'shopping_items') {
         try {
             console.log(`🔍 Cercando documento con URL: ${url}`);
             
-            // Cerca il documento con questo URL
             const querySnapshot = await this.db
                 .collection(collectionName)
                 .where('link', '==', url)
@@ -153,15 +288,14 @@ class ScrapingService {
             const docRef = querySnapshot.docs[0].ref;
             const existingData = querySnapshot.docs[0].data();
             
-            // Prepara i dati di aggiornamento
+            // Prepara i dati base
             const updateData = {
-                // Campi estratti dal scraping
                 name: scrapingResult.name || existingData.name,
                 brandName: scrapingResult.brandName || existingData.brandName,
-                estimatedPrice: scrapingResult.estimatedPrice || existingData.estimatedPrice,
                 category: scrapingResult.category || existingData.category,
                 imageUrl: scrapingResult.imageUrl || existingData.imageUrl,
                 scrapingText: scrapingResult.scraping,
+                
                 // Metadati scraping
                 scrapingData: {
                     lastScraped: new Date(),
@@ -171,9 +305,56 @@ class ScrapingService {
                     errors: scrapingResult.error || null
                 },
                 
-                // Aggiorna timestamp
                 updatedAt: new Date()
             };
+
+            // 🔴 GESTIONE PREZZI MULTIPLI
+            const priceDetection = scrapingResult.priceDetectionResult;
+            
+            if (priceDetection) {
+                if (priceDetection.status === 'single_price' && priceDetection.selectedPrice) {
+                    // Un solo prezzo - aggiorna direttamente
+                    updateData.estimatedPrice = priceDetection.selectedPrice.numericValue;
+                    updateData.priceSelection = {
+                        status: 'single_price',
+                        detectedPrices: priceDetection.detectedPrices,
+                        selectedPriceIndex: 0,
+                        selectedCssSelector: priceDetection.selectedPrice.cssSelector,
+                        selectionTimestamp: new Date(),
+                        lastDetectionAttempt: new Date()
+                    };
+                    updateData.needsPriceSelection = false;
+                    
+                } else if (priceDetection.status === 'multiple_prices') {
+                    // Prezzi multipli - necessita selezione
+                    updateData.priceSelection = {
+                        status: 'needs_selection',
+                        detectedPrices: priceDetection.detectedPrices,
+                        lastDetectionAttempt: new Date()
+                    };
+                    updateData.needsPriceSelection = true;
+                    // Non aggiornare estimatedPrice
+                    
+                } else if (priceDetection.status === 'no_prices_detected') {
+                    // Nessun prezzo rilevato - usa DeepSeek result se disponibile
+                    if (scrapingResult.estimatedPrice) {
+                        updateData.estimatedPrice = scrapingResult.estimatedPrice;
+                    }
+                    updateData.priceSelection = {
+                        status: 'error',
+                        detectedPrices: [],
+                        detectionErrors: ['Nessun prezzo rilevato durante lo scraping'],
+                        lastDetectionAttempt: new Date()
+                    };
+                    updateData.needsPriceSelection = false;
+                }
+            } else {
+                // Fallback ai vecchi dati di prezzo
+                if (scrapingResult.estimatedPrice) {
+                    updateData.estimatedPrice = scrapingResult.estimatedPrice;
+                }
+                updateData.needsPriceSelection = false;
+            }
 
             // Aggiorna il documento
             await docRef.update(updateData);
@@ -186,10 +367,11 @@ class ScrapingService {
             };
             
         } catch (error) {
-            console.error('❌ Errore in updateFirestoreDocument:', error);
+            console.error('❌ Errore in updateFirestoreDocumentWithPrices:', error);
             throw error;
         }
     }
+
 
     /**
      * Metodo per scraping senza aggiornamento Firestore (se preferisci gestirlo nel frontend)

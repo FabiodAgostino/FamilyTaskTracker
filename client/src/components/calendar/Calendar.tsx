@@ -43,13 +43,11 @@ import {
   subMonths,
   isToday,
   getDay,
-  startOfDay,
-  endOfDay,
-  isAfter,
 } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { CalendarEvent } from '@/lib/models/types';
 import { FaCalendar } from 'react-icons/fa';
+import { LoadingScreen, useLoadingTransition } from '../ui/loading-screen';
 
 export function Calendar() {
   const { user } = useAuthContext();
@@ -86,6 +84,9 @@ export function Calendar() {
     update: updateEvent,
     remove: deleteEvent,
   } = useFirestore<CalendarEvent>('calendar_events');
+
+const {showLoading } = useLoadingTransition(loading, events);
+
 
   // ✅ MODIFICATO: Filtri applicati
   const visibleEvents = useMemo(() => {
@@ -289,17 +290,13 @@ export function Calendar() {
     return types[eventType] || { label: eventType, icon: '📅' };
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-burnt-newStyle"></div>
-        <span className="ml-3 text-delft-blue font-medium">Caricamento...</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+return (
+  <LoadingScreen
+    isVisible={showLoading}
+    title="Caricamento Calendario"
+    subtitle="Sincronizzazione eventi..."
+  >
+     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
       {/* ✅ HEADER RESPONSIVE - MODIFICATO con TABS */}
       <div className={cn("mb-8", isMobile && "mb-6")}>
         <div className={cn(
@@ -388,7 +385,7 @@ export function Calendar() {
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <Filter className="h-4 w-4 text-cambridge-newStyle" />
-                    <span className="font-medium text-sm">Filtri</span>
+                    <span className="font-medium text-sm">Filtri di ricerca</span>
                   </div>
                   <Button
                     variant="ghost"
@@ -651,5 +648,7 @@ export function Calendar() {
       />
       
     </div>
-  );
+  </LoadingScreen>
+);
+
 }

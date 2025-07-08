@@ -38,8 +38,7 @@ class FirebaseTokenManager {
       this.serviceAccount = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_PATH, 'utf8'));
       this.projectId = this.serviceAccount.project_id;
       
-      console.log(`✅ Service account caricato per progetto: ${this.projectId}`);
-    } catch (error) {
+          } catch (error) {
       console.error('❌ Errore caricamento service account:', error.message);
       throw error;
     }
@@ -52,12 +51,10 @@ class FirebaseTokenManager {
     try {
       // Controlla se abbiamo un token valido in cache
       if (this.accessToken && this.tokenExpiry && Date.now() < this.tokenExpiry - 60000) {
-        console.log('🔄 Usando token cached');
-        return this.accessToken;
+                return this.accessToken;
       }
 
-      console.log('🔑 Generando nuovo access token...');
-
+      
       const jwtClient = new google.auth.JWT(
         this.serviceAccount.client_email,
         null,
@@ -75,8 +72,7 @@ class FirebaseTokenManager {
       this.saveTokenCache();
       
       const expiresIn = Math.floor((this.tokenExpiry - Date.now()) / 60000);
-      console.log(`✅ Nuovo token generato (valido per ${expiresIn} minuti)`);
-      
+            
       return this.accessToken;
       
     } catch (error) {
@@ -114,8 +110,7 @@ class FirebaseTokenManager {
         if (cacheData.projectId === this.projectId) {
           this.accessToken = cacheData.accessToken;
           this.tokenExpiry = cacheData.tokenExpiry;
-          console.log('📂 Token cache caricato');
-        }
+                  }
       }
     } catch (error) {
       console.warn('⚠️ Impossibile caricare token cache:', error.message);
@@ -183,10 +178,7 @@ class FCMNotificationSender {
         }
       };
 
-      console.log('📤 Inviando notifica...');
-      console.log(`🎯 Token: ${fcmToken.substring(0, 20)}...`);
-      console.log(`📝 Titolo: ${notification.title}`);
-      
+                        
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -198,9 +190,7 @@ class FCMNotificationSender {
 
       if (response.ok) {
         const result = await response.json();
-        console.log('✅ NOTIFICA INVIATA CON SUCCESSO!');
-        console.log(`📨 Message ID: ${result.name}`);
-        return result;
+                        return result;
       } else {
         const error = await response.text();
         console.error('❌ ERRORE INVIO NOTIFICA:');
@@ -254,44 +244,35 @@ class FCMNotificationSender {
       }
     ];
 
-    console.log('🎯 Avviando serie di test automatici...\n');
-
+    
     for (let i = 0; i < tests.length; i++) {
       const test = tests[i];
       try {
-        console.log(`\n🧪 Eseguendo: ${test.title}`);
-        await this.sendNotification(fcmToken, test, test.data);
-        console.log(`✅ Test ${i + 1} completato`);
-        
+                await this.sendNotification(fcmToken, test, test.data);
+                
         // Attendi 3 secondi tra i test
         if (i < tests.length - 1) {
-          console.log('⏳ Attendo 3 secondi...');
-          await new Promise(resolve => setTimeout(resolve, 3000));
+                    await new Promise(resolve => setTimeout(resolve, 3000));
         }
       } catch (error) {
         console.error(`❌ Test ${i + 1} fallito:`, error.message);
       }
     }
     
-    console.log('\n🎉 Serie di test completata!');
-  }
+      }
 
   /**
    * Monitoring dei token FCM nel browser
    */
   async startTokenMonitoring() {
-    console.log('👀 Avviando monitoring automatico token FCM...');
-    console.log('💡 Apri il browser su http://localhost:3000 e attiva le notifiche');
-    console.log('🔄 Il sistema controllerà automaticamente ogni 10 secondi...\n');
-
+            
     let tokenFound = false;
     const checkInterval = setInterval(async () => {
       try {
         // Qui potresti implementare logic per leggere token da un file
         // o da un endpoint API della tua app
         
-        console.log('🔍 Controllando nuovi token FCM...');
-        
+                
         // Per ora, simula il controllo
         // In una implementazione reale, potresti:
         // 1. Leggere da un file condiviso
@@ -306,8 +287,7 @@ class FCMNotificationSender {
     // Cleanup dopo 5 minuti
     setTimeout(() => {
       clearInterval(checkInterval);
-      console.log('⏹️ Monitoring interrotto dopo 5 minuti');
-    }, 300000);
+          }, 300000);
   }
 }
 
@@ -323,15 +303,7 @@ class FCMCommandSystem {
    * Mostra menu comandi
    */
   showMenu() {
-    console.log('\n🤖 === SISTEMA AUTOMATIZZATO FCM ===');
-    console.log('Comandi disponibili:');
-    console.log('  test <token>        - Invia notifica di test');
-    console.log('  series <token>      - Invia serie di test');
-    console.log('  monitor             - Avvia monitoring token');
-    console.log('  token               - Genera solo access token');
-    console.log('  help                - Mostra questo menu');
-    console.log('=====================================\n');
-  }
+                                  }
 
   /**
    * Esegue comando
@@ -361,8 +333,7 @@ class FCMCommandSystem {
 
         case 'token':
           const token = await this.sender.tokenManager.getAccessToken();
-          console.log(`🔑 Access Token: ${token}`);
-          break;
+                    break;
 
         case 'help':
           this.showMenu();

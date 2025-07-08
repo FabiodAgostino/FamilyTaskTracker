@@ -11,6 +11,9 @@ import { UserPreferencesProvider } from "./contexts/UserPreferencesContext";
 import UserSettings from "@/components/settings/UserSettings";
 import { useCallback, useEffect, useState } from "react";
 
+// 🔴 NUOVO: Import per sistema prezzi multipli
+import { PriceSelectionManager } from "@/components/shopping/PriceSelectionManager";
+
 // 🔄 RIPRISTINO: Hook hash routing originale (ma con fix iPhone)
 function useHashLocation(): [string, (path: string) => void] {
   const [hash, setHash] = useState(() => {
@@ -57,19 +60,23 @@ function AppContent() {
 
   // 🔄 RIPRISTINO: Switch routing come prima
   return (
-    <Switch>
-      <Route path="/settings">
-        <div className="min-h-screen bg-background">
-          <div className="container mx-auto p-6">
-            <UserSettings />
+    <>
+      <Switch>
+        <Route path="/settings">
+          <div className="min-h-screen bg-background">
+            <div className="container mx-auto p-6">
+              <UserSettings />
+            </div>
           </div>
-        </div>
-      </Route>
+        </Route>
+        
+        <Route>
+          <Dashboard />
+        </Route>
+      </Switch>
       
-      <Route>
-        <Dashboard />
-      </Route>
-    </Switch>
+      <PriceSelectionManager />
+    </>
   );
 }
 

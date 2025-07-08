@@ -5,6 +5,7 @@
 const axios = require('axios');
 const { HeadersManager } = require('./headers-manager');
 const { ContentExtractor } = require('./content-extractor');
+const { PriceDetectorService } = require('./price-detector-service');
 
 class WebScraper {
   constructor(options = {}) {
@@ -12,6 +13,7 @@ class WebScraper {
     this.useRealHeaders = options.useRealHeaders !== false; // Default true
     this.enableDelays = options.enableDelays !== false;     // Default true
     this.maxRetries = options.maxRetries || 1;              // Default 1 tentativo
+    this.priceDetector = new PriceDetectorService();
   }
 
   /**
@@ -59,7 +61,7 @@ class WebScraper {
         if (isJSHeavy) {
           console.log('⚠️ Detected JavaScript-heavy page - content might be incomplete');
         }
-        
+       
         // Pulizia HTML
         const cleanedHtml = ContentExtractor.cleanHtml(response.data);
         
@@ -70,7 +72,8 @@ class WebScraper {
           cleanedLength: cleanedHtml.length,
           isJSHeavy: isJSHeavy,
           headers: response.headers,
-          status: response.status
+          status: response.status,
+          raw: response.data
         };
       }
 
@@ -164,17 +167,27 @@ class WebScraper {
   /**
    * Estrae contenuto completo da HTML
    */
-  extractContent(html) {
+  async extractContent(html, url,raw) {
     try {
       // Estrazione testo completo
       const allText = ContentExtractor.extractAllText(html);
-      
-      // Tentativo estrazione prezzo aggressiva come fallback
-      const aggressivePrice = ContentExtractor.extractPricesAggressively(html);
-      
+      if(raw)
+      {
+        console.warn("RAW AVAILABLE!");
+        const oneLine = raw
+          .replace(/[\r\n]+/g, ' ')   // sostituisce CR/LF con spazio
+          .replace(/\s\s+/g, ' ')     // collassa spazi ripetuti
+          .trim();
+        console.log(oneLine);
+
+      }
+      const detectedPrices = await this.priceDetector.detectMultiplePrices(
+                    raw, // ← USA .text come nel vecchio codice
+                    undefined
+                );
       return {
         text: allText,
-        aggressivePrice: aggressivePrice,
+        detectedPrices: detectedPrices,
         length: allText.length
       };
       
@@ -182,7 +195,7 @@ class WebScraper {
       console.error('❌ Errore estrazione contenuto:', error.message);
       return {
         text: html.substring(0, 20000), // Fallback: primi 10k caratteri
-        aggressivePrice: null,
+        detectedPrices: [],
         length: html.length,
         error: error.message
       };
@@ -213,7 +226,7 @@ class WebScraper {
     }
     
     // Step 2: Estrazione contenuto
-    const content = this.extractContent(scrapingResult.html);
+    const content = await this.extractContent(scrapingResult.html, url, scrapingResult.raw);
     
     // Step 3: Preparazione risultato
     const result = {
@@ -221,6 +234,7 @@ class WebScraper {
       url: url,
       content: {
         text: content.text,
+        detectedPrices: content.detectedPrices,
         length: content.length
       },
       metadata: {

@@ -10,10 +10,8 @@ import {
   Repeat,
   AlertCircle,
   CheckCircle,
-  Pause,
   Trash2,
   Edit3,
-  Globe,
   Lock,
   MoreHorizontal
 } from 'lucide-react';
@@ -39,9 +37,9 @@ import { useAuthContext } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { format, isAfter, isBefore, isToday, isTomorrow } from 'date-fns';
+import { format, isBefore, isToday, isTomorrow } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { RecurrencePattern, Reminder } from '@/lib/models/reminder';
+import { Reminder } from '@/lib/models/reminder';
 
 
 export const RemindersTab = React.forwardRef<{ openModal: () => void }>((props, ref) => {
@@ -224,55 +222,7 @@ export const RemindersTab = React.forwardRef<{ openModal: () => void }>((props, 
     }
   };
 
- const handleSnoozeReminder = async (reminder: Reminder, minutes: number) => {
-  try {
-    const snoozeUntil = new Date(Date.now() + minutes * 60 * 1000);
-    
-    // ✅ Usa il metodo della classe Reminder per aggiornare correttamente
-    const reminderInstance = new Reminder(
-      reminder.id,
-      reminder.title,
-      reminder.message,
-      reminder.scheduledTime,
-      reminder.createdBy,
-      reminder.createdAt,
-      reminder.updatedAt,
-      reminder.isActive,
-      reminder.isPublic,
-      reminder.isRecurring,
-      reminder.recurrencePattern,
-      reminder.reminderType,
-      reminder.notificationSent,
-      reminder.notificationSentAt,
-      reminder.cloudTaskId,
-      reminder.lastTriggered,
-      reminder.triggerCount,
-      reminder.priority,
-      reminder.tags,
-      reminder.notes,
-      reminder.snoozeUntil,
-      reminder.completedAt
-    );
-    
-    // Usa il metodo snooze della classe
-    reminderInstance.snooze(minutes);
-    
-    // Aggiorna con i dati serializzati per Firestore
-    await updateReminder(reminder.id, reminderInstance.toFirestore());
-    
-    toast({
-      title: 'Promemoria posticipato',
-      description: `Promemoria posticipato di ${minutes} minuti`,
-    });
-  } catch (error) {
-    console.error('Errore nel posticipare il promemoria:', error);
-    toast({
-      title: 'Errore',
-      description: 'Impossibile posticipare il promemoria',
-      variant: 'destructive',
-    });
-  }
-};
+
 
   const handleEditReminder = (reminder: Reminder) => {
     setEditReminder(reminder);
@@ -302,14 +252,7 @@ export const RemindersTab = React.forwardRef<{ openModal: () => void }>((props, 
     return types[type] || types['other'];
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'text-red-600 bg-red-50 border-red-200';
-      case 'medium': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-      case 'low': return 'text-green-600 bg-green-50 border-green-200';
-      default: return 'text-gray-600 bg-gray-50 border-gray-200';
-    }
-  };
+
 
   const formatReminderTime = (date: Date) => {
     if (isToday(date)) {
@@ -498,7 +441,7 @@ export const RemindersTab = React.forwardRef<{ openModal: () => void }>((props, 
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-cambridge-newStyle" />
-              <span className="font-medium text-sm">Filtri</span>
+              <span className="font-medium text-sm">Filtri di ricerca</span>
             </div>
             {isMobile && (
               <Button variant="ghost" size="sm" onClick={toggleFilters}>

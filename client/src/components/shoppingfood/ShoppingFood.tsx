@@ -2,7 +2,7 @@
 // SHOPPING FOOD COMPONENT - Versione Semplificata e Corretta
 // ==============================================================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   ShoppingCart, 
   Plus, 
@@ -20,8 +20,7 @@ import {
   Circle,
   ChevronDown,
   ChevronUp,
-  Filter,
-  CircleCheckBig
+  Filter
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,7 +29,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Progress } from '@/components/ui/progress';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
@@ -43,6 +42,7 @@ import { cn } from '@/lib/utils';
 import { ShoppingFood, CategoryFood, Supermarket, ShoppingFoodItem } from '@/lib/models/food';
 import { FaCartShopping } from 'react-icons/fa6';
 import { DeepSeekCategorizationClient } from '@/lib/deepseek-client';
+import { LoadingScreen, useLoadingTransition } from '../ui/loading-screen';
 
 interface ShoppingFoodComponentProps {
   className?: string;
@@ -77,9 +77,12 @@ const {
   data: allListsForCategorization 
 } = useFirestore<ShoppingFood>('shopping_food', { includeDeleted: true });
 const { 
-  data: trashedLists, 
-  loading: trashedLoading 
+  data: trashedLists
 } = useFirestore<ShoppingFood>('shopping_food', { onlyDeleted: true });
+
+
+const {showLoading } = useLoadingTransition(listsLoading, shoppingLists);
+
 
   // Stati principali - semplificati
   const [selectedList, setSelectedList] = useState<ShoppingFood | null>(null);
@@ -670,34 +673,14 @@ const handlePermanentDelete = async (listId: string) => {
     return selectedList.getCompletionStats();
   };
 
-  const groupItemsByCategory = (items: ShoppingFoodItem[]) => {
-    const grouped = new Map<string, ShoppingFoodItem[]>();
-    
-    items.forEach(item => {
-      const category = item.category || 'Altro';
-      if (!grouped.has(category)) {
-        grouped.set(category, []);
-      }
-      grouped.get(category)!.push(item);
-    });
-    
-    return grouped;
-  };
-
   // Loading state
-  if (listsLoading) {
-    return (
-      <div className="container mx-auto p-6 max-w-7xl">
-        <div className="flex justify-center items-center py-20">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cambridge-newStyle"></div>
-          <span className="ml-3 text-gray-600">Caricamento Spesa...</span>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className={cn("container mx-auto p-6 max-w-7xl", className)}>
+return (
+  <LoadingScreen
+    isVisible={showLoading}
+    title="Caricamento Lista della spesa"
+    subtitle="Recupero degli articoli..."
+  >
+      <div className={cn("container mx-auto p-6 max-w-7xl", className)}>
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex-1">
@@ -763,7 +746,7 @@ const handlePermanentDelete = async (listId: string) => {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-cambridge-newStyle" />
-              <span className="font-medium text-delft-blue">Filtri</span>
+              <span className="font-medium text-delft-blue">Filtri di ricerca</span>
             </div>
             <Button
               variant="ghost"
@@ -1666,5 +1649,7 @@ const handlePermanentDelete = async (listId: string) => {
   </DialogContent>
 </Dialog>
         </div>
-  );
+  </LoadingScreen>
+);
+
 }

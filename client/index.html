@@ -605,8 +605,7 @@ html, body {
                 const versionData = await response.json();
                 const versionElement = document.getElementById('versionText');
                 
-                console.log('Version data loaded:', versionData);
-                
+                                
                 if (versionData.major !== undefined && versionData.minor !== undefined && versionData.patch !== undefined) {
                     const versionString = `v${versionData.major}.${versionData.minor}.${versionData.patch}`;
                     const buildString = versionData.build ? `.${versionData.build}` : '';
@@ -617,8 +616,7 @@ html, body {
                     versionElement.textContent = 'v1.0.0';
                 }
             } catch (error) {
-                console.log('Version file not found:', error);
-                document.getElementById('versionText').textContent = 'v1.0.0';
+                                document.getElementById('versionText').textContent = 'v1.0.0';
             }
         }
 
@@ -648,20 +646,16 @@ html, body {
             
             // Se non deve mostrare splash, nascondila subito
             if (!shouldShowSplash()) {
-                console.log('Browser: splash già vista in questa sessione - saltata');
-                splash.classList.add('hidden');
+                                splash.classList.add('hidden');
                 return;
             }
 
-            console.log('Mostrando splash screen...');
-            console.log('Modalità:', isPWA() ? 'PWA (sempre)' : 'Browser (prima volta)');
-            
+                                    
             // Mobile: nascondi splash iOS nativa se PWA
             if (isMobile() && isPWA()) {
                 // Aspetta un momento per far passare la splash nativa iOS
                 setTimeout(() => {
-                    console.log('PWA mobile: mostrando animazione dopo splash nativa');
-                }, 1000);
+                                    }, 1000);
             }
 
             // Controlla caricamento React
@@ -670,8 +664,7 @@ html, body {
                 const isReactLoaded = root && root.children.length > 0;
                 
                 if (isReactLoaded) {
-                    console.log('React loaded! Root has', root.children.length, 'children');
-                }
+                                    }
                 
                 return isReactLoaded;
             }
@@ -680,16 +673,14 @@ html, body {
             let checkInterval = 200;
             let elapsedTime = 0;
             
-            console.log('Waiting for React to load...');
-            
+                        
             const waitForReact = setInterval(() => {
                 elapsedTime += checkInterval;
                 
                 if (checkReactLoaded()) {
                     // React caricato!
                     clearInterval(waitForReact);
-                    console.log('React loaded! Hiding splash in 4 seconds...');
-                    
+                                        
                     // Marca come vista solo per browser
                     markSplashAsShown();
                     
@@ -726,17 +717,14 @@ html, body {
                     }, 800);
                 } else {
                     if (elapsedTime % 2000 === 0) {
-                        console.log(`Waiting for React... ${elapsedTime/1000}s elapsed`);
-                    }
+                                            }
                 }
             }, checkInterval);
         }
 
         // Inizializza tutto
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('Modalità app:', isPWA() ? 'PWA' : 'Browser');
-            console.log('Device type:', isMobile() ? 'Mobile' : 'Desktop');
-            
+                                    
             loadVersion(); // Carica subito la versione
             animateText();
             handleSplash();
@@ -744,8 +732,7 @@ html, body {
 
         // Click per saltare (solo per testing)
         document.getElementById('splash').addEventListener('click', () => {
-            console.log('Splash clicked - skipping');
-            const splash = document.getElementById('splash');
+                        const splash = document.getElementById('splash');
             markSplashAsShown();
             splash.classList.add('fade-out');
             setTimeout(() => {

@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { VersionBadge, MobileVersionBadge } from '@/components/common/VersionBadge';
+import { NotificationCenter } from '../user/NotificationCenter';
 
 interface HeaderProps {
   onMenuToggle: () => void;
@@ -75,6 +76,7 @@ const { permission, requestPermission, isSupported, token, debug, isInitializing
   const AppIcon = appConfig.icon;
 
   return (
+    <>
     <header className="bg-card shadow-md border-b border-border sticky top-0 z-50 transition-colors duration-200">
       <div className="px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
@@ -127,8 +129,9 @@ const { permission, requestPermission, isSupported, token, debug, isInitializing
           <div className="flex items-center space-x-3">
             
             {/* 🆕 AGGIUNTO: Version Badge - Desktop */}
-            <div className="hidden md:block">
+            <div className="hidden md:flex items-center space-x-2">
               <VersionBadge variant="default" />
+              <NotificationCenter variant="desktop" />
             </div>
 
             {/* 🆕 AGGIUNTO: Version Badge - Tablet (compatto) */}
@@ -261,7 +264,9 @@ const { permission, requestPermission, isSupported, token, debug, isInitializing
             </DropdownMenu>
 
             {/* 🔧 FIXED: Mobile user icon - Dimensioni aumentate */}
-            <div className="sm:hidden">
+            <div className="sm:hidden flex items-center space-x-2">
+                <NotificationCenter variant="mobile" />
+
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button 
@@ -361,7 +366,7 @@ const { permission, requestPermission, isSupported, token, debug, isInitializing
                   )}
                   
                   <DropdownMenuSeparator />
-                  
+
                   <DropdownMenuItem 
                     onClick={logout} 
                     className="flex items-center cursor-pointer text-destructive focus:text-destructive"
@@ -376,5 +381,6 @@ const { permission, requestPermission, isSupported, token, debug, isInitializing
         </div>
       </div>
     </header>
+    </>
   );
 }

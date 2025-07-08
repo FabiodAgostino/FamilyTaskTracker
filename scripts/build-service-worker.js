@@ -12,8 +12,7 @@ const currentDir = process.cwd();
 const envPath = path.join(currentDir, '.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath });
-  console.log('✅ File .env caricato da:', envPath);
-} else {
+  } else {
   console.warn('⚠️ File .env non trovato in:', envPath);
 }
 // Get __dirname equivalent in ES modules
@@ -44,8 +43,7 @@ function buildServiceWorker() {
 
     // Verifica che il template esista
      if (!fs.existsSync(templatePath)) {
-      console.log('ℹ️  Template non trovato, utilizzando Service Worker manuale');
-      return true; // ← Restituisci successo invece di errore
+            return true; // ← Restituisci successo invece di errore
     }
 
     // Leggi il template

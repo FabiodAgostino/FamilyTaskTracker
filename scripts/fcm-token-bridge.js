@@ -30,8 +30,7 @@ class FCMTokenBridge {
       if (fs.existsSync(WATCHED_TOKENS_FILE)) {
         const data = JSON.parse(fs.readFileSync(WATCHED_TOKENS_FILE, 'utf8'));
         this.watchedTokens = new Set(data.tokens || []);
-        console.log(`📂 Caricati ${this.watchedTokens.size} token già processati`);
-      }
+              }
     } catch (error) {
       console.warn('⚠️ Impossibile caricare token watched:', error.message);
     }
@@ -74,11 +73,9 @@ class FCMTokenBridge {
       const existingIndex = bridgeData.tokens.findIndex(t => t.token === token);
       if (existingIndex >= 0) {
         bridgeData.tokens[existingIndex] = { ...bridgeData.tokens[existingIndex], ...tokenData };
-        console.log('🔄 Token aggiornato nel bridge');
-      } else {
+              } else {
         bridgeData.tokens.push(tokenData);
-        console.log('✅ Nuovo token registrato nel bridge');
-      }
+              }
 
       // Salva
       fs.writeFileSync(TOKEN_BRIDGE_FILE, JSON.stringify(bridgeData, null, 2));
@@ -112,8 +109,7 @@ class FCMTokenBridge {
    */
   async sendWelcomeNotification(token) {
     if (this.watchedTokens.has(token)) {
-      console.log('🔄 Token già processato, skip welcome');
-      return;
+            return;
     }
 
     try {
@@ -133,8 +129,7 @@ class FCMTokenBridge {
       this.watchedTokens.add(token);
       this.saveWatchedTokens();
       
-      console.log('✅ Notifica di benvenuto inviata');
-    } catch (error) {
+          } catch (error) {
       console.error('❌ Errore invio welcome:', error.message);
     }
   }
@@ -143,9 +138,7 @@ class FCMTokenBridge {
    * Avvia monitoring automatico
    */
   async startAutoMonitoring() {
-    console.log('🤖 Avviando monitoring automatico FCM...');
-    console.log('💡 I token verranno catturati automaticamente dalla tua app\n');
-
+        
     const monitorInterval = setInterval(async () => {
       try {
         const tokens = this.getAvailableTokens();
@@ -155,16 +148,13 @@ class FCMTokenBridge {
           
           // Invia welcome se è un nuovo token
           if (!this.watchedTokens.has(token)) {
-            console.log(`🆕 Nuovo token trovato: ${token.substring(0, 20)}...`);
-            await this.sendWelcomeNotification(token);
+                        await this.sendWelcomeNotification(token);
           }
         }
 
         if (tokens.length > 0) {
-          console.log(`🔍 Monitoring attivo: ${tokens.length} token(s) registrati`);
-        } else {
-          console.log('⏳ In attesa di token FCM dalla tua app...');
-        }
+                  } else {
+                  }
         
       } catch (error) {
         console.error('❌ Errore monitoring:', error.message);
@@ -174,12 +164,9 @@ class FCMTokenBridge {
     // Cleanup dopo 30 minuti
     setTimeout(() => {
       clearInterval(monitorInterval);
-      console.log('\n⏹️ Monitoring interrotto dopo 30 minuti');
-      console.log('💡 Riavvia con: npm run fcm:bridge:start');
-    }, 1800000);
+                }, 1800000);
 
-    console.log('ℹ️  Monitoring attivo. Premi Ctrl+C per interrompere.');
-  }
+      }
 
   /**
    * Testa tutti i token disponibili
@@ -188,29 +175,22 @@ class FCMTokenBridge {
     const tokens = this.getAvailableTokens();
     
     if (tokens.length === 0) {
-      console.log('❌ Nessun token disponibile per il test');
-      console.log('💡 Prima attiva le notifiche nella tua app');
-      return;
+                  return;
     }
 
-    console.log(`🎯 Testando ${tokens.length} token(s) disponibili...\n`);
-
+    
     for (let i = 0; i < tokens.length; i++) {
       const { token, userInfo } = tokens[i];
       
       try {
-        console.log(`🧪 Test ${i + 1}/${tokens.length}`);
-        console.log(`👤 User: ${userInfo.username || 'Unknown'}`);
-        console.log(`🎯 Token: ${token.substring(0, 20)}...`);
-        
+                                
         const notification = {
           title: `🧪 Test Automatico ${i + 1}`,
           body: `Notifica di test per ${userInfo.username || 'utente'}`
         };
 
         await this.sender.sendNotification(token, notification);
-        console.log(`✅ Test ${i + 1} completato\n`);
-        
+                
         // Pausa tra i test
         if (i < tokens.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 2000));
@@ -221,8 +201,7 @@ class FCMTokenBridge {
       }
     }
 
-    console.log('🎉 Test su tutti i token completato!');
-  }
+      }
 
   /**
    * Pulisce token vecchi
@@ -239,8 +218,7 @@ class FCMTokenBridge {
 
       if (validTokens.length < tokens.length) {
         const removed = tokens.length - validTokens.length;
-        console.log(`🧹 Rimossi ${removed} token(s) scaduti`);
-        
+                
         const bridgeData = { tokens: validTokens };
         fs.writeFileSync(TOKEN_BRIDGE_FILE, JSON.stringify(bridgeData, null, 2));
       }
@@ -258,21 +236,15 @@ class FCMTokenBridge {
   showStats() {
     const tokens = this.getAvailableTokens();
     
-    console.log('\n📊 === STATISTICHE FCM BRIDGE ===');
-    console.log(`🎯 Token registrati: ${tokens.length}`);
-    console.log(`👀 Token processati: ${this.watchedTokens.size}`);
-    
+                
     if (tokens.length > 0) {
-      console.log('\n📱 Token attivi:');
-      tokens.forEach((tokenData, index) => {
+            tokens.forEach((tokenData, index) => {
         const { userInfo, registeredAt } = tokenData;
         const age = Math.floor((Date.now() - new Date(registeredAt).getTime()) / (1000 * 60));
-        console.log(`  ${index + 1}. ${userInfo.username || 'Unknown'} (${age}m fa)`);
-      });
+              });
     }
     
-    console.log('================================\n');
-  }
+      }
 }
 
 /**
@@ -312,15 +284,7 @@ async function main() {
       break;
 
     default:
-      console.log('\n🌉 === FCM TOKEN BRIDGE ===');
-      console.log('Comandi disponibili:');
-      console.log('  start     - Avvia monitoring automatico');
-      console.log('  test      - Testa tutti i token disponibili');
-      console.log('  stats     - Mostra statistiche');
-      console.log('  cleanup   - Pulisce token vecchi');
-      console.log('  register  - Registra token manualmente');
-      console.log('============================\n');
-  }
+                                                  }
 }
 
 // Esegui se chiamato direttamente

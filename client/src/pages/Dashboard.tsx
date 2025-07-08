@@ -9,6 +9,7 @@ import { useAuthContext } from '@/contexts/AuthContext';
 import AdminPanel from '@/components/admin/AdministratorPanel';
 import { ShoppingFoodComponent } from '@/components/shoppingfood/ShoppingFood';
 import { AutoFCMManager } from '@/components/admin/AutoFCMManager';
+import { NotificationCenter } from '@/components/user/NotificationCenter';
 
 export default function Dashboard() {
   const { user } = useAuthContext();
@@ -25,6 +26,10 @@ export default function Dashboard() {
 
          <Route path="/notification">
           {() => <AutoFCMManager />}
+        </Route>
+
+         <Route path="/notificationcenter">
+          {() => <NotificationCenter />}
         </Route>
 
         
