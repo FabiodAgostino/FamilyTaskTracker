@@ -103,7 +103,6 @@ export function ShoppingList() {
     update: updateItem, 
     remove: deleteItem 
   } = useFirestore<ShoppingItem>('shopping_items');
-  console.log('itemsLoading:', itemsLoading, 'items:', items?.length);
 
 const { data: categories } = useDynamicCategories();
 

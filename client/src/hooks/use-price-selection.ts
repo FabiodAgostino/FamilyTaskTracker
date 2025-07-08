@@ -105,7 +105,7 @@ export function usePriceSelection() {
     }
 
     const filtered = fixedItems.filter(item => {
-      const needsSelection = item.needsPriceSelection === true;
+      const needsSelection = item.needsPriceSelection === true && item.priceSelection?.status!=="skipped";
       const notCompleted = item.completed === false;
       const userCanAccess = user?.username === item.createdBy || user?.role === 'admin';
       const pricesCount = getDetectedPricesCount(item);
@@ -131,8 +131,6 @@ export function usePriceSelection() {
    * ✅ Auto-apri modale se ci sono item pending
    */
   useEffect(() => {
-    console.group('🎯 Auto-open logic');
-                
     const shouldOpen = pendingItems.length > 0 && !isModalOpen && !currentItem;
         
     if (shouldOpen) {
@@ -243,12 +241,9 @@ export function usePriceSelection() {
             
       // Aggiorna l'item per nasconderlo temporaneamente
       await updateItem(itemId, {
-        needsPriceSelection: false,
-        priceSelection: {
-          status: 'skipped',
-          detectedPrices: []
-        }
-      });
+  needsPriceSelection: true,
+  'priceSelection.status': 'skipped',
+} as any);
       
       closeModalAndNext();
       

@@ -77,7 +77,6 @@ export function PriceSelectionModal({
   }
 
   const detectedPrices = item.priceSelection.detectedPrices;
-    
   // 🔧 DEBUG: Verifica confidence per ogni prezzo
   detectedPrices.forEach((price, index) => {
       });

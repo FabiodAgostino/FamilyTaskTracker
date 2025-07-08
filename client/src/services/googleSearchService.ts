@@ -29,7 +29,6 @@ export class GoogleSearchService {
       var searchQuery = `"${name}"`;
       if(brand)
         searchQuery+= ` "${brand}"`
-      alert(searchQuery)
       if (searchQuery === null)
         throw "searchQuery null";
      const params = new URLSearchParams({

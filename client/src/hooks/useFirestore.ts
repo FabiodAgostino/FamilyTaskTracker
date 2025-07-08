@@ -225,7 +225,6 @@ export function useFirestore<T>(
       var u = updateData as any;
       // Aggiungi sempre updatedAt
       u.updatedAt = Timestamp.now();
-      
       await updateDoc(docRef, u);
     } catch (error) {
       console.error('Errore durante l\'aggiornamento:', error);
