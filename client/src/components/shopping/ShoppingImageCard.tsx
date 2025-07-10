@@ -485,7 +485,7 @@ export function ShoppingImageCard({
                       <p>Modifica</p>
                     </TooltipContent>
                   </Tooltip>
-                  
+                  {item.priceSelection?.selectedCssSelector=="[data-json-price]"? "ciaooo" : ""}
                   <AlertDialog>
                     <Tooltip>
                       <TooltipTrigger asChild>

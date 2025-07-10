@@ -2,26 +2,23 @@
 
 const { getFirestore } = require('firebase-admin/firestore');
 const { WebScraper } = require('./web-scraper');
-const { DeepSeekClient } = require('./deepseek-client');
-const { ContentExtractor } = require('./content-extractor');
 const { PriceDetectorService } = require('./price-detector-service');
 const { emailService } = require('./email-service');
-const cheerio = require('cheerio');
 
 class PriceMonitorService {
     constructor() {
         this.db = getFirestore();
         this.conversationId = null;
         this.priceDetector = new PriceDetectorService();
-        this.stats = {
+       this.stats = {
             total: 0,
             processed: 0,
-            completed: 0,         // Item completati saltati
-            legacyUrlMode: 0,     // Item con scrapingMode = url_legacy saltati
-            noPriceSelection: 0,  // Item senza priceSelection saltati
-            samePrice: 0,         // Prezzo presente e invariato
-            priceChanged: 0,      // Solo questi aggiornano il DB
-            deepseekCalls: 0,
+            completed: 0,
+            legacyUrlMode: 0,
+            noPriceSelection: 0,
+            samePrice: 0,
+            priceChanged: 0,
+            cssSelectorFailed: 0,  // ✅ NUOVO: conta fallimenti CSS
             dbWrites: 0,
             errors: 0
         };
@@ -117,28 +114,9 @@ class PriceMonitorService {
                     cssSelector: monitoringResult.cssSelector,
                     confidence: monitoringResult.confidence
                 };
-            } else if (monitoringResult.status === 'price_not_found' || monitoringResult.status === 'css_selector_failed') {
-                // Fallback a DeepSeek solo se CSS selector fallisce completamente
-                console.log(`🤖 Fallback DeepSeek necessario: ${monitoringResult.status}`);
-                
-                if (!this.conversationId) {
-                    this.conversationId = await this.initializePriceMonitoringConversation();
-                }
-
-                const analysisResult = await this.analyzePriceWithDeepSeek(
-                    scrapingResult.content.text,
-                    url,
-                    mockCurrentData
-                );
-
-                if (analysisResult) {
-                    const deepSeekChanges = this.detectChanges(mockCurrentData, analysisResult);
-                    if (deepSeekChanges.hasChanges) {
-                        needsUpdate = true;
-                        changes = deepSeekChanges;
-                        changes.fallbackMethod = 'deepseek';
-                    }
-                }
+            } else if (monitoringResult.skipItem) {
+                console.log(`⏩ Skip item: ${monitoringResult.status}`);
+                // Non aggiornare nulla, vai avanti
             }
 
             // Step 5: 💾 AGGIORNAMENTO FIRESTORE (se necessario)
@@ -288,97 +266,119 @@ class PriceMonitorService {
         };
     }
 
-    /**
-     * 🎯 CORE: Monitoraggio prezzo con CSS selector targeting
-     */
-    async monitorPriceWithCssSelector(htmlContent, itemData) {
-        try {
-            const priceSelection = itemData.priceSelection;
-            const currentPrice = itemData.estimatedPrice;
-            const cssSelector = priceSelection.selectedCssSelector;
-            
-            console.log(`🎯 Monitoraggio CSS selector: "${cssSelector}"`);
-            console.log(`📊 Prezzo attuale: ${currentPrice}`);
+   async monitorPriceWithCssSelector(htmlContent, itemData) {
+    try {
+        const priceSelection = itemData.priceSelection;
+        const currentPrice = itemData.estimatedPrice;
+        const selectedCssSelector = priceSelection.selectedCssSelector;
+        const selectedPriceIndex = priceSelection.selectedPriceIndex || 0;
+        
+        console.log(`🎯 Monitoraggio CSS selector: "${selectedCssSelector}"`);
+        console.log(`📊 Prezzo attuale: ${currentPrice}`);
 
-            const $ = cheerio.load(htmlContent);
-            
-            // Step 1: Prova CSS selector specifico
-            const targetElement = $(cssSelector);
-            
-            if (targetElement.length === 0) {
-                console.log(`❌ CSS selector "${cssSelector}" non trova elementi`);
-                return {
-                    status: 'css_selector_failed',
-                    cssSelector: cssSelector,
-                    error: 'Selector non trova elementi',
-                    fallbackNeeded: true
-                };
-            }
-
-            console.log(`✅ CSS selector trovato ${targetElement.length} elementi`);
-
-            // Step 2: Estrai prezzo dal primo elemento
-            const elementText = targetElement.first().text().trim();
-            console.log(`📋 Testo elemento: "${elementText}"`);
-
-            // Step 3: Usa PriceDetectorService per estrarre prezzo dal testo
-            const extractedPrices = this.priceDetector.extractPricesFromText(elementText);
-            
-            if (extractedPrices.length === 0) {
-                console.log(`❌ Nessun prezzo estratto dal testo: "${elementText}"`);
-                return {
-                    status: 'price_not_found',
-                    cssSelector: cssSelector,
-                    elementText: elementText,
-                    error: 'Nessun prezzo trovato nel selector',
-                    fallbackNeeded: true
-                };
-            }
-
-            const foundPrice = extractedPrices[0];
-            const newPrice = foundPrice.numericValue;
-            
-            console.log(`💰 Prezzo estratto: ${newPrice} (dal testo: "${foundPrice.value}")`);
-
-            // Step 4: Confronta con prezzo attuale
-            const priceChanged = Math.abs(newPrice - currentPrice) > 0.01; // Tolleranza centesimi
-            
-            if (priceChanged) {
-                console.log(`🔄 PREZZO CAMBIATO: ${currentPrice} → ${newPrice}`);
-                return {
-                    status: 'price_changed',
-                    cssSelector: cssSelector,
-                    oldPrice: currentPrice,
-                    newPrice: newPrice,
-                    elementText: elementText,
-                    extractedValue: foundPrice.value,
-                    confidence: 0.95, // Alta confidenza per CSS selector specifico
-                    analysisData: {
-                        estimatedPrice: newPrice,
-                        name: itemData.name, // Mantieni nome esistente
-                        method: 'css_selector_targeting'
-                    }
-                };
-            } else {
-                console.log(`✅ Prezzo invariato: ${currentPrice}`);
-                return {
-                    status: 'price_unchanged',
-                    cssSelector: cssSelector,
-                    currentPrice: currentPrice,
-                    elementText: elementText,
-                    extractedValue: foundPrice.value
-                };
-            }
-
-        } catch (error) {
-            console.error(`❌ Errore monitoraggio CSS selector:`, error);
+        // ✅ USA IL NUOVO PriceDetectorService per rilevamento completo
+        const detectionResult = await this.priceDetector.detectMultiplePrices(htmlContent);
+        
+        if (detectionResult.status === 'no_prices_detected') {
+            console.log(`❌ Nessun prezzo rilevato nella pagina`);
             return {
-                status: 'css_selector_error',
-                error: error.message,
-                fallbackNeeded: true
+                status: 'no_prices_detected',
+                error: 'Nessun prezzo trovato nella pagina',
+                skipItem: true
             };
         }
+
+        // ✅ CERCA il CSS selector specifico nei prezzi rilevati
+        const detectedPrices = detectionResult.detectedPrices;
+        let matchingPrice = null;
+        
+        // Prova prima il CSS selector principale
+        matchingPrice = detectedPrices.find(price => 
+            price.cssSelector === selectedCssSelector
+        );
+        
+        // ✅ FALLBACK: Prova alternativeSelectors se disponibili
+        if (!matchingPrice && priceSelection.detectedPrices && 
+            priceSelection.detectedPrices[selectedPriceIndex]?.alternativeSelectors) {
+            
+            const alternativeSelectors = priceSelection.detectedPrices[selectedPriceIndex].alternativeSelectors;
+            
+            for (const altSelector of alternativeSelectors) {
+                matchingPrice = detectedPrices.find(price => 
+                    price.cssSelector === altSelector.cssSelector
+                );
+                if (matchingPrice) {
+                    console.log(`✅ Trovato con selector alternativo: ${altSelector.cssSelector}`);
+                    break;
+                }
+            }
+        }
+        
+        // ✅ FALLBACK: Prova per valore numerico simile (tolleranza 5%)
+        if (!matchingPrice) {
+            const tolerance = currentPrice * 0.05; // 5% di tolleranza
+            matchingPrice = detectedPrices.find(price => 
+                Math.abs(price.numericValue - currentPrice) <= tolerance
+            );
+            if (matchingPrice) {
+                console.log(`✅ Trovato per valore simile: ${matchingPrice.value} (tolleranza ±5%)`);
+            }
+        }
+
+        if (!matchingPrice) {
+            console.log(`❌ CSS selector "${selectedCssSelector}" non trova corrispondenze`);
+            console.log(`📋 Selettori disponibili: ${detectedPrices.map(p => p.cssSelector).join(', ')}`);
+            return {
+                status: 'css_selector_not_found',
+                selectedCssSelector: selectedCssSelector,
+                availableSelectors: detectedPrices.map(p => p.cssSelector),
+                skipItem: true
+            };
+        }
+
+        const newPrice = matchingPrice.numericValue;
+        console.log(`💰 Prezzo estratto: ${newPrice} (dal selector: "${matchingPrice.cssSelector}")`);
+
+        // ✅ CONFRONTA con tolleranza centesimi
+        const priceChanged = Math.abs(newPrice - currentPrice) > 0.01;
+        
+        if (priceChanged) {
+            console.log(`🔄 PREZZO CAMBIATO: ${currentPrice} → ${newPrice}`);
+            return {
+                status: 'price_changed',
+                cssSelector: matchingPrice.cssSelector,
+                oldPrice: currentPrice,
+                newPrice: newPrice,
+                confidence: matchingPrice.confidence,
+                source: matchingPrice.source,
+                analysisData: {
+                    estimatedPrice: newPrice,
+                    name: itemData.name,
+                    method: 'css_selector_targeting',
+                    detectionConfidence: matchingPrice.confidence,
+                    usedSelector: matchingPrice.cssSelector
+                }
+            };
+        } else {
+            console.log(`✅ Prezzo invariato: ${currentPrice}`);
+            return {
+                status: 'price_unchanged',
+                cssSelector: matchingPrice.cssSelector,
+                currentPrice: currentPrice,
+                newPrice: newPrice
+            };
+        }
+
+    } catch (error) {
+        console.error(`❌ Errore monitoraggio CSS selector:`, error);
+        return {
+            status: 'css_selector_error',
+            error: error.message,
+            skipItem: true
+        };
     }
+}
+    
 
     /**
      * 🎯 FUNZIONE PRINCIPALE: Monitoraggio ottimizzato con CSS selector targeting
@@ -405,7 +405,7 @@ class PriceMonitorService {
                 noPriceSelection: 0,
                 samePrice: 0,
                 priceChanged: 0,
-                deepseekCalls: 0,
+                cssSelectorFailed: 0,
                 dbWrites: 0,
                 errors: 0
             },
@@ -457,9 +457,6 @@ class PriceMonitorService {
                 };
             }
 
-            // Step 2: Inizializza conversazione DeepSeek (per fallback)
-            this.conversationId = await this.initializePriceMonitoringConversation();
-            
             // Step 3: Monitora ogni item con CSS selector targeting
             const changesSummary = [];
             
@@ -705,47 +702,10 @@ class PriceMonitorService {
             }
 
             // Step 5: ✅ FALLBACK DEEPSEEK (se CSS selector fallisce)
-            if (monitoringResult.fallbackNeeded) {
-                console.log(`🤖 Fallback DeepSeek necessario per ${itemData.name}: ${monitoringResult.status}`);
-                this.stats.deepseekCalls++;
-                
-                const analysisResult = await this.analyzePriceWithDeepSeek(
-                    scrapingResult.content.text,
-                    itemData.link,
-                    itemData
-                );
-
-                if (!analysisResult) {
-                    console.log(`⚠️ Analisi DeepSeek fallita per ${itemData.name}`);
-                    return null;
-                }
-
-                const changes = this.detectChanges(itemData, analysisResult);
-
-                if (changes.hasChanges) {
-                    console.log(`💾 AGGIORNAMENTO DB per ${itemData.name}: cambiamenti rilevati via DeepSeek fallback`);
-                    
-                    changes.method = 'deepseek_fallback';
-                    changes.originalMethod = 'css_selector_failed';
-                    
-                    await this.updateItemWithChanges(itemId, itemData, changes, analysisResult, scrapingResult.content.text);
-                    this.stats.dbWrites++;
-                    
-                    if (changes.priceChanged) this.stats.priceChanged++;
-                    
-                    return {
-                        itemId: itemId,
-                        itemName: itemData.name,
-                        itemData: itemData,
-                        changes: changes,
-                        newData: analysisResult,
-                        timestamp: new Date(),
-                        method: 'deepseek_fallback'
-                    };
-                } else {
-                    console.log(`✅ Nessun cambiamento rilevato via DeepSeek fallback per ${itemData.name}`);
-                    return null;
-                }
+           if (monitoringResult.skipItem) {
+                console.log(`⏩ Skip ${itemData.name}: ${monitoringResult.status}`);
+                this.stats.cssSelectorFailed++;
+                return null;
             }
 
             console.log(`✅ Nessun cambiamento per ${itemData.name}`);
@@ -820,41 +780,19 @@ class PriceMonitorService {
     }
 
     /**
-     * ✅ Rileva cambiamenti reali (per fallback DeepSeek)
-     */
-    detectChanges(currentData, newData) {
-        const changes = {
-            hasChanges: false,
-            priceChanged: false,
-            oldPrice: this.extractNumberFromPrice(currentData.estimatedPrice),
-            newPrice: this.extractNumberFromPrice(newData.estimatedPrice)
-        };
-
-        // ✅ Controllo prezzo basato solo su cifre
-        if (changes.oldPrice !== changes.newPrice) {
-            changes.priceChanged = true;
-            changes.hasChanges = true;
-            console.log(`💰 Prezzo cambiato (DeepSeek): ${changes.oldPrice} → ${changes.newPrice}`);
-        }
-
-        return changes;
-    }
-
-    /**
      * 📝 Genera descrizione cambiamenti
      */
     generateChangeDescription(changes, newData) {
-        const descriptions = [];
-        
-        if (changes.priceChanged) {
-            const direction = changes.newPrice > changes.oldPrice ? 'aumentato' : 'diminuito';
-            const method = changes.method === 'css_selector' ? 'CSS selector' : 
-                          changes.method === 'deepseek_fallback' ? 'DeepSeek (fallback)' : 'Sistema automatico';
-            descriptions.push(`Prezzo ${direction}: €${changes.oldPrice} → €${changes.newPrice} (rilevato via ${method})`);
-        }
-        
-        return descriptions.join('; ') || 'Cambiamenti rilevati dal monitoraggio automatico';
+    const descriptions = [];
+    
+    if (changes.priceChanged) {
+        const direction = changes.newPrice > changes.oldPrice ? 'aumentato' : 'diminuito';
+        const method = changes.method === 'css_selector' ? 'CSS selector' : 'Sistema automatico';  // ✅ CORRETTO
+        descriptions.push(`Prezzo ${direction}: €${changes.oldPrice} → €${changes.newPrice} (rilevato via ${method})`);
     }
+    
+    return descriptions.join('; ') || 'Cambiamenti rilevati dal monitoraggio automatico';
+}
 
     /**
      * 📊 Salva il report completo del job su Firestore
@@ -887,7 +825,7 @@ class PriceMonitorService {
                     noPriceSelectionItems: reportData.stats.noPriceSelection,
                     unchangedItems: reportData.stats.samePrice,
                     priceChangedItems: reportData.stats.priceChanged,
-                    deepseekCallsCount: reportData.stats.deepseekCalls,
+                    cssSelectorFailedCount: reportData.stats.cssSelectorFailed,
                     databaseWritesCount: reportData.stats.dbWrites,
                     errorsCount: reportData.stats.errors
                 },
@@ -957,9 +895,9 @@ class PriceMonitorService {
                     legacyUrlSkipped: reportData.stats.legacyUrlMode,
                     noPriceSelectionSkipped: reportData.stats.noPriceSelection,
                     cssSuccessRate: reportData.stats.processed > 0 ? 
-                        Math.round(((reportData.stats.processed - reportData.stats.deepseekCalls) / reportData.stats.processed) * 100) : 0,
-                    deepseekFallbackRate: reportData.stats.processed > 0 ? 
-                        Math.round((reportData.stats.deepseekCalls / reportData.stats.processed) * 100) : 0
+                        Math.round(((reportData.stats.processed - reportData.stats.cssSelectorFailed) / reportData.stats.processed) * 100) : 0,  // ✅
+                    cssSelectorFailureRate: reportData.stats.processed > 0 ? 
+                        Math.round((reportData.stats.cssSelectorFailed / reportData.stats.processed) * 100) : 0  // ✅
                 }
             };
             
@@ -1000,30 +938,31 @@ class PriceMonitorService {
             changeRate: stats.processed > 0 ? Math.round((stats.priceChanged / stats.processed) * 100) : 0,
             
             // Efficienza CSS selector (meno DeepSeek calls = meglio)
-            cssSelectorEfficiency: stats.processed > 0 ? Math.round(((stats.processed - stats.deepseekCalls) / stats.processed) * 100) : 0,
+            cssSelectorEfficiency: stats.processed > 0 ? Math.round(((stats.processed - stats.cssSelectorFailed) / stats.processed) * 100) : 0,  // ✅
             
             // Efficienza database (chiamate DB/items processati)
             dbEfficiency: stats.processed > 0 ? Math.round((stats.dbWrites / stats.processed) * 100) / 100 : 0,
             
             // Classificazione performance
-            performanceClass: this.getPerformanceClass(duration, stats.processed, stats.errors, stats.deepseekCalls)
+            performanceClass: this.getPerformanceClass(duration, stats.processed, stats.errors, stats.cssSelectorFailed)  // ✅
+
         };
     }
 
     /**
      * 📊 Determina la classe di performance del job (aggiornata per CSS targeting)
      */
-    getPerformanceClass(duration, processed, errors, deepseekCalls) {
+    getPerformanceClass(duration, processed, errors, cssSelectorFailed) {  // ✅
         const avgTimePerItem = processed > 0 ? duration / processed : 0;
         const errorPercentage = processed > 0 ? (errors / processed) * 100 : 0;
-        const deepseekFallbackRate = processed > 0 ? (deepseekCalls / processed) * 100 : 0;
+        const cssFailureRate = processed > 0 ? (cssSelectorFailed / processed) * 100 : 0;  // ✅
         
         if (errorPercentage > 20) return 'poor';
         if (avgTimePerItem > 30000) return 'slow'; // > 30s per item
-        if (deepseekFallbackRate > 50) return 'poor'; // Troppi fallback CSS
+        if (cssFailureRate > 50) return 'poor'; // Troppi fallimenti CSS  // ✅
         
-        if (avgTimePerItem < 10000 && errorPercentage < 5 && deepseekFallbackRate < 10) return 'excellent';
-        if (avgTimePerItem < 20000 && errorPercentage < 10 && deepseekFallbackRate < 25) return 'good';
+        if (avgTimePerItem < 10000 && errorPercentage < 5 && cssFailureRate < 10) return 'excellent';  // ✅
+        if (avgTimePerItem < 20000 && errorPercentage < 10 && cssFailureRate < 25) return 'good';  // ✅
         return 'average';
     }
 
@@ -1102,54 +1041,6 @@ class PriceMonitorService {
         }
     }
 
-    async analyzePriceWithDeepSeek(htmlContent, url, currentItemData) {
-        try {
-            const result = await DeepSeekClient.analyzeHtmlWithContext(
-                this.conversationId,
-                htmlContent,
-                url
-            );
-            return this.validateAnalysisResult(result, currentItemData);
-        } catch (error) {
-            console.error('❌ Errore analisi DeepSeek:', error);
-            return null;
-        }
-    }
-
-    validateAnalysisResult(result, currentItemData) {
-        try {
-            // ✅ Validazione prezzo
-            if (result.estimatedPrice) {
-                const extracted = this.extractNumberFromPrice(result.estimatedPrice);
-                result.estimatedPrice = extracted;
-            } else {
-                result.estimatedPrice = null;
-            }
-
-            // ✅ NON aggiornare il nome (mantieni quello esistente)
-            if (!result.name || result.name.trim() === '') {
-                result.name = currentItemData.name;
-            }
-
-            return result;
-        } catch (error) {
-            console.error('❌ Errore validazione risultato:', error);
-            return null;
-        }
-    }
-
-    async initializePriceMonitoringConversation() {
-        try {
-            const conversationId = DeepSeekClient.generateConversationId('price_monitoring_css');
-            await DeepSeekClient.initializeConversation(conversationId);
-            console.log(`🤖 Conversazione DeepSeek inizializzata: ${conversationId}`);
-            return conversationId;
-        } catch (error) {
-            console.error('❌ Errore inizializzazione DeepSeek:', error);
-            return null;
-        }
-    }
-
     async humanDelay() {
         const delay = Math.random() * 1000 + 1500;
         await new Promise(resolve => setTimeout(resolve, delay));
@@ -1219,7 +1110,7 @@ class PriceMonitorService {
                     priceChanges: priceHistory.filter(entry => entry.oldPrice !== null).length,
                     cssTargetingStats: {
                         cssSuccessful: priceHistory.filter(entry => entry.method === 'css_selector').length,
-                        deepseekFallback: priceHistory.filter(entry => entry.method === 'deepseek_fallback').length
+                        cssSelectorFailed: priceHistory.filter(entry => entry.method === 'css_selector_failed').length  // ✅ CORRETTO
                     }
                 }
             };
@@ -1229,6 +1120,111 @@ class PriceMonitorService {
             return null;
         }
     }
+
+    /**
+ * 💾 Aggiorna item nel database con i cambiamenti rilevati
+ */
+async updateItemWithChanges(itemId, currentData, changes, analysisData, newScrapingText) {
+    try {
+        const timestamp = new Date();
+        
+        console.log(`💾 Aggiornamento DB per item ${itemId}...`);
+        
+        // ✅ PREPARA I DATI PER L'AGGIORNAMENTO
+        const updateData = {
+            // Aggiorna prezzo se cambiato
+            estimatedPrice: changes.priceChanged ? changes.newPrice : currentData.estimatedPrice,
+            
+            // Aggiorna dati di scraping
+            scrapingData: {
+                ...currentData.scrapingData,
+                lastScraped: timestamp,
+                scrapingSuccess: true,
+                scrapingMode: 'css_targeting', // ✅ Nuovo modo
+                errors: null
+            },
+            
+            // Aggiorna timestamp monitoraggio
+            lastDetectionAttempt: timestamp,
+            
+            // ✅ Aggiorna informazioni sui cambiamenti (se ci sono stati)
+            ...(changes.hasChanges && {
+                lastPriceChange: {
+                    date: timestamp,
+                    oldPrice: changes.oldPrice,
+                    newPrice: changes.newPrice,
+                    method: changes.method || 'css_selector',
+                    cssSelector: changes.cssSelector,
+                    confidence: changes.confidence || null
+                }
+            }),
+            
+            // ✅ Mantieni informazioni di analisi (se disponibili)
+            ...(analysisData && analysisData.name && {
+                // Non sovrascrivere il nome esistente a meno che non sia vuoto
+                ...((!currentData.name || currentData.name.trim() === '') && { name: analysisData.name })
+            })
+        };
+        
+        // ✅ AGGIORNA STORICO PREZZI (se prezzo cambiato)
+        if (changes.priceChanged) {
+            const updatedHistory = this.updateEnhancedPriceHistory(currentData, changes, timestamp);
+            updateData.historicalPrice = updatedHistory.prices;
+            updateData.historicalPriceWithDates = updatedHistory.withDates;
+            
+            console.log(`📈 Storico prezzi aggiornato: ${changes.oldPrice} → ${changes.newPrice}`);
+        }
+        
+        // ✅ AGGIORNA CONTENUTO SCRAPING (limitato a 1500 caratteri)
+        if (newScrapingText && newScrapingText.length > 0) {
+            const ContentExtractor = require('./content-extractor');
+            const extractedText = ContentExtractor.extractAllText(newScrapingText);
+            updateData.scrapingData.extractedText = extractedText;
+            
+            console.log(`📄 Contenuto scraping aggiornato: ${extractedText.length} caratteri`);
+        }
+        
+        // ✅ SALVA SU FIRESTORE
+        await this.db.collection('shopping_items').doc(itemId).update(updateData);
+        
+        console.log(`✅ Item ${itemId} aggiornato con successo`);
+        
+        // ✅ LOG DETTAGLIATO DEI CAMBIAMENTI
+        if (changes.hasChanges) {
+            const changeDescription = this.generateChangeDescription(changes, analysisData);
+            console.log(`🔄 Cambiamenti: ${changeDescription}`);
+        }
+        
+        return {
+            success: true,
+            updatedFields: Object.keys(updateData),
+            priceChanged: changes.priceChanged,
+            newPrice: changes.newPrice,
+            method: changes.method
+        };
+        
+    } catch (error) {
+        console.error(`❌ Errore aggiornamento item ${itemId}:`, error);
+        
+        // ✅ Tenta di salvare almeno il timestamp di tentativo
+        try {
+            await this.db.collection('shopping_items').doc(itemId).update({
+                lastDetectionAttempt: new Date(),
+                scrapingData: {
+                    ...currentData.scrapingData,
+                    lastScraped: new Date(),
+                    scrapingSuccess: false,
+                    errors: error.message
+                }
+            });
+            console.log(`⚠️ Salvato timestamp di errore per item ${itemId}`);
+        } catch (timestampError) {
+            console.error(`❌ Impossibile salvare nemmeno il timestamp:`, timestampError);
+        }
+        
+        throw error; // Rilancia l'errore per gestione upstream
+    }
+}
 
     /**
      * 📊 Metodo per ottenere statistiche aggregrate per dashboard
@@ -1270,8 +1266,8 @@ class PriceMonitorService {
                 cssTargetingStats: {
                     averageCssSuccessRate: reports.length > 0 ? 
                         Math.round(reports.reduce((sum, r) => sum + (r.cssTargetingMetrics?.cssSuccessRate || 0), 0) / reports.length) : 0,
-                    averageDeepseekFallbackRate: reports.length > 0 ? 
-                        Math.round(reports.reduce((sum, r) => sum + (r.cssTargetingMetrics?.deepseekFallbackRate || 0), 0) / reports.length) : 0,
+                    averageCssFailureRate: reports.length > 0 ? 
+                        Math.round(reports.reduce((sum, r) => sum + (r.cssTargetingMetrics?.cssSelectorFailureRate || 0), 0) / reports.length) : 0,  // ✅
                     totalLegacyItemsSkipped: reports.reduce((sum, r) => sum + (r.stats?.legacyUrlModeItems || 0), 0),
                     totalNoPriceSelectionSkipped: reports.reduce((sum, r) => sum + (r.stats?.noPriceSelectionItems || 0), 0)
                 }

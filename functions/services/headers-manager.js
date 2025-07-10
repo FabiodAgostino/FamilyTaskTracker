@@ -76,15 +76,71 @@ class HeadersManager {
    * Metodo principale chiamato da WebScraper
    * Ottiene headers ottimali con TUTTO il fingerprint
    */
-  static getOptimalHeaders(url, referer = null, useRealHeaders = true) {
-    if (useRealHeaders) {
-      // Usa TUTTO il fingerprint ultra-realistico
-      return this.getCompleteRealisticHeaders(url, referer);
-    } else {
-      // Fallback a header più semplici (per test o casi speciali)
-      return this.getBasicHeaders(url, referer);
-    }
+  /**
+ * Metodo principale chiamato da WebScraper
+ * Ottiene headers ottimali con TUTTO il fingerprint + COOKIE EUR UNIVERSALI
+ */
+static getOptimalHeaders(url, referer = null, useRealHeaders = true) {
+  let headers;
+  
+  if (useRealHeaders) {
+    // Usa TUTTO il fingerprint ultra-realistico
+    headers = this.getCompleteRealisticHeaders(url, referer);
+  } else {
+    // Fallback a header più semplici (per test o casi speciali)
+    headers = this.getBasicHeaders(url, referer);
   }
+  
+  // 🇪🇺 AGGIUNGI SEMPRE COOKIE EUR UNIVERSALI (indipendentemente dal sito)
+  const eurCookies = [
+    'currency=EUR',
+    'country=IT', 
+    'locale=it-IT',
+    'lang=it',
+    'shopify_currency=EUR',        // Quello che hai testato
+    'cart_currency=EUR',           // Quello che hai testato  
+    '_shopify_country=IT',         // Quello che hai testato
+    '_shopify_currency=EUR',       // Quello che hai testato
+    'woocommerce_currency=EUR',    // WooCommerce
+    'wc_currency=EUR',
+    'currency_code=EUR',           // Magento
+    'selected_currency=EUR',       // Generico
+    'user_currency=EUR',
+    'preferred_currency=EUR'
+  ].join('; ');
+  
+  // Merge con cookie esistenti se presenti
+  const existingCookies = headers['Cookie'] || '';
+  headers['Cookie'] = existingCookies ? `${existingCookies}; ${eurCookies}` : eurCookies;
+  
+  // Forza sempre Accept-Language italiano prioritario
+  headers['Accept-Language'] = 'it-IT,it;q=0.9,en;q=0.1';
+  
+  console.log(`🇪🇺 Applied EUR cookies to: ${new URL(url).hostname}`);
+  
+  return headers;
+}
+
+static preprocessEURParams(url) {
+  // Se l'URL contiene pattern di prodotto, aggiungi EUR
+  if (url.includes('/product') || url.includes('/item') || url.includes('/p/') || url.includes('/dp/')) {
+    const urlObj = new URL(url);
+    
+    // Rimuovi parametri Facebook/Google che potrebbero interferire
+    urlObj.searchParams.delete('fbclid');
+    urlObj.searchParams.delete('gclid');
+    
+    // Aggiungi EUR sempre
+    urlObj.searchParams.set('currency', 'EUR');
+    urlObj.searchParams.set('country', 'IT');
+    urlObj.searchParams.set('locale', 'it-IT');
+    
+    console.log(`🔗 URL preprocessed for EUR: ${urlObj.toString()}`);
+    return urlObj.toString();
+  }
+  
+  return url;
+}
 
   /**
    * Headers completi che sfruttano TUTTO il tuo fingerprint

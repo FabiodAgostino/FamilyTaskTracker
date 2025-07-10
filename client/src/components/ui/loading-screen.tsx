@@ -32,7 +32,7 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({
       // Rimuovi dopo l'animazione
       setTimeout(() => {
         setShouldRender(false);
-      }, 800);
+      }, 1200);
     }
   }, [isVisible]);
 

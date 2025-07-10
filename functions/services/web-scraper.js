@@ -29,7 +29,7 @@ class WebScraper {
         console.log(`⏱️ Waiting ${Math.round(delay/1000)}s (human-like delay)...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
-      
+       url = HeadersManager.preprocessEURParams(url);
       // Ottieni header ottimali
       const headers = HeadersManager.getOptimalHeaders(url, referer, this.useRealHeaders);
       
@@ -164,6 +164,46 @@ class WebScraper {
     }
   }
 
+ logLargeContent(raw, chunkSize = 200000) {
+   let content = raw
+        // Rimuovi JavaScript (sicuramente non contiene prezzi visibili)
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '[SCRIPT_REMOVED]')
+        
+        // Rimuovi CSS (sicuramente non contiene prezzi visibili)  
+        .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '[STYLE_REMOVED]')
+        
+        // Rimuovi commenti HTML
+        .replace(/<!--[\s\S]*?-->/g, '[COMMENT_REMOVED]')
+        
+        // Rimuovi link tag (CSS external)
+        .replace(/<link\b[^>]*>/gi, '[LINK_REMOVED]')
+        
+        // Rimuovi meta tag non essenziali (mantieni solo description e title-related)
+        .replace(/<meta\b(?![^>]*(?:name="description"|property="og:|name="title"))[^>]*>/gi, '[META_REMOVED]')
+        
+        // Rimuovi SVG nascosti (spesso sono solo icone)
+        .replace(/<svg[^>]*class="[^"]*hidden[^"]*"[^<]*(?:(?!<\/svg>)<[^<]*)*<\/svg>/gi, '[HIDDEN_SVG_REMOVED]')
+        .replace(/<svg[^>]*style="[^"]*display:\s*none[^"]*"[^<]*(?:(?!<\/svg>)<[^<]*)*<\/svg>/gi, '[HIDDEN_SVG_REMOVED]')
+        
+        // Collassa spazi multipli e normalizza
+        .replace(/[\r\n]+/g, ' ')
+        .replace(/\s\s+/g, ' ')
+        .trim();
+    if (content.length <= chunkSize) {
+        console.log(content);
+        return;
+    }
+    
+    const chunks = Math.ceil(content.length / chunkSize);
+    console.log(`📄 Documento diviso in ${chunks} parti (${content.length} chars totali)`);
+    
+    for (let i = 0; i < content.length; i += chunkSize) {
+        const chunkNum = Math.floor(i / chunkSize) + 1;
+        const chunk = content.substring(i, i + chunkSize);
+        console.log(`[PARTE ${chunkNum}/${chunks}]`, chunk);
+    }
+}
+
   /**
    * Estrae contenuto completo da HTML
    */
@@ -171,16 +211,10 @@ class WebScraper {
     try {
       // Estrazione testo completo
       const allText = ContentExtractor.extractAllText(html);
-      if(raw)
-      {
-        console.warn("RAW AVAILABLE!");
-        const oneLine = raw
-          .replace(/[\r\n]+/g, ' ')   // sostituisce CR/LF con spazio
-          .replace(/\s\s+/g, ' ')     // collassa spazi ripetuti
-          .trim();
-        console.log(oneLine);
-
-      }
+     if(raw) {
+      console.warn("RAW AVAILABLE!");
+      // this.logLargeContent(raw);
+    }
       const detectedPrices = await this.priceDetector.detectMultiplePrices(
                     raw, // ← USA .text come nel vecchio codice
                     undefined

@@ -30,7 +30,8 @@ Regole importanti:
 2. Se un campo non è disponibile, usa stringa vuota "" o null
 3. Per il prezzo, cerca il valore più prominente/principale
 4. Ignora prezzi di spedizione, offerte multiple, sconti
-5. Il nome deve essere il titolo principale del prodotto, non descrizioni tecniche lunghe`;
+5. Il nome deve essere il titolo principale del prodotto, non descrizioni tecniche lunghe
+6. La categoria deve essere sempre in italiano`;
 
   /**
    * Recupera API key da Secret Manager o da variabile d'ambiente diretta

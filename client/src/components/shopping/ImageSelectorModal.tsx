@@ -1,5 +1,5 @@
 // src/components/shopping/ImageSelectorModal.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Check, 
   AlertCircle, 
@@ -42,14 +42,27 @@ const ImageCard: React.FC<ImageCardProps> = ({ image, isSelected, onSelect }) =>
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
 
-  const handleImageLoad = () => {
-    setImageLoading(false);
-  };
+  // ✅ Reset states when image changes
+  useEffect(() => {
+    setImageError(false);
+    setImageLoading(true);
+  }, [image.url]);
 
-  const handleImageError = () => {
+  const handleImageLoad = useCallback(() => {
+    setImageLoading(false);
+  }, []);
+
+  const handleImageError = useCallback(() => {
     setImageError(true);
     setImageLoading(false);
-  };
+  }, []);
+
+  // ✅ Gestione click più sicura
+  const handleCardClick = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onSelect();
+  }, [onSelect]);
 
   return (
     <Card 
@@ -58,7 +71,7 @@ const ImageCard: React.FC<ImageCardProps> = ({ image, isSelected, onSelect }) =>
         hover:shadow-lg hover:scale-[1.02]
         ${isSelected ? 'ring-2 ring-blue-500 shadow-xl' : 'hover:shadow-md'}
       `}
-      onClick={onSelect}
+      onClick={handleCardClick}
     >
       {/* Immagine */}
       <div className="relative aspect-square bg-gray-100">
@@ -145,21 +158,59 @@ export const ImageSelectorModal: React.FC<ImageSelectorModalProps> = ({
     }
   }, [isOpen]);
 
-  const handleConfirmSelection = () => {
+  // ✅ Cleanup quando si smonta il componente
+  useEffect(() => {
+    return () => {
+      setSelectedImageUrl('');
+    };
+  }, []);
+
+  const handleConfirmSelection = useCallback(() => {
     if (selectedImageUrl) {
       onSelectImage(selectedImageUrl);
       onClose();
     }
-  };
+  }, [selectedImageUrl, onSelectImage, onClose]);
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     setSelectedImageUrl('');
     onClose();
-  };
+  }, [onClose]);
+
+  // ✅ Gestione sicura della selezione immagine
+  const handleImageSelect = useCallback((imageUrl: string) => {
+    setSelectedImageUrl(imageUrl);
+  }, []);
+
+  // ✅ Previeni chiusura accidentale ma permetti chiusura manuale
+  const handleOpenChange = useCallback((open: boolean) => {
+    if (!open) {
+      handleCancel();
+    }
+  }, [handleCancel]);
+
+  // ✅ Se la modale non è aperta, non renderizzare nulla
+  if (!isOpen) {
+    return null;
+  }
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleCancel}>
-      <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogContent 
+        className="max-w-4xl max-h-[90vh] p-0"
+        // ✅ Gestione click outside più sicura
+        onInteractOutside={(e) => {
+          e.preventDefault();
+          handleCancel();
+        }}
+        onClick={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+        }}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+        }}
+      >
         {/* Header */}
         <DialogHeader className="p-6 pb-4 border-b">
           <div className="flex items-center justify-between">
@@ -237,18 +288,16 @@ export const ImageSelectorModal: React.FC<ImageSelectorModalProps> = ({
                     </Button>
                   </div>
                 ) : (
-                  <>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                      {images.map((image) => (
-                        <ImageCard
-                          key={image.id}
-                          image={image}
-                          isSelected={selectedImageUrl === image.url}
-                          onSelect={() => setSelectedImageUrl(image.url)}
-                        />
-                      ))}
-                    </div>
-                  </>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {images.map((image) => (
+                      <ImageCard
+                        key={image.id}
+                        image={image}
+                        isSelected={selectedImageUrl === image.url}
+                        onSelect={() => handleImageSelect(image.url)}
+                      />
+                    ))}
+                  </div>
                 )}
               </div>
             </ScrollArea>

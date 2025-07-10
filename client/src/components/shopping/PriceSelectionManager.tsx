@@ -1,38 +1,47 @@
-// ===== NUOVO FILE: src/components/shopping/PriceSelectionManager.tsx =====
+// ===== GESTORE UNICO DELLE MODALI DI SELEZIONE PREZZI =====
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { PriceSelectionModal } from './PriceSelectorModal';
 import { usePriceSelection } from '@/hooks/use-price-selection';
 
 /**
- * Componente che gestisce automaticamente la modale di selezione prezzi
- * - Monitora automaticamente gli item che necessitano selezione
- * - Mostra la modale quando necessario
- * - Gestisce il flusso di selezione automatico
+ * ✅ COMPONENTE UNICO CHE GESTISCE TUTTE LE MODALI DI SELEZIONE PREZZI
+ * - Da usare UNA SOLA VOLTA in App.tsx o layout principale
+ * - Fornisce il servizio per il NotificationCenter
  */
 export function PriceSelectionManager() {
   const {
-    pendingItems,
     currentItem,
     isModalOpen,
     selectPrice,
-    closeModalAndNext,
+    closeModal,
     skipItem,
-    hasPendingItems
+    openPriceSelection,
+    reopenSkippedItem
   } = usePriceSelection();
 
-  // Debug logging (rimuovi in produzione)
+  // ✅ ESPONE IL SERVIZIO PER ALTRI COMPONENTI
+  React.useEffect(() => {
+    // Registra il servizio globalmente per il NotificationCenter
+    (window as any).priceSelectionService = {
+      openPriceSelection,
+      reopenSkippedItem
+    };
+    
+    return () => {
+      delete (window as any).priceSelectionService;
+    };
+  }, [openPriceSelection, reopenSkippedItem]);
 
-
-  // Non renderizza nulla se non ci sono item pending
-  if (!hasPendingItems || !currentItem) {
+  // ✅ RENDERIZZA LA MODALE SOLO SE NECESSARIO
+  if (!isModalOpen || !currentItem) {
     return null;
   }
 
   return (
     <PriceSelectionModal
       isOpen={isModalOpen}
-      onClose={closeModalAndNext}
+      onClose={closeModal}
       item={currentItem}
       onPriceSelected={selectPrice}
       onSkip={skipItem}
@@ -40,7 +49,25 @@ export function PriceSelectionManager() {
   );
 }
 
-// Componente opzionale: Badge per notificare item pending nella navbar
+/**
+ * ✅ HOOK PERSONALIZZATO PER USARE IL SERVIZIO
+ */
+export function usePriceSelectionService() {
+  const service = (window as any).priceSelectionService;
+  
+  if (!service) {
+    console.warn('PriceSelectionService non disponibile. Assicurati di aver incluso PriceSelectionManager.');
+  }
+  
+  return service || {
+    openPriceSelection: (itemId: string) => console.warn('PriceSelectionService non disponibile:', itemId),
+    reopenSkippedItem: (itemId: string) => console.warn('PriceSelectionService non disponibile:', itemId)
+  };
+}
+
+/**
+ * ✅ COMPONENTE BADGE PER MOSTRARE PENDING ITEMS
+ */
 export function PriceNotificationBadge({ 
   variant = 'default' 
 }: { 

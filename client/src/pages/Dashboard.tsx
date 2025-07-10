@@ -10,6 +10,7 @@ import AdminPanel from '@/components/admin/AdministratorPanel';
 import { ShoppingFoodComponent } from '@/components/shoppingfood/ShoppingFood';
 import { AutoFCMManager } from '@/components/admin/AutoFCMManager';
 import { NotificationCenter } from '@/components/user/NotificationCenter';
+import DigitalWallet from '@/components/wallet/DigitalWallet';
 
 export default function Dashboard() {
   const { user } = useAuthContext();
@@ -30,6 +31,10 @@ export default function Dashboard() {
 
          <Route path="/notificationcenter">
           {() => <NotificationCenter />}
+        </Route>
+
+         <Route path="/digitalwallet">
+          {() => <DigitalWallet />}
         </Route>
 
         

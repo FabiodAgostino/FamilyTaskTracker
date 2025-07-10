@@ -1,18 +1,13 @@
-// ===== NUOVO FILE: src/components/notifications/NotificationCenter.tsx =====
-
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
   Bell, 
   BellRing,
   X,
   Euro,
-  ShoppingCart,
   AlertTriangle,
   Clock,
   ChevronRight,
-  ExternalLink,
-  CheckCircle2,
-  Trash2
+  CheckCircle2
 } from 'lucide-react';
 import {
   Popover,
@@ -38,8 +33,12 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { ShoppingItem } from '@/lib/models/shopping-item';
 import { formatDistanceToNow } from 'date-fns';
 import { it } from 'date-fns/locale';
-// ✅ NUOVO: Import del componente modale
-import { PriceSelectionModal } from '@/components/shopping/PriceSelectorModal';
+
+// ✅ PULITO: Import del servizio centralizzato
+interface PriceSelectionService {
+  openPriceSelection: (itemId: string) => void;
+  reopenSkippedItem: (itemId: string) => void;
+}
 
 // Tipi di notifiche
 interface NotificationItem {
@@ -49,29 +48,29 @@ interface NotificationItem {
   description: string;
   timestamp: Date;
   priority: 'low' | 'medium' | 'high';
-  data?: any; // Dati specifici per il tipo di notifica
+  data?: any;
   actionLabel?: string;
   onAction?: () => void;
 }
 
 interface NotificationCenterProps {
   variant?: 'desktop' | 'mobile';
+  priceSelectionService?: PriceSelectionService; // ✅ NUOVO: Servizio iniettato
 }
 
-export function NotificationCenter({ variant = 'desktop' }: NotificationCenterProps) {
+export function NotificationCenter({ 
+  variant = 'desktop',
+  priceSelectionService 
+}: NotificationCenterProps) {
   const { user } = useAuthContext();
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const [isOpen, setIsOpen] = useState(false);
   
-  // ✅ NUOVO: Stati per la modale di selezione prezzo
-  const [selectedItemForPrice, setSelectedItemForPrice] = useState<ShoppingItem | null>(null);
-  const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
-  
-  // Hooks per dati
+  // Hook per dati (solo lettura)
   const { data: shoppingItems, update: updateShoppingItem } = useFirestore<ShoppingItem>('shopping_items');
 
-  // ✅ Genera tutte le notifiche
+  // ✅ PULITO: Genera notifiche SENZA gestire modali
   const notifications = useMemo(() => {
     if (!shoppingItems || !user) return [];
     
@@ -80,78 +79,63 @@ export function NotificationCenter({ variant = 'desktop' }: NotificationCenterPr
       item.createdBy === user.username || user.role === 'admin'
     );
 
-    // 🔍 DEBUG: Log tutti gli items per capire la struttura
-        userItems.forEach(item => {
-      if (item.needsPriceSelection || item.priceSelection) {
-              }
-    });
-
-    // 1. PREZZI SALTATI - Items che necessitano selezione prezzo (LOGICA CORRETTA)
-    const skippedPriceItems = userItems.filter(item => {
-      // Caso 1: Items esplicitamente skippati (anche se needsPriceSelection = false)
-      const isExplicitlySkipped = item.priceSelection?.status === 'skipped' && !item.completed;
-      
-      // Caso 2: Items che necessitano ancora selezione (needsPriceSelection = true)
+    // 1. PREZZI CHE NECESSITANO SELEZIONE (include skipped + pending)
+    const priceSelectionItems = userItems.filter(item => {
+      const isSkipped = item.priceSelection?.status === 'skipped' && !item.completed;
       const needsSelection = item.needsPriceSelection === true && !item.completed;
-      
-      // Caso 3: Items con prezzi rilevati ma non processati (status !== 'selected' e senza selectedPriceIndex)
-      const hasUnprocessedPrices = item.priceSelection?.detectedPrices?.length && item.priceSelection?.detectedPrices?.length > 0 && 
+      const hasUnprocessedPrices = item.priceSelection?.detectedPrices?.length && 
+                                   item.priceSelection?.detectedPrices?.length > 0 && 
                                    !item.priceSelection?.selectedPriceIndex && 
                                    item.priceSelection?.status !== 'selected' &&
                                    !item.completed;
       
-      // ✅ ESCLUDI items che hanno già un prezzo selezionato
       const alreadyProcessed = item.priceSelection?.status === 'selected' || 
                                (item.priceSelection?.selectedPriceIndex !== undefined && 
                                 item.priceSelection?.selectedPriceIndex !== null);
       
-      const shouldInclude = (isExplicitlySkipped || needsSelection || hasUnprocessedPrices) && !alreadyProcessed;
-      
-      return shouldInclude;
+      return (isSkipped || needsSelection || hasUnprocessedPrices) && !alreadyProcessed;
     });
-
-        userItems.forEach(item => {
-      if (item.priceSelection?.status === 'skipped' || item.needsPriceSelection || item.priceSelection?.detectedPrices?.length && item.priceSelection?.detectedPrices?.length > 0) {
-        const isExplicitlySkipped = item.priceSelection?.status === 'skipped' && !item.completed;
-        const needsSelection = item.needsPriceSelection === true && !item.completed;
-        const hasUnprocessedPrices = item.priceSelection?.detectedPrices?.length && item.priceSelection?.detectedPrices?.length > 0 && 
-                                     !item.priceSelection?.selectedPriceIndex && 
-                                     item.priceSelection?.status !== 'selected' &&
-                                     !item.completed;
-        const alreadyProcessed = item.priceSelection?.status === 'selected' || 
-                                 (item.priceSelection?.selectedPriceIndex !== undefined && 
-                                  item.priceSelection?.selectedPriceIndex !== null);
-        const shouldInclude = (isExplicitlySkipped || needsSelection || hasUnprocessedPrices) && !alreadyProcessed;
-        
-              }
-    });
-
     
-    skippedPriceItems.forEach(item => {
+    priceSelectionItems.forEach(item => {
       const detectedPricesCount = item.priceSelection?.detectedPrices?.length || 0;
       const isSkipped = item.priceSelection?.status === 'skipped';
       
       items.push({
-        id: `price_skipped_${item.id}`,
+        id: `price_selection_${item.id}`,
         type: 'price_selection',
         title: isSkipped ? 'Prezzo saltato - richiede attenzione' : 'Selezione prezzo richiesta',
         description: `"${item.name || 'Prodotto'}" ${detectedPricesCount > 0 ? `ha ${detectedPricesCount} prezzi rilevati` : 'necessita analisi prezzi'}`,
         timestamp: item.updatedAt || item.createdAt,
         priority: isSkipped ? 'medium' : 'high',
-        data: { item },
+        data: { item, isSkipped },
         actionLabel: isSkipped ? 'Rivaluta prezzo' : 'Seleziona prezzo',
-        onAction: () => handlePriceSelection(item)
+        // ✅ DELEGA al servizio esterno invece di gestire modali
+        onAction: () => {
+          if (priceSelectionService) {
+            if (isSkipped) {
+              priceSelectionService.reopenSkippedItem(item.id);
+            } else {
+              priceSelectionService.openPriceSelection(item.id);
+            }
+            setIsOpen(false);
+          } else {
+            toast({
+              title: 'Servizio non disponibile',
+              description: 'Il servizio di selezione prezzi non è disponibile.',
+              variant: 'destructive'
+            });
+          }
+        }
       });
     });
 
-    // 2. ITEMS CON ERRORI DI SCRAPING
+    // 2. ERRORI DI SCRAPING
     const scrapingErrorItems = userItems.filter(item => 
       item.scrapingData?.scrapingSuccess === false &&
       item.scrapingData?.errors &&
       !item.completed
     );
 
-    
     scrapingErrorItems.forEach(item => {
       items.push({
         id: `scraping_error_${item.id}`,
@@ -173,7 +157,7 @@ export function NotificationCenter({ variant = 'desktop' }: NotificationCenterPr
       
       const lastChange = history[history.length - 1];
       const isRecent = lastChange.date && 
-        new Date().getTime() - new Date(lastChange.date).getTime() < 24 * 60 * 60 * 1000; // 24 ore
+        new Date().getTime() - new Date(lastChange.date).getTime() < 24 * 60 * 60 * 1000;
       
       return isRecent && lastChange.changeType !== 'initial';
     });
@@ -195,7 +179,7 @@ export function NotificationCenter({ variant = 'desktop' }: NotificationCenterPr
       });
     });
 
-    // 5. ITEMS VECCHI NON COMPLETATI (più di 30 giorni)
+    // 4. ITEMS VECCHI NON COMPLETATI
     const oldItems = userItems.filter(item => {
       if (item.completed) return false;
       const daysDiff = (new Date().getTime() - new Date(item.createdAt).getTime()) / (1000 * 60 * 60 * 24);
@@ -219,127 +203,27 @@ export function NotificationCenter({ variant = 'desktop' }: NotificationCenterPr
     });
 
     // Ordina per priorità e timestamp
-    const sortedItems = items.sort((a, b) => {
+    return items.sort((a, b) => {
       const priorityOrder = { high: 3, medium: 2, low: 1 };
       if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
         return priorityOrder[b.priority] - priorityOrder[a.priority];
       }
       return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
     });
+  }, [shoppingItems, user, priceSelectionService]);
 
-        sortedItems.forEach(item => {
-          });
-
-    return sortedItems;
-  }, [shoppingItems, user]);
-
-  // Handlers
-  const handlePriceSelection = (item: ShoppingItem) => {
-        setSelectedItemForPrice(item);
-    setIsPriceModalOpen(true);
-    setIsOpen(false); // Chiudi il notification center
-  };
-
-  // ✅ NUOVO: Handler per la selezione del prezzo dalla modale
-  const handlePriceSelected = async (itemId: string, priceIndex: number): Promise<boolean> => {
-    try {
-            
-      const item = shoppingItems?.find(i => i.id === itemId);
-      if (!item?.priceSelection?.detectedPrices) {
-        throw new Error('Item o prezzi non trovati');
-      }
-
-      const detectedPrices = item.priceSelection.detectedPrices as any[];
-      if (priceIndex < 0 || priceIndex >= detectedPrices.length) {
-        throw new Error('Indice prezzo non valido');
-      }
-
-      const selectedPrice = detectedPrices[priceIndex];
-      const now = new Date();
-
-      // Aggiornamento Firestore
-      const updateData = {
-        estimatedPrice: selectedPrice.numericValue || 0,
-        priceSelection: {
-          status: 'selected',
-          detectedPrices: detectedPrices,
-          selectedPriceIndex: priceIndex,
-          selectedCssSelector: selectedPrice.cssSelector || '',
-          selectionTimestamp: now,
-          lastDetectionAttempt: item.priceSelection.lastDetectionAttempt || now
-        },
-        needsPriceSelection: false,
-        historicalPrice: [...(item.historicalPrice || []), selectedPrice.numericValue || 0],
-        historicalPriceWithDates: [
-          ...(item.historicalPriceWithDates || []),
-          {
-            price: selectedPrice.numericValue || 0,
-            date: now,
-            changeType: 'initial' as const
-          }
-        ],
-        updatedAt: now
-      };
-
-      await updateShoppingItem(itemId, updateData as ShoppingItem);
-      
-      toast({
-        title: "Prezzo selezionato",
-        description: `Il prezzo ${selectedPrice.value || selectedPrice.numericValue} è stato salvato.`,
-      });
-      
-      return true;
-      
-    } catch (error) {
-      console.error('❌ Errore selezione prezzo:', error);
-      toast({
-        title: "Errore",
-        description: "Si è verificato un errore durante il salvataggio.",
-        variant: "destructive"
-      });
-      return false;
-    }
-  };
-
-  // ✅ NUOVO: Handler per saltare un item
-  const handleSkipItem = async (itemId: string) => {
-    try {
-      await updateShoppingItem(itemId, {
-        needsPriceSelection: false,
-        priceSelection: {
-          status: 'skipped',
-          detectedPrices: []
-        }
-      });
-      
-      toast({
-        title: "Item saltato",
-        description: "L'item è stato saltato.",
-      });
-    } catch (error) {
-      console.error('❌ Errore skip item:', error);
-      toast({
-        title: "Errore",
-        description: "Impossibile saltare l'item.",
-        variant: "destructive"
-      });
-    }
-  };
-
+  // ✅ HANDLERS SEMPLIFICATI
   const handleViewItem = (item: ShoppingItem) => {
-    // Naviga ai dettagli dell'item o apri una modale
     window.open(item.link, '_blank');
     setIsOpen(false);
   };
 
   const handleRetryScrapingItem = async (item: ShoppingItem) => {
-    // Handler per riprovare lo scraping
     toast({
       title: 'Riprova scraping',
       description: `Riprovando estrazione dati per "${item.name || 'Prodotto'}"`,
     });
     setIsOpen(false);
-    // TODO: Implementa retry scraping
   };
 
   const handleCompleteItem = async (item: ShoppingItem) => {
@@ -352,6 +236,7 @@ export function NotificationCenter({ variant = 'desktop' }: NotificationCenterPr
         title: 'Articolo completato',
         description: `"${item.name || 'Prodotto'}" è stato segnato come completato`,
       });
+      setIsOpen(false);
     } catch (error) {
       toast({
         title: 'Errore',
@@ -362,7 +247,6 @@ export function NotificationCenter({ variant = 'desktop' }: NotificationCenterPr
   };
 
   const handleDismissNotification = (notificationId: string) => {
-    // Per ora non implementato - potresti salvare dismissals in localStorage
     toast({
       title: 'Notifica ignorata',
       description: 'La notifica è stata rimossa temporaneamente',
@@ -381,26 +265,25 @@ export function NotificationCenter({ variant = 'desktop' }: NotificationCenterPr
     switch (type) {
       case 'price_selection':
       case 'price_change':
-        return <Euro className="h-4 w-4 text-cambridge-newStyle" />;
+        return <Euro className="h-4 w-4 text-blue-600" />;
       case 'expired_item':
-        return <Clock className="h-4 w-4 bg-icons-newStyle" />;
+        return <Clock className="h-4 w-4 text-orange-600" />;
       default:
-        return <AlertTriangle className="h-4 w-4 text-cambridge-newStyle" />;
+        return <AlertTriangle className="h-4 w-4 text-red-600" />;
     }
   };
 
   const getPriorityColor = (priority: NotificationItem['priority']) => {
     switch (priority) {
-      case 'high': return 'bg-icons-newStyle text-white border-red-200';
-      case 'medium': return 'text-burnt-newStyle bg-purple-50 border-cambridge-newStyle';
-      case 'low': return 'text-gray-600 bg-gray-50 border-gray-200';
+      case 'high': return ' text-red-500 border-red-500';
+      case 'medium': return 'text-orange-700  border-orange-200';
+      case 'low': return 'text-gray-600  border-gray-200';
     }
   };
 
-  // Contenuto delle notifiche
+  // ✅ CONTENUTO NOTIFICHE
   const NotificationContent = () => (
     <div className="w-full">
-      {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-lg font-semibold text-gray-900">Avvisi</h3>
@@ -412,12 +295,12 @@ export function NotificationCenter({ variant = 'desktop' }: NotificationCenterPr
         {counts.total > 0 && (
           <div className="flex items-center gap-2">
             {counts.high > 0 && (
-              <Badge className="text-xs bg-icons-newStyle text-white border-none">
+              <Badge className="text-xs bg-red-500 text-white border-none">
                 {counts.high} urgenti
               </Badge>
             )}
             {counts.medium > 0 && (
-              <Badge variant="secondary" className="text-xs bg-purple-100 text-burnt-newStyle border-cambridge-newStyle">
+              <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700">
                 {counts.medium} medi
               </Badge>
             )}
@@ -425,12 +308,11 @@ export function NotificationCenter({ variant = 'desktop' }: NotificationCenterPr
         )}
       </div>
 
-      {/* Lista notifiche */}
       <ScrollArea className="h-96">
         <div className="space-y-3">
           {notifications.length === 0 ? (
             <div className="text-center py-8">
-              <CheckCircle2 className="h-12 w-12 text-cambridge-newStyle mx-auto mb-3" />
+              <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-3" />
               <p className="text-gray-600">Tutto a posto!</p>
               <p className="text-sm text-gray-500">Nessun avviso al momento</p>
             </div>
@@ -470,7 +352,7 @@ export function NotificationCenter({ variant = 'desktop' }: NotificationCenterPr
                           <Button
                             size="sm"
                             variant="outline"
-                            className="mt-2 h-7 text-xs border-cambridge-newStyle text-burnt-newStyle hover:bg-purple-50"
+                            className="mt-2 h-7 text-xs border-blue-500 text-blue-600 hover:bg-blue-50"
                             onClick={notification.onAction}
                           >
                             {notification.actionLabel}
@@ -498,94 +380,61 @@ export function NotificationCenter({ variant = 'desktop' }: NotificationCenterPr
     </div>
   );
 
-  // Se non ci sono notifiche, non mostrare il badge
-  if (counts.total === 0) {
-    return null;
-  }
-
-  // Versione mobile (Sheet)
+  // ✅ VERSIONE MOBILE
   if (variant === 'mobile' || isMobile) {
     return (
-      <>
-        <Sheet open={isOpen} onOpenChange={setIsOpen}>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="default" className="relative p-2">
-              {counts.total > 0 ? (
-                <BellRing className="h-5 w-5 bg-icons-newStyle" />
-              ) : (
-                <Bell className="h-5 w-5" />
-              )}
-              {counts.total > 0 && (
-                <Badge 
-                  className="absolute -top-1 -right-1 h-5 w-5 text-xs p-0 flex items-center justify-center bg-icons-newStyle text-white border-none"
-                >
-                  {counts.total > 99 ? '99+' : counts.total}
-                </Badge>
-              )}
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="right" className="w-full sm:w-96">
-            <SheetHeader className="sr-only">
-              <SheetTitle>Avvisi</SheetTitle>
-              <SheetDescription>Lista degli avvisi e notifiche</SheetDescription>
-            </SheetHeader>
-            <NotificationContent />
-          </SheetContent>
-        </Sheet>
-
-        {/* ✅ NUOVO: Modale di selezione prezzo anche per mobile */}
-        <PriceSelectionModal
-          isOpen={isPriceModalOpen}
-          onClose={() => {
-            setIsPriceModalOpen(false);
-            setSelectedItemForPrice(null);
-          }}
-          item={selectedItemForPrice}
-          onPriceSelected={handlePriceSelected}
-          onSkip={handleSkipItem}
-        />
-      </>
-    );
-  }
-
-  // Versione desktop (Popover)
-  return (
-    <>
-      <Popover open={isOpen} onOpenChange={setIsOpen}>
-        <PopoverTrigger asChild>
-          <Button variant="ghost" size="sm" className="relative p-2">
+      <Sheet open={isOpen} onOpenChange={setIsOpen}>
+        <SheetTrigger asChild>
+          <Button variant="ghost" size="default" className="relative p-2">
             {counts.total > 0 ? (
-              <BellRing className="h-5 w-5 bg-icons-newStyle" />
+              <BellRing className="h-5 w-5 text-red-500" />
             ) : (
               <Bell className="h-5 w-5" />
             )}
             {counts.total > 0 && (
               <Badge 
-                className="absolute -top-1 -right-1 h-4 w-4 text-xs p-0 flex items-center justify-center bg-icons-newStyle text-white border-none"
+                className="absolute -top-1 -right-1 h-5 w-5 text-xs p-0 flex items-center justify-center bg-red-500 text-white border-none"
               >
                 {counts.total > 99 ? '99+' : counts.total}
               </Badge>
             )}
           </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-96 p-0" align="end">
-          <div className="p-4">
-            <NotificationContent />
-          </div>
-        </PopoverContent>
-      </Popover>
+        </SheetTrigger>
+        <SheetContent side="right" className="w-full sm:w-96">
+          <SheetHeader className="sr-only">
+            <SheetTitle>Avvisi</SheetTitle>
+            <SheetDescription>Lista degli avvisi e notifiche</SheetDescription>
+          </SheetHeader>
+          <NotificationContent />
+        </SheetContent>
+      </Sheet>
+    );
+  }
 
-      {/* ✅ NUOVO: Modale di selezione prezzo */}
-      <PriceSelectionModal
-        isOpen={isPriceModalOpen}
-        onClose={() => {
-          setIsPriceModalOpen(false);
-          setSelectedItemForPrice(null);
-        }}
-        item={selectedItemForPrice}
-        onPriceSelected={handlePriceSelected}
-        onSkip={handleSkipItem}
-      />
-    </>
+  // ✅ VERSIONE DESKTOP
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="sm" className="relative p-2">
+          {counts.total > 0 ? (
+            <BellRing className="h-5 w-5 text-red-500" />
+          ) : (
+            <Bell className="h-5 w-5" />
+          )}
+          {counts.total > 0 && (
+            <Badge 
+              className="absolute -top-1 -right-1 h-4 w-4 text-xs p-0 flex items-center justify-center bg-red-500 text-white border-none"
+            >
+              {counts.total > 99 ? '99+' : counts.total}
+            </Badge>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-96 p-0" align="end">
+        <div className="p-4">
+          <NotificationContent />
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }

@@ -196,8 +196,34 @@ updateWithMultiplePrices(detectedPrices: DetectedPrice[]): void {
 
   // ===== FIRESTORE SERIALIZATION =====
 
+ static getAlternativeSelectors(data: any): any[] {
+  try {
+    const detectedPrices = data?.priceSelection?.detectedPrices;
+    
+    if (!Array.isArray(detectedPrices)) {
+      console.log('detectedPrices non è un array o non esiste');
+      return [];
+    }
+    
+    // Estrai tutti gli alternativeSelectors da ogni elemento
+    const allSelectors: any[] = [];
+    
+    detectedPrices.forEach((price: any, index: number) => {
+      if (price?.alternativeSelectors && Array.isArray(price.alternativeSelectors)) {
+        allSelectors.push(...price.alternativeSelectors);
+      }
+    });
+    
+    return allSelectors;
+  } catch (error) {
+    console.error('Errore nell\'estrazione dei selettori:', error);
+    return [];
+  }
+}
+
   static fromFirestore(data: any): ShoppingItem {
     try {
+      this.getAlternativeSelectors(data);
       const parseDate = (dateField: any): Date => {
         if (!dateField) return new Date();
         if (dateField instanceof Date) return dateField;
@@ -282,37 +308,50 @@ updateWithMultiplePrices(detectedPrices: DetectedPrice[]): void {
           analysisText: data.priceMonitoring.analysisText
         };
       }
- if (data.priceSelection && typeof data.priceSelection === 'object') {
-  // 🔧 FIX: Parsing corretto dei detectedPrices da Firestore
-  let detectedPrices = [];
+// ===== PARSING PRICE SELECTION CON DESERIALIZZAZIONE =====
+if (data.priceSelection && typeof data.priceSelection === 'object') {
+  let detectedPrices: DetectedPrice[] = [];
   
   if (data.priceSelection.detectedPrices) {
-    // Caso 1: detectedPrices è già un array
-    if (Array.isArray(data.priceSelection.detectedPrices)) {
-      detectedPrices = data.priceSelection.detectedPrices;
-    }
-    // Caso 2: detectedPrices è un oggetto (mappa Firestore)
-    else if (typeof data.priceSelection.detectedPrices === 'object') {
-      detectedPrices = Object.values(data.priceSelection.detectedPrices);
+    try {
+      // Deserializza l'array di prezzi rilevati
+      const rawPrices = data.priceSelection.detectedPrices;
+     if (Array.isArray(rawPrices)) {
+    // ✅ PASSA L'INDEX DEL LOOP come fallback
+    detectedPrices = rawPrices.map((rawPrice, index) => 
+        parseDetectedPrice(rawPrice, index)  // ← Passa l'index!
+    );
+} else if (typeof rawPrices === 'object') {
+    // ✅ ANCHE QUI, usa l'index dell'array dei valori
+    const values = Object.values(rawPrices);
+    detectedPrices = values.map((rawPrice, index) => 
+        parseDetectedPrice(rawPrice, index)  // ← Passa l'index!
+    );
+}
+    } catch (error) {
+      console.error('❌ Error parsing detectedPrices:', error, data.priceSelection.detectedPrices);
+      detectedPrices = [];
     }
   }
 
   item.priceSelection = {
-    status: data.priceSelection.status || 'error',
-    detectedPrices: detectedPrices, // 🔧 Usa l'array parsato correttamente
-    selectedPriceIndex: data.priceSelection.selectedPriceIndex,
-    selectedCssSelector: data.priceSelection.selectedCssSelector,
+    status: deserializeFirestoreValue(data.priceSelection.status) || 'error',
+    detectedPrices: detectedPrices,
+    selectedPriceIndex: deserializeFirestoreValue(data.priceSelection.selectedPriceIndex),
+    selectedCssSelector: deserializeFirestoreValue(data.priceSelection.selectedCssSelector),
     selectionTimestamp: data.priceSelection.selectionTimestamp 
       ? parseDate(data.priceSelection.selectionTimestamp) 
       : undefined,
     lastDetectionAttempt: data.priceSelection.lastDetectionAttempt 
       ? parseDate(data.priceSelection.lastDetectionAttempt) 
       : undefined,
-    detectionErrors: data.priceSelection.detectionErrors
+    detectionErrors: data.priceSelection.detectionErrors 
+      ? deserializeFirestoreObject(data.priceSelection.detectionErrors)
+      : undefined,
   };
 }
 
-item.needsPriceSelection = data.needsPriceSelection || false;
+item.needsPriceSelection = deserializeFirestoreValue(data.needsPriceSelection) || false;
 
       // Validazione condizionale per dati esistenti
       if (link && category && createdBy) {
@@ -406,7 +445,7 @@ item.needsPriceSelection = data.needsPriceSelection || false;
     historicalPriceWithDates: this.historicalPriceWithDates,
     
     // 🔧 FIX: Pulizia speciale per priceSelection
-    priceSelection: this.priceSelection ? cleanObjectRecursive(this.priceSelection) : undefined,
+  priceSelection: this.priceSelection ? this.serializePriceSelection() : undefined,
     
     needsPriceSelection: this.needsPriceSelection
   };
@@ -847,6 +886,23 @@ item.needsPriceSelection = data.needsPriceSelection || false;
     );
   }
 
+    /**
+   * Serializza correttamente priceSelection per Firestore
+   */
+  private serializePriceSelection(): any {
+    if (!this.priceSelection) return undefined;
+
+    return {
+      status: this.priceSelection.status,
+      detectedPrices: this.priceSelection.detectedPrices || [],
+      selectedPriceIndex: this.priceSelection.selectedPriceIndex,
+      selectedCssSelector: this.priceSelection.selectedCssSelector,
+      selectionTimestamp: this.priceSelection.selectionTimestamp,
+      lastDetectionAttempt: this.priceSelection.lastDetectionAttempt,
+      detectionErrors: this.priceSelection.detectionErrors
+    };
+  }
+
   toJSON(): object {
     return {
       id: this.id,
@@ -883,14 +939,28 @@ export interface DetectedPrice {
   parentClasses: string[]; // Classi CSS dei 4 div parent
   elementText: string;     // Testo completo dell'elemento che contiene il prezzo
   confidence: number;      // 0-1, confidence che sia un prezzo valido
-  position: {              // Posizione nell'HTML per ranking
+  isStrikethrough?: boolean; // Se il prezzo è barrato
+  priority?: number;       // Priorità del prezzo
+  source?: string;         // Fonte del rilevamento (css, json, etc.)
+  conversionType?: string; // Tipo di conversione applicata
+  position?: {             // Posizione nell'HTML per ranking
     index: number;         // Ordine di apparizione nella pagina
     depth: number;         // Profondità nell'HTML
   };
-  context: {               // Contesto per aiutare l'utente a scegliere
+  context?: {              // Contesto per aiutare l'utente a scegliere
     nearbyText: string;    // Testo vicino al prezzo (es: "Prezzo scontato:", "Spedizione:")
-    isProminent: boolean;  // Se il prezzo è visualmente prominente
+    isProminent: boolean;  // Se il prezzo è visivamente prominente
   };
+  alternativeSelectors: Array<AlternativeSelector>;
+}
+
+export interface AlternativeSelector
+{
+  confidence:number;
+  context: string;
+  cssSelector:string;
+  source:string;
+
 }
 
 export interface PriceSelectionData {
@@ -911,4 +981,91 @@ export interface ScrapingData {
   scrapingText?: string;
   errors?: any;
 }
+
+// ===== HELPER FUNCTIONS FOR FIRESTORE DESERIALIZATION =====
+
+/**
+ * Deserializza i valori Firestore che contengono metadati sui tipi
+ * Gestisce stringhe come "@{stringValue=value}", "@{integerValue=42}", etc.
+ */
+function deserializeFirestoreValue(value: any): any {
+  if (typeof value !== 'string') {
+    return value; // Se non è una stringa, restituisci così com'è
+  }
+
+  // Pattern per estrarre valori wrappati in metadati Firestore
+  const patterns = [
+    { regex: /^@\{stringValue=(.+)\}$/, parser: (match: string) => match },
+    { regex: /^@\{integerValue=(.+)\}$/, parser: (match: string) => parseInt(match, 10) },
+    { regex: /^@\{doubleValue=(.+)\}$/, parser: (match: string) => parseFloat(match) },
+    { regex: /^@\{booleanValue=(.+)\}$/, parser: (match: string) => match.toLowerCase() === 'true' },
+    { regex: /^@\{arrayValue=\}$/, parser: () => [] }, // Array vuoto
+    { regex: /^@\{mapValue=\}$/, parser: () => ({}) }, // Oggetto vuoto
+    { regex: /^@\{nullValue=.*\}$/, parser: () => null }, // Valore null
+  ];
+
+  for (const pattern of patterns) {
+    const match = value.match(pattern.regex);
+    if (match) {
+      return pattern.parser(match[1] || '');
+    }
+  }
+
+  // Se non corrisponde a nessun pattern, restituisci il valore originale
+  return value;
+}
+
+/**
+ * Deserializza ricorsivamente un oggetto che può contenere valori Firestore serializzati
+ */
+function deserializeFirestoreObject(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => deserializeFirestoreObject(item));
+  }
+
+  if (typeof obj === 'object') {
+    const result: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      result[key] = deserializeFirestoreObject(deserializeFirestoreValue(value));
+    }
+    return result;
+  }
+
+  return deserializeFirestoreValue(obj);
+
+  
+}
+
+/**
+ * Parser specifico per DetectedPrice con validazione dei campi
+ */
+function parseDetectedPrice(rawPrice: any, fallbackIndex: number = 0): DetectedPrice {
+    const deserialized = deserializeFirestoreObject(rawPrice);
+    return {
+        value: deserialized.value || '',
+        numericValue: typeof deserialized.numericValue === 'number' ? deserialized.numericValue : 0,
+        cssSelector: deserialized.cssSelector || '',
+        parentClasses: Array.isArray(deserialized.parentClasses) ? deserialized.parentClasses : [],
+        elementText: deserialized.elementText || '',
+        confidence: typeof deserialized.confidence === 'number' ? deserialized.confidence : 0,
+        isStrikethrough: typeof deserialized.isStrikethrough === 'boolean' ? deserialized.isStrikethrough : false,
+        priority: typeof deserialized.priority === 'number' ? deserialized.priority : 0,
+        source: deserialized.source || 'unknown',
+        conversionType: deserialized.conversionType,
+        
+        // ✅ FIX: Se position esiste usalo, altrimenti usa fallbackIndex
+        position: deserialized.position || { 
+            index: fallbackIndex,  // ← Usa l'index del loop invece di sempre 0!
+            depth: 0 
+        },
+        context: deserialized.context || { nearbyText: '', isProminent: false },
+        alternativeSelectors:deserialized.alternativeSelectors || []
+    };
+}
+
+
 

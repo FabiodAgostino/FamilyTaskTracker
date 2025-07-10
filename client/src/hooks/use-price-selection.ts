@@ -1,89 +1,19 @@
-// src/hooks/use-price-selection.ts - VERSIONE COMPLETA E PULITA
+// ===== HOOK SEMPLIFICATO - SENZA AUTO-OPENING =====
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore } from '@/hooks/useFirestore';
-import { ShoppingItem } from '@/lib/models/shopping-item';
+import { ShoppingItem, DetectedPrice, PriceSelectionData } from '@/lib/models/shopping-item';
 
 export interface PendingPriceItem {
   id: string;
   name?: string;
   link: string;
   createdBy: string;
-  priceSelection?: any;
+  priceSelection?: PriceSelectionData;
   createdAt: any;
   category: string;
-}
-
-// 🔧 FUNZIONE HELPER per fixare i detectedPrices
-function fixDetectedPrices(item: ShoppingItem): ShoppingItem {
-  if (item.priceSelection?.detectedPrices) {
-    const rawPrices = item.priceSelection.detectedPrices as any;
-    
-    // Caso 1: Array normale di prezzi
-    if (Array.isArray(rawPrices) && rawPrices.length > 0 && 
-        typeof rawPrices[0] === 'object' && rawPrices[0]?.value) {
-      return item; // È già corretto
-    }
-    
-    // Caso 2: Array strano ["status", "message", [actualPrices]]
-    if (Array.isArray(rawPrices) && rawPrices.length === 3 && Array.isArray(rawPrices[2])) {
-      (item.priceSelection as any).detectedPrices = rawPrices[2];
-            return item;
-    }
-    
-    // Caso 3: Array misto [Array, Object, String] - estrai tutti i prezzi validi
-    if (Array.isArray(rawPrices) && rawPrices.length > 0) {
-      const validPrices: any[] = [];
-      
-      rawPrices.forEach((element, index) => {
-                
-        // Se è un array, estrai i prezzi ricorsivamente
-        if (Array.isArray(element)) {
-          const arrayPrices = element.filter(p => p && typeof p === 'object' && p.value && p.numericValue);
-          validPrices.push(...arrayPrices);
-                  }
-        // Se è un oggetto con prezzo valido
-        else if (typeof element === 'object' && element !== null && element.value && element.numericValue) {
-          validPrices.push(element);
-                  }
-        // Ignora stringhe, null, undefined
-        else {
-                  }
-      });
-      
-      if (validPrices.length > 0) {
-        // 🔧 BONUS: Rimuovi prezzi duplicati basandoti su numericValue e value
-        const uniquePrices = validPrices.filter((price, index, arr) => 
-          arr.findIndex(p => 
-            p.numericValue === price.numericValue && 
-            p.value === price.value
-          ) === index
-        );
-        
-        (item.priceSelection as any).detectedPrices = uniquePrices;
-                return item;
-      }
-    }
-    
-    // Caso 4: Oggetto invece di array
-    if (!Array.isArray(rawPrices) && typeof rawPrices === 'object') {
-      const detectedPricesArray = Object.values(rawPrices);
-      (item.priceSelection as any).detectedPrices = detectedPricesArray;
-            return item;
-    }
-  }
-  return item;
-}
-
-// 🔧 HELPER per contare i prezzi in modo sicuro
-function getDetectedPricesCount(item: ShoppingItem): number {
-  const prices = item.priceSelection?.detectedPrices;
-  if (!prices) return 0;
-  if (Array.isArray(prices)) return prices.length;
-  if (typeof prices === 'object') return Object.keys(prices).length;
-  return 0;
 }
 
 export function usePriceSelection() {
@@ -92,187 +22,277 @@ export function usePriceSelection() {
   const { user } = useAuthContext();
   const { toast } = useToast();
   
-  // ✅ Hook useFirestore esistente
+  // Hook useFirestore per i dati
   const { data: allItems, update: updateItem } = useFirestore<ShoppingItem>('shopping_items');
 
-  // 🔧 Applica il fix a tutti gli items
-  const fixedItems = allItems?.map(fixDetectedPrices) || [];
-
-  // ✅ Filtra items che necessitano selezione prezzo
+  // ✅ SEMPLIFICATO: Filtra items che necessitano selezione prezzo
   const pendingItems = (() => {
-    if (!fixedItems) {
-            return [];
+    if (!allItems) {
+      return [];
     }
 
-    const filtered = fixedItems.filter(item => {
-      const needsSelection = item.needsPriceSelection === true && item.priceSelection?.status!=="skipped";
+    return allItems.filter(item => {
+      const needsSelection = item.needsPriceSelection === true;
+      const notSkipped = item.priceSelection?.status !== "skipped";
       const notCompleted = item.completed === false;
       const userCanAccess = user?.username === item.createdBy || user?.role === 'admin';
-      const pricesCount = getDetectedPricesCount(item);
-      const hasDetectedPrices = pricesCount > 0;
       
-      // 🔍 DEBUG per ogni item che necessita selezione
-      if (needsSelection) {
-                                                              }
+      const priceSelection = item.priceSelection;
+      const hasDetectedPrices = priceSelection?.detectedPrices && 
+                               Array.isArray(priceSelection.detectedPrices) && 
+                               priceSelection.detectedPrices.length > 0;
       
-      return needsSelection && notCompleted && userCanAccess && hasDetectedPrices;
-    });
+      const hasValidPrices = hasDetectedPrices && 
+                             priceSelection!.detectedPrices!.some((price: DetectedPrice) => 
+                               price && 
+                               typeof price.value === 'string' && 
+                               typeof price.numericValue === 'number' && 
+                               price.numericValue > 0
+                             );
 
-        return filtered;
+      return needsSelection && notSkipped && notCompleted && userCanAccess && hasValidPrices;
+    });
   })();
 
-  // 🔍 DEBUG: Log pendingItems
-  useEffect(() => {
-            if (pendingItems.length > 0) {
-                }
-  }, [pendingItems]);
-
   /**
-   * ✅ Auto-apri modale se ci sono item pending
+   * ✅ NUOVO: Apri modale per un item specifico (SOLO MODALITÀ MANUALE)
    */
-  useEffect(() => {
-    const shouldOpen = pendingItems.length > 0 && !isModalOpen && !currentItem;
-        
-    if (shouldOpen) {
-            setCurrentItem(pendingItems[0]);
-      setIsModalOpen(true);
-      
+  const openPriceSelection = useCallback((itemId: string) => {
+    console.log(`🎯 Opening price selection for item: ${itemId}`);
+    
+    // Trova l'item
+    const item = allItems?.find(i => i.id === itemId);
+    if (!item) {
+      console.error(`❌ Item ${itemId} not found`);
+      return;
     }
-    console.groupEnd();
-  }, [pendingItems, isModalOpen, currentItem]);
+    
+    // Controlla se ha prezzi validi
+    if (!item.priceSelection?.detectedPrices?.length) {
+      toast({
+        title: "Errore",
+        description: "Nessun prezzo rilevato per questo item.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setCurrentItem(item);
+    setIsModalOpen(true);
+  }, [allItems, toast]);
 
   /**
-   * ✅ Seleziona un prezzo per un item
+   * ✅ CHIUDI MODALE (SEMPLIFICATO)
+   */
+  const closeModal = useCallback(() => {
+    console.log(`🚪 Closing price selection modal`);
+    setIsModalOpen(false);
+    setCurrentItem(null);
+  }, []);
+
+  /**
+   * ✅ SELEZIONA PREZZO
    */
   const selectPrice = useCallback(async (itemId: string, priceIndex: number): Promise<boolean> => {
     try {
-            
-      // Trova l'item (con fix applicato)
-      const item = fixedItems?.find(i => i.id === itemId);
+      console.log(`💰 Selecting price ${priceIndex} for item ${itemId}`);
+      
+      const item = allItems?.find(i => i.id === itemId);
       if (!item?.priceSelection?.detectedPrices) {
         throw new Error('Item o prezzi non trovati');
       }
 
-      const detectedPrices = item.priceSelection.detectedPrices as any[];
+      const detectedPrices = item.priceSelection.detectedPrices as DetectedPrice[];
       if (priceIndex < 0 || priceIndex >= detectedPrices.length) {
         throw new Error('Indice prezzo non valido');
       }
 
       const selectedPrice = detectedPrices[priceIndex];
-      const now = new Date();
+      
+      if (!selectedPrice || typeof selectedPrice.numericValue !== 'number' || selectedPrice.numericValue <= 0) {
+        throw new Error('Prezzo selezionato non valido');
+      }
 
-      // ✅ AGGIORNAMENTO DIRETTO FIRESTORE (oggetto completamente nuovo)
-      const updateData = {
-        // Imposta il prezzo principale
-        estimatedPrice: selectedPrice.numericValue || 0,
-        
-        // 🔧 FIX: Crea un nuovo oggetto priceSelection senza spread
-        priceSelection: {
-          status: 'selected',
-          detectedPrices: detectedPrices,
-          selectedPriceIndex: priceIndex,
-          selectedCssSelector: selectedPrice.cssSelector || '',
-          selectionTimestamp: now,
-          lastDetectionAttempt: item.priceSelection.lastDetectionAttempt || now
-          // NON include detectionErrors o altri campi undefined
-        },
-        
-        // Non necessita più selezione
-        needsPriceSelection: false,
-        
-        // Aggiunge al historical price
-        historicalPrice: [...(item.historicalPrice || []), selectedPrice.numericValue || 0],
-        historicalPriceWithDates: [
-          ...(item.historicalPriceWithDates || []),
-          {
-            price: selectedPrice.numericValue || 0,
-            date: now,
-            changeType: 'initial' as const
-          }
-        ],
-        
-        // Aggiorna timestamp
-        updatedAt: now
-      };
+      // Crea istanza ShoppingItem e usa i suoi metodi
+      const shoppingItemInstance = ShoppingItem.fromFirestore({
+        ...item,
+        id: item.id
+      });
+      
+      shoppingItemInstance.selectPrice(priceIndex);
+      const firestoreData = shoppingItemInstance.toFirestore();
 
-            await updateItem(itemId, updateData as ShoppingItem);
+      await updateItem(itemId, firestoreData);
       
       toast({
         title: "Prezzo selezionato",
-        description: `Il prezzo ${selectedPrice.value || selectedPrice.numericValue} è stato salvato e il monitoraggio è attivo.`,
+        description: `Il prezzo ${selectedPrice.value} è stato salvato.`,
       });
       
       return true;
       
     } catch (error) {
       console.error('❌ Errore selezione prezzo:', error);
+      
+      const errorMessage = error instanceof Error ? error.message : 'Errore sconosciuto';
+      
       toast({
         title: "Errore",
-        description: "Si è verificato un errore durante il salvataggio.",
+        description: `Errore durante il salvataggio: ${errorMessage}`,
         variant: "destructive"
       });
       return false;
     }
-  }, [fixedItems, updateItem, toast]);
+  }, [allItems, updateItem, toast]);
 
   /**
-   * ✅ Chiudi modale e passa al prossimo item se disponibile
-   */
-  const closeModalAndNext = useCallback(() => {
-        setIsModalOpen(false);
-    setCurrentItem(null);
-    
-    // Se ci sono altri item, mostra il prossimo dopo un delay
-    const remainingItems = pendingItems.filter(item => item.id !== currentItem?.id);
-        
-    if (remainingItems.length > 0) {
-      setTimeout(() => {
-                setCurrentItem(remainingItems[0]);
-        setIsModalOpen(true);
-      }, 1000);
-    }
-  }, [pendingItems, currentItem]);
-
-  /**
-   * ✅ Salta un item (nascondilo temporaneamente)
+   * ✅ SALTA ITEM
    */
   const skipItem = useCallback(async (itemId: string) => {
     try {
-            
-      // Aggiorna l'item per nasconderlo temporaneamente
-      await updateItem(itemId, {
-  needsPriceSelection: true,
-  'priceSelection.status': 'skipped',
-} as any);
+      console.log(`⏭️ Skipping item ${itemId}`);
       
-      closeModalAndNext();
+      const item = allItems?.find(i => i.id === itemId);
+      if (!item) {
+        throw new Error('Item non trovato');
+      }
+      
+      const shoppingItemInstance = ShoppingItem.fromFirestore({
+        ...item,
+        id: item.id
+      });
+      
+      if (shoppingItemInstance.priceSelection) {
+        shoppingItemInstance.priceSelection.status = 'skipped';
+      }
+      shoppingItemInstance.needsPriceSelection = true;
+      shoppingItemInstance.updatedAt = new Date();
+      
+      const firestoreData = shoppingItemInstance.toFirestore();
+      await updateItem(itemId, firestoreData);
       
       toast({
         title: "Item saltato",
-        description: "L'item è stato temporaneamente nascosto dalla lista.",
+        description: "L'item è stato saltato temporaneamente.",
       });
+      
     } catch (error) {
       console.error('❌ Errore skip item:', error);
+      
+      const errorMessage = error instanceof Error ? error.message : 'Errore sconosciuto';
+      
       toast({
         title: "Errore",
-        description: "Impossibile saltare l'item.",
+        description: `Impossibile saltare l'item: ${errorMessage}`,
         variant: "destructive"
       });
     }
-  }, [updateItem, closeModalAndNext, toast]);
+  }, [allItems, updateItem, toast]);
 
-  const returnValue = {
+  /**
+   * ✅ RIAPRI ITEM SALTATO
+   */
+  const reopenSkippedItem = useCallback(async (itemId: string) => {
+    try {
+      console.log(`🔄 Reopening skipped item ${itemId}`);
+      
+      const item = allItems?.find(i => i.id === itemId);
+      if (!item) {
+        throw new Error('Item non trovato');
+      }
+      
+      const shoppingItemInstance = ShoppingItem.fromFirestore({
+        ...item,
+        id: item.id
+      });
+      
+      if (shoppingItemInstance.priceSelection) {
+        shoppingItemInstance.priceSelection.status = 'needs_selection';
+      }
+      shoppingItemInstance.needsPriceSelection = true;
+      shoppingItemInstance.updatedAt = new Date();
+      
+      const firestoreData = shoppingItemInstance.toFirestore();
+      await updateItem(itemId, firestoreData);
+      
+      // Apri immediatamente la modale per questo item
+      openPriceSelection(itemId);
+      
+      toast({
+        title: "Item riaperto",
+        description: "L'item è stato riaggiunto per la selezione prezzo.",
+      });
+      
+    } catch (error) {
+      console.error('❌ Errore reopening item:', error);
+      
+      const errorMessage = error instanceof Error ? error.message : 'Errore sconosciuto';
+      
+      toast({
+        title: "Errore",
+        description: `Impossibile riaprire l'item: ${errorMessage}`,
+        variant: "destructive"
+      });
+    }
+  }, [allItems, updateItem, openPriceSelection, toast]);
+
+  /**
+   * ✅ HELPER: Ottieni prezzi dell'item corrente
+   */
+  const getCurrentItemPrices = useCallback(() => {
+    if (!currentItem?.priceSelection?.detectedPrices) {
+      return [];
+    }
+    return currentItem.priceSelection.detectedPrices as DetectedPrice[];
+  }, [currentItem]);
+
+  /**
+   * ✅ HELPER: Ottieni summary selezione prezzi
+   */
+  const getPriceSelectionSummary = useCallback((item: ShoppingItem) => {
+    if (!item.priceSelection) return 'Nessun dato prezzi';
+    
+    const pricesCount = item.priceSelection.detectedPrices?.length || 0;
+    switch (item.priceSelection.status) {
+      case 'needs_selection':
+        return `${pricesCount} prezzi trovati - necessita selezione`;
+      case 'selected':
+        return `Prezzo selezionato`;
+      case 'single_price':
+        return `Prezzo unico rilevato`;
+      case 'skipped':
+        return `Saltato dall'utente`;
+      case 'error':
+        return `Errore rilevamento prezzi`;
+      default:
+        return 'Stato sconosciuto';
+    }
+  }, []);
+
+  // ✅ RITORNA SOLO QUELLO CHE SERVE
+  return {
+    // Dati
     pendingItems,
     currentItem,
     isModalOpen,
     loading: false,
+    
+    // Azioni principali
+    openPriceSelection,
+    closeModal,
     selectPrice,
-    closeModalAndNext,
     skipItem,
-    hasPendingItems: pendingItems.length > 0
+    reopenSkippedItem,
+    
+    // Helper
+    getCurrentItemPrices,
+    getPriceSelectionSummary,
+    hasPendingItems: pendingItems.length > 0,
+    
+    // Statistiche
+    stats: {
+      totalPending: pendingItems.length,
+      currentIndex: currentItem ? pendingItems.findIndex(item => item.id === currentItem.id) + 1 : 0
+    }
   };
-
-  // 🔍 DEBUG: Log return value
-  
-  return returnValue;
 }

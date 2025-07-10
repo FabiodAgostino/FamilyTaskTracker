@@ -74,8 +74,6 @@ function AppContent() {
           <Dashboard />
         </Route>
       </Switch>
-      
-      <PriceSelectionManager />
     </>
   );
 }
@@ -91,6 +89,7 @@ function App() {
               <Router hook={useHashLocation}>
                 <AppContent />
                 <Toaster />
+                <PriceSelectionManager />
               </Router>
             </UserPreferencesProvider>
           </AuthProvider>

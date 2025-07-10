@@ -136,7 +136,7 @@ class PriceDetectorService {
             console.log(`📊 DEBUG: Trovati ${titleMetaPrices.length} prezzi da title/meta`);
             
             // STEP 3: Cerca prezzi nei JSON (alta priority)
-            const jsonPrices = this.extractJsonPrices(htmlContent);
+            const jsonPrices = this.extractJsonPrices(htmlContent, $);
             detectedPrices.push(...jsonPrices);
             console.log(`📊 DEBUG: Trovati ${jsonPrices.length} prezzi da JSON`);
             
@@ -263,9 +263,15 @@ class PriceDetectorService {
     /**
      * Estrae prezzi dai dati JSON embedded
      */
-    extractJsonPrices(htmlContent) {
-        const prices = [];
-        const seenValues = new Set();
+    extractJsonPrices(htmlContent, $ = null){
+         const prices = [];
+    const seenValues = new Set();
+    
+    // ✅ Se $ non è passato, crea cheerio instance
+    if (!$) {
+        const cheerio = require('cheerio');
+        $ = cheerio.load(htmlContent);
+    }
 
         for (const pattern of this.jsonPatterns) {
             let match;
@@ -314,17 +320,35 @@ class PriceDetectorService {
                                 currencySymbol = '£';
                             }
                             
-                            prices.push({
+                            const correlatedElement = this.correlatePriceToElement(finalPrice, $);
+                            const priceData = {
                                 value: `${currencySymbol}${finalPrice.toFixed(2)}`,
                                 numericValue: finalPrice,
-                                cssSelector: '[data-json-price]',
-                                confidence: 0.85,
                                 source: 'json',
                                 conversionType: conversionType,
-                                parentClasses: [],
-                                elementText: `JSON: ${rawValue} → ${currencySymbol}${finalPrice.toFixed(2)}`,
-                                context: { nearbyText: '', isProminent: true }
-                            });
+                                jsonPattern: rawValue,  // Pattern JSON originale
+                                confidence: 0.85
+                            };
+
+                            if (correlatedElement) {
+                                // ✅ USA GERARCHIA ESISTENTE per elemento correlato
+                                priceData.cssSelector = this.generateCssSelector(correlatedElement, $);
+                                priceData.parentClasses = this.getParentClasses(correlatedElement, $);
+                                priceData.elementText = correlatedElement.text().substring(0, 100);
+                                priceData.context = {
+                                    nearbyText: this.getNearbyText(correlatedElement, $),
+                                    isProminent: this.isElementProminent(correlatedElement, $)
+                                };
+                                priceData.source = 'json-correlated';
+                            } else {
+                                // ✅ FALLBACK migliorato se non trova correlazione
+                                priceData.cssSelector = `[data-json-fallback="${finalPrice.toFixed(2)}"]`;
+                                priceData.parentClasses = [];
+                                priceData.elementText = `JSON: ${rawValue} → ${finalPrice}`;
+                                priceData.context = { nearbyText: 'Estratto da JSON', isProminent: true };
+                            }
+
+                            prices.push(priceData);
                         }
                         
                     } catch (e) {
@@ -336,7 +360,99 @@ class PriceDetectorService {
 
         return prices;
     }
+    /**
+ * ✅ NUOVO: Correlazione JSON → HTML
+ * Trova l'elemento HTML che mostra visivamente il prezzo estratto dal JSON
+ */
+correlatePriceToElement(jsonPrice, $) {
+    const priceString = jsonPrice.toFixed(2);
+    const variations = [
+        priceString,                          // "65.95"
+        priceString.replace('.', ','),        // "65,95" (formato italiano)
+        `€${priceString}`,                   // "€65.95"
+        `${priceString}€`,                   // "65.95€"
+        `$${priceString}`,                   // "$65.95"
+        `${priceString} €`,                  // "65.95 €"
+        `€ ${priceString}`,                  // "€ 65.95"
+        priceString.replace(/\.(\d{2})$/, ',$1')  // "65,95"
+    ];
+    
+    console.log(`🔗 Cercando correlazione HTML per prezzo JSON: ${priceString}`);
+    
+    for (const variation of variations) {
+        // Cerca elementi che contengono esattamente questa variazione di prezzo
+        const elements = $(`*:contains("${variation}")`).filter((i, el) => {
+            const $el = $(el);
+            const text = $el.text().trim();
+            
+            // Deve contenere il prezzo ma non essere troppo lungo o rumoroso
+            const containsPrice = text.includes(variation);
+            const notTooLong = text.length < 200;
+            const notNoise = !this.isNoiseElement($el, text, $);
+            const hasReasonableText = text.replace(/[^\w€$£.,\s]/g, '').length > 2;
+            
+            return containsPrice && notTooLong && notNoise && hasReasonableText;
+        });
+        
+        if (elements.length > 0) {
+            console.log(`✅ Trovati ${elements.length} elementi HTML per "${variation}"`);
+            
+            // Ordina per specificità (meno elementi figli = più specifico)
+            const sortedElements = elements.toArray().sort((a, b) => {
+                const aChildCount = $(a).find('*').length;
+                const bChildCount = $(b).find('*').length;
+                const aTextLength = $(a).text().trim().length;
+                const bTextLength = $(b).text().trim().length;
+                
+                // Preferisci elementi con meno figli e testo più corto
+                if (aChildCount !== bChildCount) {
+                    return aChildCount - bChildCount;
+                }
+                return aTextLength - bTextLength;
+            });
+            
+            const bestElement = $(sortedElements[0]);
+            console.log(`🎯 Elemento migliore: ${this.generateCssSelector(bestElement, $)}`);
+            return bestElement;
+        }
+    }
+    
+    console.log(`❌ Nessuna correlazione HTML trovata per prezzo ${priceString}`);
+    return null;
+}
 
+isNoiseElement($element, text, $) {
+    const classes = ($element.attr('class') || '').toLowerCase();
+    const id = ($element.attr('id') || '').toLowerCase();
+    
+    // Esclude prodotti correlati/raccomandazioni
+    const noiseKeywords = [
+        'recommend', 'related', 'similar', 'cross-sell',
+        'product-card', 'other-product', 'brother-price', 'suggestion',
+        'bundle', 'combo', 'accessory', 'cart', 'footer', 'header',
+        'navigation', 'menu', 'breadcrumb', 'pagination'
+    ];
+    
+    for (const keyword of noiseKeywords) {
+        if (classes.includes(keyword) || id.includes(keyword)) {
+            return true;
+        }
+    }
+    
+    // Esclude se contiene troppe occorrenze dello stesso prezzo (listing)
+    const priceOccurrences = (text.match(/[\$€£]\s*\d+/g) || []).length;
+    if (priceOccurrences > 2) {
+        return true;
+    }
+    
+    // Esclude script/style tag
+    const tagName = $element.prop('tagName').toLowerCase();
+    if (['script', 'style', 'noscript'].includes(tagName)) {
+        return true;
+    }
+    
+    return false;
+}
     /**
      * Estrae prezzi usando selettori CSS
      */
@@ -554,13 +670,23 @@ class PriceDetectorService {
             });
             
             const bestPrice = prices[0];
+        // ✅ MIGLIORATO: Merge selettori alternativi se stesso prezzo
+        if (prices.length > 1) {
+            bestPrice.alternativeSelectors = prices.slice(1).map(p => ({
+                cssSelector: p.cssSelector,
+                confidence: p.confidence,
+                source: p.source,
+                context: p.context?.nearbyText || ''
+            }));
             
             // Bonus per essere in più elementi (più affidabile)
-            if (prices.length > 1) {
-                bestPrice.confidence += Math.min(0.2, prices.length * 0.05);
-            }
+            bestPrice.confidence += Math.min(0.2, prices.length * 0.05);
             
-            bestPrices.push(bestPrice);
+            console.log(`🔗 Prezzo ${value} trovato in ${prices.length} elementi:`, 
+                prices.map(p => p.cssSelector));
+        }
+
+        bestPrices.push(bestPrice);
         });
         
         // Ordina prezzi finali per confidence
@@ -719,41 +845,47 @@ class PriceDetectorService {
 /**
      * Formatta il risultato finale
      */
-    formatResult(prices) {
-        if (prices.length === 0) {
-            return {
-                status: 'no_prices_detected',
-                detectedPrices: [],
-                detectionErrors: ['Nessun prezzo rilevato nella pagina']
-            };
-        }
-        
-        if (prices.length === 1) {
-            return {
-                status: 'single_price',
-                detectedPrices: prices,
-                selectedPrice: prices[0]
-            };
-        }
-        
-        // Verifica se tutti i prezzi sono uguali (deduplicazione by value)
-        const uniqueValues = [...new Set(prices.map(p => p.numericValue))];
-        
-        if (uniqueValues.length === 1) {
-            return {
-                status: 'single_price',
-                detectedPrices: prices,
-                selectedPrice: prices[0],
-                note: 'Più elementi con stesso prezzo, selezione automatica'
-            };
-        }
-        
+formatResult(prices) {
+    if (prices.length === 0) {
         return {
-            status: 'multiple_prices',
-            detectedPrices: prices,
-            note: `${uniqueValues.length} prezzi diversi rilevati`
+            status: 'no_prices_detected',
+            detectedPrices: [],
+            detectionErrors: ['Nessun prezzo rilevato nella pagina']
         };
     }
+    
+    // ✅ AGGIUNGI position.index dopo l'ordinamento finale
+    const pricesWithPosition = prices.map((price, index) => ({
+        ...price,
+        position: {
+            depth: 0,
+            index: index,  // ← Index progressivo nell'array ordinato
+        }
+    }));
+    
+    if (pricesWithPosition.length === 1) {
+        return {
+            status: 'single_price',
+            detectedPrices: pricesWithPosition
+        };
+    }
+    
+    const uniqueValues = [...new Set(pricesWithPosition.map(p => p.numericValue))];
+    
+    if (uniqueValues.length === 1) {
+        return {
+            status: 'single_price',
+            detectedPrices: pricesWithPosition,
+            note: 'Più elementi con stesso prezzo, selezione automatica'
+        };
+    }
+    
+    return {
+        status: 'multiple_prices',
+        detectedPrices: pricesWithPosition,
+        note: `${uniqueValues.length} prezzi diversi rilevati`
+    };
+}
 
     /**
      * Test di un CSS selector specifico

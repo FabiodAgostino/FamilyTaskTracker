@@ -78,63 +78,40 @@ class ScrapingService {
                 useNavigation: false,
                 fallbackToAggressive: true
             });
-            const detectedPrices = scrapingResult.content.detectedPrices;
+
+            const priceDetectionResult = scrapingResult.content.detectedPrices;
+            const detectedPricesArray = priceDetectionResult.detectedPrices || [];
 
             if (scrapingResult.success) {
                 console.log('✅ Scraping completato, analizzando prezzi...');
+                console.log(`💰 Rilevati ${detectedPricesArray.length} prezzi nella pagina`);
                 
-               
-
-                
-                console.log(`💰 Rilevati ${detectedPrices.length} prezzi nella pagina`);
-                
-                // 🔴 STEP 3: NUOVO - Decisione su come procedere
-                if (detectedPrices.length === 0) {
-                    // Nessun prezzo trovato - procedura normale con DeepSeek
-                    console.log('❌ Nessun prezzo rilevato, usando DeepSeek per analisi completa...');
+                if (detectedPricesArray.length === 0) {
                     finalResult = await this.processWithDeepSeek(scrapingResult, url);
+                    finalResult.priceDetectionResult = priceDetectionResult; // Usa il risultato originale
+                    
+                } else if (detectedPricesArray.length === 1) {
+                    finalResult = await this.processWithDeepSeekNoPriceExtraction(scrapingResult, url);
+                    finalResult.estimatedPrice = detectedPricesArray[0].numericValue;
+                    
+                    // Arricchisci il risultato originale
                     finalResult.priceDetectionResult = {
-                        detectedPrices: [],
-                        status: 'no_prices_detected',
+                        ...priceDetectionResult,
+                        selectedPrice: detectedPricesArray[0],
                         needsSelection: false
                     };
                     
-                } else if (detectedPrices.length === 1) {
-                    // Un solo prezzo - selezione automatica + DeepSeek per altri dati
-                    console.log('✅ Un solo prezzo rilevato, procedura automatica...');
-                    const singlePrice = detectedPrices[0];
-                    
-                    // Usa DeepSeek ma senza fargli estrarre il prezzo
-                    finalResult = await this.processWithDeepSeekNoPriceExtraction(scrapingResult, url);
-                    
-                    // Sovrascrivi con il prezzo rilevato automaticamente
-                    finalResult.estimatedPrice = singlePrice.numericValue;
-                    finalResult.priceDetectionResult = {
-                        detectedPrices: detectedPrices,
-                        status: 'single_price',
-                        needsSelection: false,
-                        selectedPrice: singlePrice
-                    };
-                    
                 } else {
-                    // Prezzi multipli - NO DeepSeek, necessita selezione utente
-                    console.log(`⚠️ ${detectedPrices.length} prezzi rilevati, necessita selezione utente`);
-                    
-                    // Estrai solo metadati base con DeepSeek (senza prezzo)
                     finalResult = await this.processWithDeepSeekNoPriceExtraction(scrapingResult, url);
-                    
-                    // Non impostare estimatedPrice, sarà impostato quando l'utente seleziona
                     finalResult.estimatedPrice = null;
+                    
+                    // Arricchisci il risultato originale
                     finalResult.priceDetectionResult = {
-                        detectedPrices: detectedPrices,
-                        status: 'multiple_prices',
+                        ...priceDetectionResult,
                         needsSelection: true
                     };
                 }
-                
-                console.log(`✅ Scraping completato con successo in ${Date.now() - startTime}ms`);
-                
-            } else {
+            }else {
                 throw new Error(`Scraping fallito: ${scrapingResult.error}`);
             }
             
@@ -222,10 +199,11 @@ Per questa pagina prodotto, estrai queste informazioni in formato JSON (ESCLUDI 
 
 IMPORTANTE: NON estrarre il prezzo, sarà gestito separatamente.
 
-Regole:
+Regole importanti:
 1. Restituisci SOLO JSON valido, niente altro
-2. Se un campo non è disponibile, usa stringa vuota ""
-3. Il nome deve essere il titolo principale del prodotto`;
+2. Se un campo non è disponibile, usa stringa vuota "" o null
+3. Il nome deve essere il titolo principale del prodotto, non descrizioni tecniche lunghe
+4. La categoria deve essere sempre in italiano`;
 
         try {
             // Usa il sistema DeepSeek esistente ma con prompt modificato
@@ -336,10 +314,6 @@ Regole:
                     // Non aggiornare estimatedPrice
                     
                 } else if (priceDetection.status === 'no_prices_detected') {
-                    // Nessun prezzo rilevato - usa DeepSeek result se disponibile
-                    if (scrapingResult.estimatedPrice) {
-                        updateData.estimatedPrice = scrapingResult.estimatedPrice;
-                    }
                     updateData.priceSelection = {
                         status: 'error',
                         detectedPrices: [],

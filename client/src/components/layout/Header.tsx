@@ -16,6 +16,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { VersionBadge, MobileVersionBadge } from '@/components/common/VersionBadge';
 import { NotificationCenter } from '../user/NotificationCenter';
+import { usePriceSelectionService } from '@/components/shopping/PriceSelectionManager';
 
 interface HeaderProps {
   onMenuToggle: () => void;
@@ -33,6 +34,7 @@ const RatIcon = ({ className }: { className?: string }) => (
 
 export function Header({ onMenuToggle }: HeaderProps) {
 const { permission, requestPermission, isSupported, token, debug, isInitializing, disableNotifications, enableNotifications, isManuallyDisabled } = useNotifications();
+  const priceSelectionService = usePriceSelectionService();
 
 
   const { user, logout } = useAuthContext();
@@ -131,7 +133,10 @@ const { permission, requestPermission, isSupported, token, debug, isInitializing
             {/* 🆕 AGGIUNTO: Version Badge - Desktop */}
             <div className="hidden md:flex items-center space-x-2">
               <VersionBadge variant="default" />
-              <NotificationCenter variant="desktop" />
+               <NotificationCenter 
+                variant="desktop"
+                priceSelectionService={priceSelectionService}
+              />
             </div>
 
             {/* 🆕 AGGIUNTO: Version Badge - Tablet (compatto) */}
@@ -265,7 +270,10 @@ const { permission, requestPermission, isSupported, token, debug, isInitializing
 
             {/* 🔧 FIXED: Mobile user icon - Dimensioni aumentate */}
             <div className="sm:hidden flex items-center space-x-2">
-                <NotificationCenter variant="mobile" />
+                <NotificationCenter 
+                variant="mobile"
+                priceSelectionService={priceSelectionService}
+              />
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

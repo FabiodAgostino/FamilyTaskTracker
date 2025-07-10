@@ -98,7 +98,7 @@ export function PriceSelectionModal({
   };
 
   const handleSkip = () => {
-    if (onSkip) {
+    if (onSkip && item.priceSelection?.status!=="skipped") {
       onSkip(item.id);
     }
     onClose();
@@ -120,28 +120,41 @@ export function PriceSelectionModal({
   };
 
   // 🔧 FIX: Gestione sicura del prezzo numerico
-  const formatNumericPrice = (numericValue?: number, fallbackValue?: string) => {
-    if (numericValue != null && !isNaN(numericValue)) {
-      return `${numericValue.toFixed(2)} €`;
-    }
+    const formatNumericPrice = (numericValue?: number, fallbackValue?: string) => {
+  // Funzione per estrarre il simbolo di valuta dal fallbackValue
+  const extractCurrencySymbol = (text: string): string => {
+    // Cerca simboli di valuta comuni
+    const currencyRegex = /[€$£¥₹₽¢₩₪₨₦₡₵₴₸₲₱₡₴₦₨₩₪₹₽¢]/;
+    const match = text.match(currencyRegex);
+    return match ? match[0] : '€'; // Default a € se non trova nessun simbolo
+  };
+ console.log(fallbackValue)
+  // Se abbiamo numericValue valido
+  if (numericValue != null && !isNaN(numericValue)) {
+    const currencySymbol = fallbackValue ? extractCurrencySymbol(fallbackValue) : '€';
     
-    // Se non c'è numericValue, prova a estrarre da fallbackValue
-    if (fallbackValue) {
-      const match = fallbackValue.match(/(\d+[.,]\d{2})/);
-      if (match) {
-        const extracted = parseFloat(match[1].replace(',', '.'));
-        if (!isNaN(extracted)) {
-          return `${extracted.toFixed(2)} €`;
-        }
+    return `${numericValue.toFixed(2)}${currencySymbol}`;
+  }
+  
+  // Se non c'è numericValue, prova a estrarre da fallbackValue
+  if (fallbackValue) {
+    const currencySymbol = extractCurrencySymbol(fallbackValue);
+    
+    const match = fallbackValue.match(/(\d+[.,]\d{2})/);
+    if (match) {
+      const extracted = parseFloat(match[1].replace(',', '.'));
+      if (!isNaN(extracted)) {
+        return `${extracted.toFixed(2)}${currencySymbol}`;
       }
     }
-    
-    return fallbackValue || 'N/A';
-  };
+  }
+  
+  return fallbackValue || 'N/A';
+};
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl">
             <Euro className="h-6 w-6 text-blue-600" />
@@ -201,10 +214,7 @@ export function PriceSelectionModal({
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <span className="text-2xl font-bold text-gray-900">
-                          {price.value}
-                        </span>
-                        <span className="text-lg text-gray-600">
-                          ({formatNumericPrice(price.numericValue, price.value)})
+                          {formatNumericPrice(price.numericValue, price.elementText)}
                         </span>
                         
                         {/* Badge prominenza */}

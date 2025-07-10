@@ -101,6 +101,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       icon: FaCalendar ,
       count: stats.calendar,
       color: 'bg-sunset'
+    },
+    {
+      name: 'Digital Wallet',
+      path: '/digitalwallet',
+      icon: FaCalendar ,
+      count: stats.calendar,
+      color: 'bg-sunset'
     }
    
   ];
