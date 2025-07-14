@@ -42,6 +42,15 @@ export function removeUndefinedFields<T extends Record<string, any>>(obj: T): Pa
   return cleaned;
 }
 
+export function viewImage(path:string):string
+{
+  const currentUrl = window.location.href;
+  if(currentUrl.includes("localhost"))
+    return path
+  else
+    return currentUrl +"/" + path;
+}
+
 /**
  * Prepara un documento per Firestore rimuovendo campi undefined
  */

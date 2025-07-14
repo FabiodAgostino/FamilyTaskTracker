@@ -201,7 +201,6 @@ updateWithMultiplePrices(detectedPrices: DetectedPrice[]): void {
     const detectedPrices = data?.priceSelection?.detectedPrices;
     
     if (!Array.isArray(detectedPrices)) {
-      console.log('detectedPrices non è un array o non esiste');
       return [];
     }
     

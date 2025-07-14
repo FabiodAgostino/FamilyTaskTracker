@@ -25,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { cn } from '@/lib/utils';
+import { cn, viewImage } from '@/lib/utils';
 import { FidelityCard } from '@/lib/models/FidelityCard';
 import JsBarcode from 'jsbarcode';
 
@@ -317,7 +317,7 @@ const CompactFidelityCard = ({ card, onCardClick }: CompactFidelityCardProps) =>
   >
     <CardContent className="p-4 h-full flex flex-col justify-center items-center text-white text-center">
       <img
-        src={card.logo}
+        src={viewImage(card.logo)}
         alt="Wallet Logo"
         className="group-hover:scale-110 transition-transform duration-200"
       />
@@ -406,7 +406,7 @@ const CardDetailModal = ({
               >
                 <div className="flex items-center justify-center h-full">
                 <img
-                  src={selectedCard.logo}
+                  src={viewImage(selectedCard.logo)}
                   alt="Wallet Logo"
                   className="h-[30%] group-hover:scale-110 transition-transform duration-200"
                 />

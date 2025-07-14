@@ -26,8 +26,8 @@ export interface LoginAttempt {
  */
 const AUTH_CONFIG = {
   MAX_LOGIN_ATTEMPTS: 3,
-  LOCKOUT_DURATION: 5 * 60 * 1000, // 5 minuti
-  SESSION_DURATION: 8 * 60 * 60 * 1000, // 8 ore
+  LOCKOUT_DURATION: 1 * 60 * 1000, // 5 minuti
+  SESSION_DURATION: 720 * 60 * 60 * 1000, // 8 ore
   API_DELAY: 1000,
   STORAGE_KEY: 'familyTaskManager_auth',
   FAILED_ATTEMPTS_KEY: 'familyTaskManager_failedAttempts'
