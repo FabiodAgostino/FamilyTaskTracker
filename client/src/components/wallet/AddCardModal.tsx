@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { 
+import {
   Scan,
   Globe,
   Lock,
@@ -20,35 +20,7 @@ import {
 } from '@/components/ui/dialog';
 import { cn, viewImage } from '@/lib/utils';
 import { supermarketData, type SupermarketKey, suggestedColors } from './walletConstants';
-
-// Definizioni TypeScript per html5-qrcode
-declare global {
-  interface Window {
-    Html5QrcodeScanner?: new (
-      elementId: string,
-      config?: any,
-      verbose?: boolean
-    ) => any;
-    Html5QrcodeSupportedFormats?: {
-      QR_CODE: number;
-      CODE_128: number;
-      EAN_13: number;
-      UPC_A: number;
-      UPC_E: number;
-      EAN_8: number;
-      CODE_39: number;
-      CODE_93: number;
-      CODABAR: number;
-      ITF: number;
-      PDF_417: number;
-      DATA_MATRIX: number;
-    };
-    Html5QrcodeScanType?: {
-      SCAN_TYPE_CAMERA: number;
-      SCAN_TYPE_FILE: number;
-    };
-  }
-}
+import { Html5Qrcode } from 'html5-qrcode';
 
 interface AddCardModalProps {
   isOpen: boolean;
@@ -56,44 +28,28 @@ interface AddCardModalProps {
   onSave: (cardData: any) => void;
 }
 
-// Hook per caricare html5-qrcode
+// Carica dinamicamente la libreria html5-qrcode
 const useHtml5QrcodeLoader = () => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Verifica se già caricato
-    if (typeof window !== 'undefined' && window.Html5QrcodeScanner) {
-      setIsLoaded(true);
-      return;
-    }
-
-    // Polyfill per globalThis (risolve problemi versione 2.3.8)
-    if (typeof globalThis === 'undefined') {
-      (window as any).globalThis = window;
-    }
-
     setIsLoading(true);
-
     const script = document.createElement('script');
     script.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
     script.async = true;
 
     script.onload = () => {
-      console.log('✅ html5-qrcode library loaded successfully');
       setIsLoaded(true);
       setIsLoading(false);
     };
-
     script.onerror = () => {
-      console.error('❌ Failed to load html5-qrcode library');
       setError('Errore caricamento libreria scanner');
       setIsLoading(false);
     };
 
     document.head.appendChild(script);
-
     return () => {
       if (document.head.contains(script)) {
         document.head.removeChild(script);
@@ -104,120 +60,76 @@ const useHtml5QrcodeLoader = () => {
   return { isLoaded, isLoading, error };
 };
 
-// Componente Scanner ottimizzato
-  const Html5QrcodePlugin = ({ 
-    onScanSuccess,
-    onScanError,
-    cameraPermission
-  }: {
-    onScanSuccess: (decodedText: string, decodedResult: any) => void;
-    onScanError?: (error: string) => void;
-    cameraPermission: 'unknown' | 'granted' | 'denied';
-  }) => {
-  const qrcodeRegionId = "html5qr-code-full-region";
-  const html5QrcodeScannerRef = useRef<any>(null);
-  const initializationStateRef = useRef<'idle' | 'initializing' | 'initialized'>('idle');
-
-  // Callback memoization per prevenire re-render
-  const handleScanSuccess = useCallback((decodedText: string, decodedResult: any) => {
-    console.log('✅ Scan success:', decodedText);
-    onScanSuccess(decodedText, decodedResult);
-  }, [onScanSuccess]);
-
-  const handleScanError = useCallback((error: string) => {
-    // Filtra errori comuni durante la scansione
-    if (error.includes('No QR code found') || 
-        error.includes('couldn\'t find enough finder patterns') ||
-        error.includes('NotFoundException')) {
-      return;
-    }
-    if (onScanError) {
-      onScanError(error);
-    }
-  }, [onScanError]);
+// Plugin scanner minimal
+const Html5QrcodePlugin = ({
+  onScanSuccess,
+  onScanError,
+  cameraPermission
+}: {
+  onScanSuccess: (decodedText: string) => void;
+  onScanError?: (error: string) => void;
+  cameraPermission: 'unknown' | 'granted' | 'denied';
+}) => {
+  const qrcodeRegionId = 'html5qr-code-full-region';
+  const qrRef = useRef<Html5Qrcode | null>(null);
+  const initState = useRef<'idle' | 'initializing' | 'initialized'>('idle');
+  const [cameras, setCameras] = useState<{ id: string; label: string }[]>([]);
+  const [currentCameraIndex, setCurrentCameraIndex] = useState(0);
 
   useEffect(() => {
-    // Prevenire doppia inizializzazione in React Strict Mode
-    if (initializationStateRef.current !== 'idle') {
-      return;
-    }
+    if (initState.current !== 'idle' || cameraPermission !== 'granted') return;
+    initState.current = 'initializing';
 
-    if (typeof window === 'undefined' || !window.Html5QrcodeScanner) {
-      console.error('Html5QrcodeScanner not available');
-      return;
-    }
-
-    initializationStateRef.current = 'initializing';
-
-    try {
-      // Configurazione ottimizzata per barcode retail
-      const config = {
-        fps: 10,
-        qrbox: { width: 420, height: 300 }, // Dimensioni ottimali per barcode
-        aspectRatio: 1.0,
-        disableFlip: false,
-        formatsToSupport: window.Html5QrcodeSupportedFormats ? [
-          window.Html5QrcodeSupportedFormats.QR_CODE,
-          window.Html5QrcodeSupportedFormats.CODE_128,
-          window.Html5QrcodeSupportedFormats.EAN_13,
-          window.Html5QrcodeSupportedFormats.UPC_A,
-          window.Html5QrcodeSupportedFormats.UPC_E,
-          window.Html5QrcodeSupportedFormats.EAN_8
-        ] : undefined,
-        showTorchButtonIfSupported: true,
-        showZoomSliderIfSupported: true,
-        supportedScanTypes: window.Html5QrcodeScanType ? 
-          [window.Html5QrcodeScanType.SCAN_TYPE_CAMERA] : undefined,
-        rememberLastUsedCamera: true,
-        experimentalFeatures: {
-          useBarCodeDetectorIfSupported: true
-        }
-      };
-
-    if (cameraPermission !== 'granted') {
-      console.warn('Camera permission non valida, skip scanner init');
-      return;
-    }
-    // Se non ho il permesso, non inizializzo
-    if (cameraPermission !== 'granted') {
-      console.warn('Camera permission non valida, skip scanner init');
-      return;
-    }
-    html5QrcodeScannerRef.current = new window.Html5QrcodeScanner(
-      qrcodeRegionId,
-      config,
-      false // verbose
-    );
-    html5QrcodeScannerRef.current.render(handleScanSuccess, handleScanError);
-      initializationStateRef.current = 'initialized';
-      console.log('✅ Html5QrcodeScanner initialized successfully');
-    } catch (error) {
-      console.error('Failed to initialize Html5QrcodeScanner:', error);
-      initializationStateRef.current = 'idle';
-    }
+    Html5Qrcode.getCameras()
+      .then(devices => {
+        setCameras(devices);
+        const cameraId = devices[currentCameraIndex]?.id;
+        qrRef.current = new Html5Qrcode(qrcodeRegionId);
+        return qrRef.current.start(
+          cameraId,
+          { fps: 10, qrbox: { width: 420, height: 300 } } as any,
+          onScanSuccess,
+          onScanError
+        );
+      })
+      .then(() => {
+        initState.current = 'initialized';
+      })
+      .catch(err => {
+        console.error('Errore init:', err);
+        initState.current = 'idle';
+      });
 
     return () => {
-      if (html5QrcodeScannerRef.current && initializationStateRef.current === 'initialized') {
-        html5QrcodeScannerRef.current.clear()
+      if (qrRef.current && initState.current === 'initialized') {
+        qrRef.current.stop()
           .then(() => {
-            console.log('✅ Html5QrcodeScanner cleaned up successfully');
-            initializationStateRef.current = 'idle';
+            qrRef.current!.clear();
+            initState.current = 'idle';
           })
-          .catch((error: any) => {
-            console.error('Failed to clear html5QrcodeScanner:', error);
-            initializationStateRef.current = 'idle';
+          .catch(() => {
+            initState.current = 'idle';
           });
       }
     };
-  }, [handleScanSuccess, handleScanError]);
+  }, [cameraPermission, currentCameraIndex]);
 
-  return <div id={qrcodeRegionId} style={{ width: '100%' }} />;
+  return (
+    <div className="relative w-full">
+      <div id={qrcodeRegionId} style={{ width: '100%' }} />
+      {cameras.length > 1 && (
+        <button
+          onClick={() => setCurrentCameraIndex(i => (i + 1) % cameras.length)}
+          className="absolute top-2 right-2 bg-white bg-opacity-50 p-2 rounded-full"
+        >
+          ⇄
+        </button>
+      )}
+    </div>
+  );
 };
 
 export const AddCardModal = ({ isOpen, onClose, onSave }: AddCardModalProps) => {
-
-
-  // Stati base
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedSupermarket, setSelectedSupermarket] = useState<SupermarketKey | null>(null);
   const [scannedData, setScannedData] = useState('');
@@ -227,6 +139,9 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: AddCardModalProps) => 
   const [isScanning, setIsScanning] = useState(false);
   const [cameraPermission, setCameraPermission] = useState<'unknown' | 'granted' | 'denied'>('unknown');
 
+  const { isLoaded, isLoading, error: loadError } = useHtml5QrcodeLoader();
+
+  // Richiedi permessi all'apertura
   useEffect(() => {
     if (!isOpen) return;
     (async () => {
@@ -240,16 +155,6 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: AddCardModalProps) => 
     })();
   }, [isOpen]);
 
-  // Hook per caricare libreria
-  const { isLoaded, isLoading, error: loadError } = useHtml5QrcodeLoader();
-
- const checkCameraPermission = useCallback(async () => {
-   // Usiamo direttamente lo stato già calcolato
-   return cameraPermission === 'granted';
-   }, [cameraPermission]);
-
-
-  // Reset modal
   const resetModal = () => {
     setCurrentStep(1);
     setSelectedSupermarket(null);
@@ -261,79 +166,58 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: AddCardModalProps) => 
     setCameraPermission('unknown');
   };
 
-  // Gestori eventi
   const handleClose = () => {
     resetModal();
     onClose();
   };
 
-  const nextStep = () => {
-    if (currentStep < 3) {
-      setCurrentStep(currentStep + 1);
-    }
-  };
+  const nextStep = () => setCurrentStep(s => Math.min(s + 1, 3));
+  const prevStep = () => setCurrentStep(s => Math.max(s - 1, 1));
 
-  const prevStep = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
-  // Callbacks scanner
-  const handleScanSuccess = useCallback((decodedText: string, decodedResult: any) => {
+  const handleScanSuccess = useCallback((decodedText: string) => {
     setScannedData(decodedText);
     setIsScanning(false);
   }, []);
 
   const handleScanError = useCallback((error: string) => {
-    // console.warn('Scan error:', error);
+    console.warn('Scan error', error);
   }, []);
 
-  // Avvia scanner
-  const startScanner = async () => {
-    if (!isLoaded) return;
-    const hasPermission = await checkCameraPermission();
-    if (!hasPermission) {
-      alert('Permesso fotocamera necessario per la scansione.');
-      return;
+  // Avvia scanner automaticamente allo step 2
+  useEffect(() => {
+    if (currentStep === 2 && isLoaded && !isScanning && cameraPermission === 'granted') {
+      setIsScanning(true);
     }
-    setIsScanning(true);
-  };
-  // Inserimento manuale
+  }, [currentStep, isLoaded, cameraPermission]);
+
   const handleManualInput = () => {
     const code = prompt('Inserisci il codice manualmente:');
-    if (code?.trim()) {
+    if (code) {
       setScannedData(code.trim());
       setIsScanning(false);
     }
   };
 
-  // Salva carta
   const saveCard = () => {
     if (!selectedSupermarket) return;
-
-    const marketData = supermarketData[selectedSupermarket];
-    const formattedNumber = scannedData.length > 12 ? 
-      scannedData.replace(/(.{4})/g, '$1 ').trim() : 
-      scannedData;
-    
-    const cardData = {
-      name: `${marketData.name} ${marketData.type}`,
-      number: formattedNumber,
-      brand: marketData.name,
-      logo: marketData.logo,
+    const m = supermarketData[selectedSupermarket];
+    const formatted = scannedData.length > 12
+      ? scannedData.replace(/(.{4})/g, '$1 ').trim()
+      : scannedData;
+    onSave({
+      name: `${m.name} ${m.type}`,
+      number: formatted,
+      brand: m.name,
+      logo: m.logo,
       barcode: scannedData,
       priority: 0,
       lastUsed: new Date(),
-      color: selectedSupermarket === 'altro' ? selectedColor : marketData.color,
+      color: selectedSupermarket === 'altro' ? selectedColor : m.color,
       isPublic: isCardPublic
-    };
-
-    onSave(cardData);
+    });
     handleClose();
   };
 
-  // STEP 1: Selezione Supermercato
   const SupermarketSelection = () => (
     <div className="space-y-6">
       <div>
@@ -475,280 +359,72 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: AddCardModalProps) => 
       </div>
     </div>
   );
-  useEffect(() => {
-    if (currentStep === 2 && isLoaded && !isScanning) {
-      startScanner();
-    }
-  }, [currentStep, isLoaded]);
-  // STEP 2: Scanner
+
   const ScannerStep = () => (
     <div className="space-y-6">
-      <div className="relative mx-auto w-full max-w-md">
-        <Card className="bg-gradient-to-br from-gray-900 to-black text-white border-2">
-          <CardContent className="text-center">
-            {/* Container per scanner */}
-            <div className="relative w-full bg-gray-900 rounded-xl overflow-hidden border-4 border-blue-400/50">
-              
-              {/* Gestione stati */}
-              {isLoading && (
-                <div className="flex items-center justify-center h-[300px] text-blue-400 text-center p-8">
-                  <div>
-                    <Camera className="w-16 h-16 mx-auto mb-4 animate-pulse" />
-                    <div className="text-lg font-semibold">Caricamento Libreria...</div>
-                    <div className="text-sm opacity-75 mt-2">Attendere prego</div>
-                  </div>
-                </div>
-              )}
-
-              {loadError && (
-                <div className="flex items-center justify-center h-[300px] text-red-400 text-center p-8">
-                  <div>
-                    <div className="text-lg font-semibold">❌ Errore Caricamento</div>
-                    <div className="text-sm opacity-75 mt-2">{loadError}</div>
-                  </div>
-                </div>
-              )}
-
-              {!isLoading && !loadError && !scannedData && (
-                <div className="w-full min-h-[300px]">
-                  {isScanning && isLoaded ? (
-                    <Html5QrcodePlugin
-                      onScanSuccess={handleScanSuccess}
-                      onScanError={handleScanError} cameraPermission={cameraPermission}                    />
-                  ) : (
-                    <div className="flex items-center justify-center h-[300px] text-blue-400 text-center p-8">
-                      <div>
-                        <Camera className="w-16 h-16 mx-auto mb-4 animate-pulse" />
-                        <div className="text-lg font-semibold">Scanner Pronto</div>
-                        <div className="text-sm opacity-75 mt-2">
-                          {!isLoaded ? 'Libreria non caricata' : 
-                           cameraPermission === 'denied' ? 'Permessi camera negati' :
-                           'Premi "Avvia Scanner"'}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-              
+      <Card className="bg-gray-900 text-white">
+        <CardContent className="p-0">
+          {isLoading && <div className="h-64 flex items-center justify-center">Caricamento...</div>}
+          {loadError && <div className="h-64 flex items-center justify-center text-red-400">{loadError}</div>}
+          {!loadError && (
+            <div className="relative h-64">
+              {isScanning
+                ? <Html5QrcodePlugin onScanSuccess={handleScanSuccess} onScanError={handleScanError} cameraPermission={cameraPermission} />
+                : <div className="h-full flex items-center justify-center text-blue-400"><Camera className="w-12 h-12 animate-pulse" /></div>
+              }
             </div>
-          </CardContent>
-        </Card>
-      </div>
-      
-      {/* Risultato scansione */}
+          )}
+        </CardContent>
+      </Card>
       {scannedData && (
-        <div className="text-center p-6 bg-green-50 rounded-xl border-2 border-green-200">
-          <div className="text-lg font-semibold text-green-800 mb-3">✅ Codice Rilevato</div>
-          <div className="font-mono text-xl font-bold text-green-900 bg-white px-4 py-2 rounded border break-all">
-            {scannedData}
-          </div>
-        </div>
+        <div className="p-4 bg-green-50 text-green-800 rounded">{scannedData}</div>
       )}
-      
-      {/* Controlli scanner */}
-      <div className="flex gap-3 justify-center">
-        {/* {!isScanning && !scannedData && isLoaded && !loadError && (
-          <Button 
-            onClick={startScanner}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3"
-          >
-            <Camera className="w-5 h-5 mr-2" />
-            Avvia Scanner
-          </Button>
-        )} */}
-        
-        {/* {isScanning && (
-          <Button 
-            variant="outline"
-            onClick={() => setIsScanning(false)}
-            className="px-6 py-3"
-          >
-            <RotateCcw className="w-5 h-5 mr-2" />
-            Ferma Scanner
-          </Button>
-        )} */}
-        
-        {isLoaded && !loadError && (
-          <Button 
-            variant="outline" 
-            onClick={handleManualInput}
-            className="px-6 py-3"
-          >
-            ✏️ Inserisci Manualmente
-          </Button>
-        )}
-      </div>
-      
-      <div className="flex gap-4 pt-4">
-        <Button variant="outline" onClick={prevStep} className="flex-1 py-3">
-          ← Indietro
-        </Button>
-        <Button 
-          onClick={nextStep}
-          disabled={!scannedData}
-          className="flex-1 py-3 bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-50"
-        >
-          Continua →
-        </Button>
+      <div className="flex justify-between">
+        <Button variant="outline" onClick={prevStep}>← Indietro</Button>
+        <Button onClick={nextStep} disabled={!scannedData}>Continua →</Button>
       </div>
     </div>
   );
 
-  // STEP 3: Conferma
   const ConfirmationStep = () => {
     if (!selectedSupermarket) return null;
-    
-    const marketData = supermarketData[selectedSupermarket];
-    const formattedNumber = scannedData.length > 12 ? 
-      scannedData.replace(/(.{4})/g, '$1 ').trim() : 
-      scannedData;
-
+    const m = supermarketData[selectedSupermarket];
+    const formatted = scannedData.length > 12
+      ? scannedData.replace(/(.{4})/g, '$1 ').trim()
+      : scannedData;
     return (
       <div className="space-y-6">
-        <div className="text-center">
-          <Label className="text-lg font-semibold mb-4 block text-gray-800">Anteprima Carta</Label>
-          <Card 
-            className="mx-auto w-full max-w-sm border-2 shadow-xl"
-            style={{ 
-              backgroundColor: selectedSupermarket === 'altro' ? selectedColor : marketData.color,
-              aspectRatio: '3/2'
-            }}
-          >
-            <CardContent className="p-6 h-full flex flex-col justify-center items-center text-white">
-              {marketData.logo.startsWith('/') ? (
-                <img
-                  src={viewImage(marketData.logo)}
-                  alt={`${marketData.name} Logo`}
-                  className="h-16 w-auto object-contain mb-3 drop-shadow-lg"
-                />
-              ) : (
-                <div className="text-5xl mb-3 drop-shadow-lg">{marketData.logo}</div>
-              )}
-              <div className="font-bold text-xl uppercase drop-shadow-md">{marketData.name}</div>
-              <div className="text-sm opacity-90 font-medium mt-1">{marketData.type}</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <Label className="text-sm font-semibold text-gray-700">Nome Carta</Label>
-            <Input 
-              value={`${marketData?.name} ${marketData?.type}`} 
-              readOnly 
-              className="mt-2 bg-gray-50 font-semibold"
-            />
-          </div>
-          <div>
-            <Label className="text-sm font-semibold text-gray-700">Numero Carta</Label>
-            <Input 
-              value={formattedNumber} 
-              readOnly 
-              className="mt-2 bg-gray-50 font-mono font-bold text-lg"
-            />
-          </div>
-          <div>
-            <Label className="text-sm font-semibold text-gray-700">Tipo</Label>
-            <Input 
-              value={marketData?.type} 
-              readOnly 
-              className="mt-2 bg-gray-50"
-            />
-          </div>
-
-          <div className="flex flex-row items-center justify-between rounded-xl border-2 p-6 bg-gray-50">
-            <div className="space-y-1">
-              <Label className="text-base font-semibold flex items-center">
-                {isCardPublic ? (
-                  <>
-                    <Globe className="mr-3 h-5 w-5 text-green-600" />
-                    Carta Pubblica
-                  </>
-                ) : (
-                  <>
-                    <Lock className="mr-3 h-5 w-5 text-orange-600" />
-                    Carta Privata
-                  </>
-                )}
-              </Label>
-              <p className="text-sm text-gray-600">
-                {isCardPublic 
-                  ? 'Visibile a tutti i membri della famiglia'
-                  : 'Visibile solo a te'
-                }
-              </p>
-            </div>
-            <Switch
-              checked={isCardPublic}
-              onCheckedChange={setIsCardPublic}
-              className="data-[state=checked]:bg-green-500 scale-125"
-            />
-          </div>
-        </div>
-        
-        <div className="flex gap-4 pt-6">
-          <Button variant="outline" onClick={prevStep} className="flex-1 py-3">
-            ← Indietro
-          </Button>
-          <Button 
-            onClick={saveCard}
-            className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold"
-          >
-            ✅ Salva Carta
-          </Button>
+        <Card className="mx-auto" style={{ backgroundColor: selectedSupermarket === 'altro' ? selectedColor : m.color }}>
+          <CardContent className="text-center text-white p-6">
+            <img src={viewImage(m.logo)} className="h-16 mx-auto mb-4" alt={m.name} />
+            <h3 className="text-xl font-bold">{m.name} {m.type}</h3>
+            <p className="font-mono">{formatted}</p>
+          </CardContent>
+        </Card>
+        <div className="flex justify-between">
+          <Button variant="outline" onClick={prevStep}>← Indietro</Button>
+          <Button onClick={saveCard} className="bg-green-600 text-white">Salva Carta</Button>
         </div>
       </div>
     );
   };
-
-  return (
+return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader className="pb-6">
-          <DialogTitle className="text-2xl font-bold text-gray-800">
-            🎫 Aggiungi Carta Fedeltà
-          </DialogTitle>
-          <DialogDescription className="text-gray-600">
-            Scanner professionale per QR codes e codici a barre
-          </DialogDescription>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Aggiungi Carta Fedeltà</DialogTitle>
+          <DialogDescription>Scanner QR e barcode</DialogDescription>
         </DialogHeader>
-
-        {/* Indicatore step */}
-        <div className="flex justify-center items-center space-x-3 my-6">
-          {[1, 2, 3].map((step) => (
-            <div key={step} className="flex items-center">
-              <div
-                className={cn(
-                  "w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300",
-                  step < currentStep 
-                    ? "bg-green-500 text-white" 
-                    : step === currentStep
-                    ? "bg-blue-500 text-white ring-4 ring-blue-200"
-                    : "bg-gray-200 text-gray-500"
-                )}
-              >
-                {step < currentStep ? '✓' : step}
-              </div>
-              {step < 3 && (
-                <div
-                  className={cn(
-                    "w-12 h-1 mx-2 transition-all duration-300",
-                    step < currentStep ? "bg-green-500" : "bg-gray-200"
-                  )}
-                />
-              )}
-            </div>
+        <div className="my-4 flex justify-center space-x-4">
+          {[1,2,3].map(step => (
+            <div key={step} className={cn('h-2 w-2 rounded-full', currentStep===step ? 'bg-blue-500':'bg-gray-300')} />
           ))}
         </div>
-
-        {/* Contenuto step */}
-        <div className="min-h-[400px]">
-          {currentStep === 1 && <SupermarketSelection />}
-          {currentStep === 2 && <ScannerStep />}
-          {currentStep === 3 && <ConfirmationStep />}
-        </div>
+        {currentStep===1 && <SupermarketSelection />}
+        {currentStep===2 && <ScannerStep />}
+        {currentStep===3 && <ConfirmationStep />}
       </DialogContent>
     </Dialog>
   );
 };
+
