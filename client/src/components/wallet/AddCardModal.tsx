@@ -241,22 +241,23 @@ const BarcodeScanner = ({
     });
 
     // ==========================================================
-    // ==== EVENT LISTENERS OTTIMIZZATI
+    // ==== EVENT LISTENERS CON ERROR DETECTION CORRETTA
     // ==========================================================
     const onDetected = (result: any) => {
       const code = result.codeResult.code;
       const format = result.codeResult.format;
-      const confidence = result.codeResult.decodedCodes?.[0]?.confidence || 0;
+      const firstDecoded = result.codeResult.decodedCodes?.[0];
+      const error = firstDecoded?.error || 1; // Default alto se non trovato
       
-      console.log(`🔍 LETTURA: ${code} (formato: ${format}, confidenza: ${confidence.toFixed(2)})`);
+      console.log(`🔍 LETTURA: ${code} (formato: ${format}, errore: ${(error * 100).toFixed(1)}%)`);
       
-      // SOGLIA CONFIDENZA RIDOTTA (dalle ricerche sui problemi)
-      if (confidence < 30) {
-        console.log(`⚠️ IGNORATO: Confidenza troppo bassa (${confidence.toFixed(2)})`);
+      // LOGICA CORRETTA: Scarta se ERROR troppo alto (qualità bassa)
+      if (error > 0.15) { // 15% di errore massimo
+        console.log(`⚠️ IGNORATO: Errore troppo alto (${(error * 100).toFixed(1)}%)`);
         return;
       }
       
-      console.log(`🎉 BARCODE ACCETTATO: ${code} (formato: ${format})`);
+      console.log(`🎉 BARCODE ACCETTATO: ${code} (formato: ${format}, errore: ${(error * 100).toFixed(1)}%)`);
       onScanSuccess(result);
     };
 
