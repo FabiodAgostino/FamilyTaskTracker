@@ -9,7 +9,10 @@ import {
   ArrowLeft,
   ArrowRight,
   Plus,
-  Palette
+  Palette,
+  Zap,
+  ZapOff,
+  Upload
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -23,133 +26,151 @@ import {
 } from '@/components/ui/dialog';
 import { cn, viewImage } from '@/lib/utils';
 import { supermarketData, type SupermarketKey, suggestedColors } from './walletConstants';
-import { Html5Qrcode } from 'html5-qrcode';
+import {
+  Html5Qrcode,
+  Html5QrcodeSupportedFormats,
+  type Html5QrcodeCameraScanConfig,
+} from 'html5-qrcode';
 
-// Hook per caricare e tracciare la libreria dello scanner in modo sicuro
-const useHtml5QrcodeLoader = () => {
-  const [isLoaded, setIsLoaded] = useState(false);
+// Definiamo manualmente i tipi per essere indipendenti dall'ambiente
+type CustomQrCodeSuccessCallback = (decodedText: string, decodedResult: any) => void;
+type CustomQrCodeErrorCallback = (errorMessage: string, decodedResult: any) => void;
 
-  useEffect(() => {
-    const SCRIPT_URL = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
-    
-    // Controlla se lo script è già presente per evitare duplicati
-    if (document.querySelector(`script[src="${SCRIPT_URL}"]`)) {
-      if ((window as any).Html5Qrcode) {
-        setIsLoaded(true);
-      }
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = SCRIPT_URL;
-    script.async = true;
-    script.onload = () => setIsLoaded(true);
-    script.onerror = () => console.error('Errore caricamento libreria scanner.');
-    document.head.appendChild(script);
-
-    return () => {
-      if (document.head.contains(script)) {
-        document.head.removeChild(script);
-      }
-    };
-  }, []);
-
-  return isLoaded;
-};
-
-// Componente Plugin per lo scanner, finale e corretto
-const Html5QrcodePlugin = ({
-  isLoaded,
+// Componente Scanner con log di debug aggiunti
+const BarcodeScanner = ({
   onScanSuccess,
-  onScanError,
-  cameraPermission
+  onScanError
 }: {
-  isLoaded: boolean;
-  onScanSuccess: (decodedText: string) => void;
-  onScanError?: (error: string) => void;
-  cameraPermission: 'granted';
+  onScanSuccess: CustomQrCodeSuccessCallback;
+  onScanError: CustomQrCodeErrorCallback;
 }) => {
+  console.log('[Scanner Debug] Componente BarcodeScanner renderizzato.');
   const qrcodeRegionId = 'html5qr-code-full-region';
   const qrRef = useRef<Html5Qrcode | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [cameras, setCameras] = useState<{ id: string; label: string }[]>([]);
   const [currentCameraIndex, setCurrentCameraIndex] = useState(0);
+  
+  const [torchAvailable, setTorchAvailable] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
 
   useEffect(() => {
-    if (!isLoaded || qrRef.current) return;
-    qrRef.current = new Html5Qrcode(qrcodeRegionId, { verbose: false });
+    console.log('[Scanner Debug] Primo useEffect eseguito.');
+    if (!qrRef.current) {
+      const formats: Html5QrcodeSupportedFormats[] = [
+        Html5QrcodeSupportedFormats.QR_CODE,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.EAN_8,
+      ];
+      console.log('[Scanner Debug] Creazione istanza Html5Qrcode con formati:', formats);
+      qrRef.current = new Html5Qrcode(qrcodeRegionId, {
+        verbose: false,
+        formatsToSupport: formats,
+      });
+    }
+
+    console.log('[Scanner Debug] Richiesta fotocamere...');
     Html5Qrcode.getCameras()
       .then(devices => {
         if (devices && devices.length) {
+          console.log('[Scanner Debug] Fotocamere trovate:', devices);
           setCameras(devices);
           const rearCameraIndex = devices.findIndex(d => d.label.toLowerCase().includes('back'));
+          console.log(`[Scanner Debug] Fotocamera posteriore trovata all'indice: ${rearCameraIndex}`);
           setCurrentCameraIndex(rearCameraIndex !== -1 ? rearCameraIndex : 0);
+        } else {
+          console.log('[Scanner Debug] Nessuna fotocamera trovata.');
         }
       })
-      .catch(err => console.error("Errore recupero fotocamere:", err));
-  }, [isLoaded]);
+      .catch(err => console.error("[Scanner Debug] Errore nel recuperare le fotocamere:", err));
+  }, []);
 
   useEffect(() => {
-    if (!isLoaded || !qrRef.current || cameras.length === 0 || qrRef.current.isScanning) {
-      return;
-    }
+    console.log(`[Scanner Debug] Secondo useEffect eseguito. Prerequisiti: qrRef=${!!qrRef.current}, num_cameras=${cameras.length}`);
+    if (!qrRef.current || cameras.length === 0) return;
 
-    const config = {
-      fps: 10,
-      qrbox: { width: 280, height: 150 },
-      formatsToScan: [
-        (window as any).Html5QrcodeSupportedFormats.QR_CODE,
-        (window as any).Html5QrcodeSupportedFormats.EAN_13,
-        (window as any).Html5QrcodeSupportedFormats.CODE_128,
-        (window as any).Html5QrcodeSupportedFormats.EAN_8,
-      ]
-    };
+    const scanner = qrRef.current;
+    if (scanner.isScanning) {
+      console.log('[Scanner Debug] Lo scanner è già attivo, lo fermo prima di riavviarlo.');
+      scanner.stop();
+    }
     
-    qrRef.current.start(cameras[currentCameraIndex].id, config, onScanSuccess, onScanError)
-      .catch(err => console.error("Impossibile avviare lo scanner:", err));
+    const cameraId = cameras[currentCameraIndex].id;
+    const config: Html5QrcodeCameraScanConfig = { fps: 10, qrbox: { width: 280, height: 150 } };
+    
+    console.log(`[Scanner Debug] Avvio scanner sulla fotocamera ID: ${cameraId}`, config);
+    scanner.start(cameraId, config, onScanSuccess, onScanError)
+      .then(() => {
+        console.log('[Scanner Debug] Scanner avviato con successo.');
+        try {
+          const capabilities = scanner.getRunningTrackCapabilities();
+          console.log('[Scanner Debug] Capacità della fotocamera:', capabilities);
+          if ((capabilities as any).torch) {
+            console.log('[Scanner Debug] La torcia è disponibile.');
+            setTorchAvailable(true);
+          }
+        } catch (err) {
+          console.warn('[Scanner Debug] Impossibile ottenere le capacità della fotocamera (normale su alcuni browser).', err);
+        }
+      })
+      .catch(err => console.error("[Scanner Debug] ERRORE CRITICO all'avvio dello scanner:", err));
 
     return () => {
-      if (qrRef.current?.isScanning) {
-        qrRef.current.stop().catch(err => console.error("Errore stop:", err));
+      console.log('[Scanner Debug] Eseguita funzione di pulizia (cleanup).');
+      if (scanner && scanner.isScanning) {
+        scanner.stop().catch(err => console.error("[Scanner Debug] Errore durante lo stop nella pulizia:", err));
       }
     };
-  }, [isLoaded, cameras, currentCameraIndex, onScanSuccess, onScanError]);
+  }, [cameras, currentCameraIndex, onScanSuccess, onScanError]);
 
-  const switchCamera = async () => {
-    if (!qrRef.current || cameras.length < 2 || !qrRef.current.isScanning) return;
-    try {
-      await qrRef.current.stop();
-      setCurrentCameraIndex(prevIndex => (prevIndex + 1) % cameras.length);
-    } catch (err) {
-      console.error("Errore nello switch della fotocamera:", err);
-      setCurrentCameraIndex(prevIndex => (prevIndex + 1) % cameras.length);
+  const switchCamera = () => {
+    console.log('[Scanner Debug] Cambio fotocamera...');
+    setCurrentCameraIndex(prev => (prev + 1) % cameras.length);
+  };
+
+  const toggleTorch = () => {
+    if (qrRef.current && torchAvailable) {
+      const newTorchState = !torchOn;
+      console.log(`[Scanner Debug] Attivazione torcia: ${newTorchState}`);
+      const constraints = { advanced: [{ torch: newTorchState }] } as any;
+      qrRef.current.applyVideoConstraints(constraints)
+        .then(() => setTorchOn(newTorchState))
+        .catch(err => console.error('[Scanner Debug] Errore attivazione torcia:', err));
+    }
+  };
+  
+  const handleFileScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('[Scanner Debug] Tentativo di scansione da file.');
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      try {
+        const decodedText = await qrRef.current?.scanFile(file, false);
+        if (decodedText) { onScanSuccess(decodedText, undefined); }
+      } catch (err: any) { onScanError(err.message, undefined); }
     }
   };
 
-  if (!isLoaded) {
-    return <div className="aspect-video bg-black flex items-center justify-center text-white rounded-lg">Caricamento scanner...</div>;
-  }
-
   return (
-    <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden">
-      <div id={qrcodeRegionId} style={{ width: '100%', height: '100%' }} />
-      {cameras.length > 1 && (
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={switchCamera}
-          className="absolute top-3 right-3 bg-black/40 text-white border-white/40 hover:bg-black/60 hover:text-white"
-        >
-          <RotateCcw size={20} />
-        </Button>
-      )}
+    <div className="w-full space-y-3">
+      <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden">
+        <div id={qrcodeRegionId} style={{ width: '100%', height: '100%' }} />
+      </div>
+      <div className="flex justify-center items-center gap-3 p-2 bg-gray-100 rounded-lg">
+        {cameras.length > 1 && <Button variant="outline" size="icon" onClick={switchCamera} title="Cambia fotocamera"><RotateCcw size={20} /></Button>}
+        {torchAvailable && <Button variant="outline" size="icon" onClick={toggleTorch} title={torchOn ? 'Spegni torcia' : 'Accendi torcia'}>{torchOn ? <ZapOff size={20} /> : <Zap size={20} />}</Button>}
+        <Button variant="outline" size="icon" onClick={() => fileInputRef.current?.click()} title="Scansiona da file"><Upload size={20} /></Button>
+        <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileScan} className="hidden" />
+      </div>
     </div>
   );
 };
 
-// Componente Modale principale che unisce tutto
+
+// Componente Modale principale completo
 export const AddCardModal = ({ isOpen, onClose, onSave }: any) => {
-  const isScannerLibraryLoaded = useHtml5QrcodeLoader();
-  
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedSupermarket, setSelectedSupermarket] = useState<SupermarketKey | null>(null);
   const [scannedData, setScannedData] = useState('');
@@ -159,12 +180,12 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: any) => {
   useEffect(() => {
     if (!isOpen) return;
     (async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        stream.getTracks().forEach(t => t.stop());
-        setCameraPermission('granted');
-      } catch {
-        setCameraPermission('denied');
+      try { 
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true }); 
+        stream.getTracks().forEach(track => track.stop());
+        setCameraPermission('granted'); 
+      } catch { 
+        setCameraPermission('denied'); 
       }
     })();
   }, [isOpen]);
@@ -185,14 +206,17 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: any) => {
   const nextStep = () => setCurrentStep(s => Math.min(s + 1, 3));
   const prevStep = () => setCurrentStep(s => Math.max(s - 1, 1));
 
-  const handleScanSuccess = useCallback((decodedText: string) => {
+  const handleScanSuccess: CustomQrCodeSuccessCallback = useCallback((decodedText, decodedResult) => {
+    console.log(`%c[Scanner Debug] SUCCESSO! Dati: ${decodedText}`, 'color: green; font-weight: bold;', decodedResult);
     setScannedData(decodedText);
   }, []);
 
-  const handleScanError = useCallback((error: string) => {
-    if (!error.includes('No MultiFormat Readers')) {
-      console.warn('Scan error', error);
-    }
+  const handleScanError: CustomQrCodeErrorCallback = useCallback((errorMessage, _decodedResult) => {
+    // Non loggare l'errore più comune per non intasare la console
+    if (errorMessage.includes('No MultiFormat Readers')) return;
+    
+    // Logga solo gli errori di scansione inaspettati
+    console.warn('[Scanner Debug] Errore di scansione:', errorMessage);
   }, []);
 
   const handleManualInput = () => {
@@ -207,11 +231,11 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: any) => {
     const m = supermarketData[selectedSupermarket];
     const formatted = scannedData.length > 12 ? scannedData.replace(/(.{4})/g, '$1 ').trim() : scannedData;
     onSave({
-      name: `${m.name} ${m.type}`,
-      number: formatted,
-      brand: m.name,
-      logo: m.logo,
-      barcode: scannedData,
+      name: `${m.name} ${m.type}`, 
+      number: formatted, 
+      brand: m.name, 
+      logo: m.logo, 
+      barcode: scannedData, 
       color: selectedSupermarket === 'altro' ? selectedColor : m.color,
     });
     handleClose();
@@ -273,23 +297,18 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: any) => {
             <p className="font-mono bg-white p-2 rounded">{scannedData}</p>
             <Button variant="link" size="sm" onClick={() => setScannedData('')}>Scansiona di nuovo</Button>
           </div>
-        ) : (
-          <Html5QrcodePlugin
-            isLoaded={isScannerLibraryLoaded}
-            onScanSuccess={handleScanSuccess}
-            onScanError={handleScanError}
-            cameraPermission={cameraPermission}
-          />
-        )
+        ) : <BarcodeScanner onScanSuccess={handleScanSuccess} onScanError={handleScanError}/>
       ) : cameraPermission === 'denied' ? (
         <div className="p-4 bg-red-50 text-red-800 rounded-lg flex flex-col items-center gap-2 border border-red-200">
           <Lock className="w-8 h-8 text-red-500" />
           <p className="font-semibold">Accesso alla fotocamera negato</p>
-          <p className="text-sm">Abilita i permessi dal tuo browser per usare lo scanner.</p>
         </div>
-      ) : (
-        <div className="aspect-video bg-gray-200 animate-pulse rounded-lg flex items-center justify-center"><Camera className="w-12 h-12 text-gray-400"/></div>
-      )}
+      ) : <div className="aspect-video bg-gray-200 animate-pulse rounded-lg flex items-center justify-center"><Camera className="w-12 h-12 text-gray-400"/></div>}
+      <div className="relative flex items-center py-2">
+        <div className="flex-grow border-t border-gray-200"></div>
+        <span className="flex-shrink mx-4 text-xs text-gray-400">OPPURE</span>
+        <div className="flex-grow border-t border-gray-200"></div>
+      </div>
       <Button variant="outline" onClick={handleManualInput}><Edit className="w-4 h-4 mr-2" /> Inserisci Manualmente</Button>
       <div className="flex gap-4 pt-4">
         <Button variant="ghost" onClick={prevStep} className="w-full"><ArrowLeft className="w-4 h-4 mr-2" /> Indietro</Button>
@@ -331,18 +350,14 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: any) => {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
-             <div className="p-2 rounded-lg" style={{ background: 'var(--burnt-newStyle)' }}>
-                 <Scan className="w-6 h-6 text-white" />
-             </div>
+             <div className="p-2 rounded-lg" style={{ background: 'var(--burnt-newStyle)' }}><Scan className="w-6 h-6 text-white" /></div>
             Aggiungi Carta Fedeltà
           </DialogTitle>
           <DialogDescription>Passo {currentStep} di 3 - Seleziona, scansiona e conferma.</DialogDescription>
         </DialogHeader>
-        
         {currentStep === 1 && <SupermarketSelection />}
         {currentStep === 2 && <ScannerStep />}
         {currentStep === 3 && <ConfirmationStep />}
-
       </DialogContent>
     </Dialog>
   );
