@@ -35,7 +35,7 @@ import {
 type CustomQrCodeSuccessCallback = (decodedText: string, decodedResult: any) => void;
 type CustomQrCodeErrorCallback = (errorMessage: string, decodedResult: any) => void;
 
-// Componente Scanner semplificato e con nuova configurazione
+// Componente Scanner OTTIMIZZATO per codici a barre basato su ricerche approfondite
 const BarcodeScanner = ({
   onScanSuccess,
   onScanError
@@ -53,21 +53,28 @@ const BarcodeScanner = ({
 
   useEffect(() => {
     if (!qrRef.current) {
+      // ==========================================================
+      // ==== FORMATI OTTIMIZZATI SOLO PER CODICI A BARRE
+      // ==== RICERCA: Rimuovere QR_CODE migliora le performance
+      // ==========================================================
       const formatsToSupport: Html5QrcodeSupportedFormats[] = [
-        Html5QrcodeSupportedFormats.QR_CODE,
-        Html5QrcodeSupportedFormats.CODE_128,
-        Html5QrcodeSupportedFormats.EAN_13,
-        Html5QrcodeSupportedFormats.UPC_A,
-        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.CODE_128,    // Più comune per loyalty cards
+        Html5QrcodeSupportedFormats.EAN_13,      // Standard europeo
+        Html5QrcodeSupportedFormats.UPC_A,       // Standard americano
+        Html5QrcodeSupportedFormats.EAN_8,       // Versione corta
+        Html5QrcodeSupportedFormats.CODE_39,     // Alfanumerico
+        Html5QrcodeSupportedFormats.CODE_93,     // Evoluzione di Code 39
+        Html5QrcodeSupportedFormats.CODABAR,     // Usato in alcune carte
+        Html5QrcodeSupportedFormats.ITF,         // Interleaved 2 of 5
       ];
       
       qrRef.current = new Html5Qrcode(qrcodeRegionId, {
         verbose: false,
         formatsToSupport: formatsToSupport,
         // ==========================================================
-        // ==== NUOVA CONFIGURAZIONE CRUCIALE
+        // ==== CONFIGURAZIONE CRUCIALE DALLA RICERCA
+        // ==== Forza l'uso del decoder ZXing.js più stabile
         // ==========================================================
-        // Forza l'uso del decoder ZXing.js, più stabile.
         experimentalFeatures: {
           useBarCodeDetectorIfSupported: false,
         },
@@ -94,10 +101,20 @@ const BarcodeScanner = ({
     }
     
     const cameraId = cameras[currentCameraIndex].id;
-    const config: Html5QrcodeCameraScanConfig = { fps: 10, qrbox: { width: 280, height: 150 } };
+    
+    // ==========================================================
+    // ==== CONFIGURAZIONE OTTIMALE DALLA RICERCA APPROFONDITA
+    // ==== fps: 5 funziona meglio di fps: 10 per EAN-13
+    // ==== qrbox più largo per codici a barre lunghi
+    // ==========================================================
+    const config: Html5QrcodeCameraScanConfig = { 
+      fps: 5,                                    // ✅ RIDOTTO da 10 a 5 (ricerca)
+      qrbox: { width: 320, height: 160 }         // ✅ AUMENTATO da 280x150 (ricerca)
+    };
 
     scanner.start(cameraId, config, onScanSuccess, onScanError)
       .then(() => {
+        console.log('✅ Scanner avviato con configurazione ottimizzata per codici a barre');
         const capabilities = scanner.getRunningTrackCapabilities();
         if ((capabilities as any).torch) {
           setTorchAvailable(true);
@@ -127,14 +144,32 @@ const BarcodeScanner = ({
       <div className="w-full bg-black rounded-lg overflow-hidden">
         <div id={qrcodeRegionId} />
       </div>
+      
       <div className="flex justify-center items-center gap-3 p-2 bg-gray-100 rounded-lg">
-        {cameras.length > 1 && <Button variant="outline" size="icon" onClick={switchCamera} title="Cambia fotocamera"><RotateCcw size={20} /></Button>}
-        {torchAvailable && <Button variant="outline" size="icon" onClick={toggleTorch} title={torchOn ? 'Spegni torcia' : 'Accendi torcia'}>{torchOn ? <ZapOff size={20} /> : <Zap size={20} />}</Button>}
+        {cameras.length > 1 && (
+          <Button 
+            variant="outline" 
+            size="icon" 
+            onClick={switchCamera} 
+            title="Cambia fotocamera"
+          >
+            <RotateCcw size={20} />
+          </Button>
+        )}
+        {torchAvailable && (
+          <Button 
+            variant="outline" 
+            size="icon" 
+            onClick={toggleTorch} 
+            title={torchOn ? 'Spegni torcia' : 'Accendi torcia'}
+          >
+            {torchOn ? <ZapOff size={20} /> : <Zap size={20} />}
+          </Button>
+        )}
       </div>
     </div>
   );
 };
-
 
 export const AddCardModal = ({ isOpen, onClose, onSave }: any) => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -143,8 +178,9 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: any) => {
   const [cameraPermission, setCameraPermission] = useState<'unknown' | 'granted' | 'denied'>('unknown');
   const [selectedColor, setSelectedColor] = useState('#536DFE');
   
-  // Usiamo un contatore per non intasare la console
+  // Contatore per gestione errori migliorata
   const errorFrameCounter = useRef(0);
+  const scanAttempts = useRef(0);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -165,6 +201,8 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: any) => {
     setScannedData('');
     setCameraPermission('unknown');
     setSelectedColor('#536DFE');
+    errorFrameCounter.current = 0;
+    scanAttempts.current = 0;
   }, []);
 
   const handleClose = () => {
@@ -175,28 +213,69 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: any) => {
   const nextStep = () => setCurrentStep(s => Math.min(s + 1, 3));
   const prevStep = () => setCurrentStep(s => Math.max(s - 1, 1));
 
-  const handleScanSuccess: CustomQrCodeSuccessCallback = useCallback((decodedText, _decodedResult) => {
-    console.log(`%c[Scanner] SUCCESSO! Dati: ${decodedText}`, 'color: green; font-weight: bold;');
-    setScannedData(decodedText);
+  // ==========================================================
+  // ==== GESTIONE SUCCESSO MIGLIORATA
+  // ==========================================================
+  const handleScanSuccess: CustomQrCodeSuccessCallback = useCallback((decodedText, decodedResult) => {
+    scanAttempts.current++;
+    console.log(`🎉 SUCCESSO SCANSIONE #${scanAttempts.current}!`);
+    console.log(`📊 Codice: ${decodedText}`);
+    console.log(`📋 Formato: ${decodedResult?.result?.format?.formatName || 'Non specificato'}`);
+    
+    // Validazione del codice scansionato
+    if (decodedText && decodedText.trim().length >= 4) {
+      setScannedData(decodedText.trim());
+    } else {
+      console.warn('⚠️ Codice troppo corto o non valido, riprovo...');
+    }
   }, []);
 
+  // ==========================================================
+  // ==== GESTIONE ERRORI OTTIMIZZATA E SILENZIOSA
+  // ==========================================================
   const handleScanError: CustomQrCodeErrorCallback = useCallback((errorMessage, _decodedResult) => {
     if (typeof errorMessage !== 'string') return;
     
-    // Logga l'errore "not found" solo ogni 60 frame (circa ogni 6 secondi) per confermare che lo scanner è attivo
-    if (errorMessage.includes('No MultiFormat Readers')) {
-        errorFrameCounter.current++;
-        if (errorFrameCounter.current % 60 === 0) {
-            console.log('[Scanner] Tentativo di scansione in corso...');
-        }
-        return;
+    errorFrameCounter.current++;
+    
+    // Errori comuni di scansione (da ignorare silenziosamente)
+    const commonErrors = [
+      'No MultiFormat Readers',
+      'NotFoundException', 
+      'Not Found',
+      'ChecksumException',
+      'FormatException'
+    ];
+    
+    if (commonErrors.some(error => errorMessage.includes(error))) {
+      // Log di progresso ogni 30 frame (circa ogni 6 secondi a 5fps)
+      if (errorFrameCounter.current % 30 === 0) {
+        console.log(`🔍 Scansione in corso... (tentativo ${errorFrameCounter.current}) - Inquadra bene il codice a barre`);
+      }
+      return;
     }
-    // Logga subito tutti gli altri errori
-    console.warn('Scan error:', errorMessage);
+    
+    // Errori critici (da loggare subito)
+    const criticalErrors = [
+      'NotAllowedError',
+      'NotFoundError',
+      'NotReadableError',
+      'OverconstrainedError'
+    ];
+    
+    if (criticalErrors.some(error => errorMessage.includes(error))) {
+      console.error('🚨 Errore critico scanner:', errorMessage);
+      return;
+    }
+    
+    // Altri errori con throttling molto ridotto
+    if (errorFrameCounter.current % 100 === 0) {
+      console.warn('⚠️ Scanner warning:', errorMessage);
+    }
   }, []);
 
   const handleManualInput = () => {
-    const code = prompt('Inserisci il codice manualmente:');
+    const code = prompt('Inserisci il codice a barre manualmente:');
     if (code && code.trim()) {
       setScannedData(code.trim());
     }
@@ -224,38 +303,88 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: any) => {
         {Object.entries(supermarketData).map(([key, market]) => {
           if (market.name === "ALTRO") {
             return (
-              <button key={key} onClick={() => setSelectedSupermarket(key as SupermarketKey)} className={cn("flex flex-col items-center justify-center w-full p-4 min-h-[6rem] bg-gray-100 rounded-lg border-2 border-dashed transition-all duration-300", selectedSupermarket === key ? "border-solid bg-indigo-50 border-[#663EF3]" : "border-gray-300 hover:border-gray-400 hover:bg-gray-200")}>
+              <button 
+                key={key} 
+                onClick={() => setSelectedSupermarket(key as SupermarketKey)} 
+                className={cn(
+                  "flex flex-col items-center justify-center w-full p-4 min-h-[6rem] bg-gray-100 rounded-lg border-2 border-dashed transition-all duration-300", 
+                  selectedSupermarket === key ? 
+                    "border-solid bg-indigo-50 border-[#663EF3]" : 
+                    "border-gray-300 hover:border-gray-400 hover:bg-gray-200"
+                )}
+              >
                 <Plus className="w-6 h-6 mb-1 text-gray-500" />
                 <span className="text-sm font-semibold text-gray-700">Altro</span>
               </button>
             )
           }
           return (
-            <Card key={key} style={{ backgroundColor: market.color }} className={cn("cursor-pointer transform transition-all duration-300 hover:scale-105 rounded-xl overflow-hidden border-2", selectedSupermarket === key ? "ring-2 ring-offset-2 ring-[#663EF3] border-white" : "border-transparent")} onClick={() => setSelectedSupermarket(key as SupermarketKey)}>
+            <Card 
+              key={key} 
+              style={{ backgroundColor: market.color }} 
+              className={cn(
+                "cursor-pointer transform transition-all duration-300 hover:scale-105 rounded-xl overflow-hidden border-2", 
+                selectedSupermarket === key ? 
+                  "ring-2 ring-offset-2 ring-[#663EF3] border-white" : 
+                  "border-transparent"
+              )} 
+              onClick={() => setSelectedSupermarket(key as SupermarketKey)}
+            >
               <CardContent className="flex flex-col items-center justify-center p-2 text-center min-h-[6rem] text-white">
-                <img src={viewImage(market.logo)} alt={`${market.name} Logo`} className="h-10 w-auto object-contain mb-2 drop-shadow-md" />
+                <img 
+                  src={viewImage(market.logo)} 
+                  alt={`${market.name} Logo`} 
+                  className="h-10 w-auto object-contain mb-2 drop-shadow-md" 
+                />
                 <div className="font-bold text-xs drop-shadow-sm">{market.name}</div>
               </CardContent>
             </Card>
           )
         })}
       </div>
+      
       {selectedSupermarket === 'altro' && (
         <div className="space-y-3 bg-gray-50 p-4 rounded-lg border">
-            <Label className="font-semibold text-gray-700 flex items-center gap-2"><Palette/> Personalizza Colore</Label>
-            <div className="flex items-center gap-4">
-                 <input type="color" value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)} className="w-14 h-14 p-0 bg-transparent border-none rounded-lg cursor-pointer"/>
-                 <div className="grid grid-cols-7 gap-2 flex-1">
-                   {suggestedColors.map((color) => (
-                     <button key={color} type="button" className={cn("w-8 h-8 rounded-full border-2 transition-all duration-200 hover:scale-110", selectedColor === color ? "ring-2 ring-offset-2 ring-[#663EF3] border-white" : "border-gray-300")} style={{ backgroundColor: color }} onClick={() => setSelectedColor(color)}/>
-                   ))}
-                 </div>
+          <Label className="font-semibold text-gray-700 flex items-center gap-2">
+            <Palette/> Personalizza Colore
+          </Label>
+          <div className="flex items-center gap-4">
+            <input 
+              type="color" 
+              value={selectedColor} 
+              onChange={(e) => setSelectedColor(e.target.value)} 
+              className="w-14 h-14 p-0 bg-transparent border-none rounded-lg cursor-pointer"
+            />
+            <div className="grid grid-cols-7 gap-2 flex-1">
+              {suggestedColors.map((color) => (
+                <button 
+                  key={color} 
+                  type="button" 
+                  className={cn(
+                    "w-8 h-8 rounded-full border-2 transition-all duration-200 hover:scale-110", 
+                    selectedColor === color ? 
+                      "ring-2 ring-offset-2 ring-[#663EF3] border-white" : 
+                      "border-gray-300"
+                  )} 
+                  style={{ backgroundColor: color }} 
+                  onClick={() => setSelectedColor(color)}
+                />
+              ))}
             </div>
+          </div>
         </div>
       )}
+      
       <div className="flex gap-4 pt-4">
-        <Button variant="ghost" onClick={handleClose} className="w-full">Annulla</Button>
-        <Button onClick={nextStep} disabled={!selectedSupermarket} className="w-full text-white" style={{ background: 'var(--burnt-newStyle)' }}>
+        <Button variant="ghost" onClick={handleClose} className="w-full">
+          Annulla
+        </Button>
+        <Button 
+          onClick={nextStep} 
+          disabled={!selectedSupermarket} 
+          className="w-full text-white" 
+          style={{ background: 'var(--burnt-newStyle)' }}
+        >
           Continua <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
       </div>
@@ -264,31 +393,64 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: any) => {
 
   const ScannerStep = () => (
     <div className="flex flex-col gap-4 text-center">
-      <div className="text-sm text-gray-500">Inquadra il codice a barre o QR della tua carta fedeltà.</div>
+      <div className="text-sm text-gray-500">
+        Inquadra il <strong>codice a barre</strong> della tua carta fedeltà.
+      </div>
+      
       {cameraPermission === 'granted' ? (
         scannedData ? (
           <div className="p-4 bg-green-50 text-green-800 rounded-lg flex flex-col items-center gap-3 border border-green-200">
             <CheckCircle className="w-10 h-10 text-green-500" />
-            <p className="font-semibold text-lg">Codice Acquisito!</p>
+            <p className="font-semibold text-lg">Codice a Barre Acquisito!</p>
             <p className="font-mono bg-white p-2 rounded">{scannedData}</p>
-            <Button variant="link" size="sm" onClick={() => setScannedData('')}>Scansiona di nuovo</Button>
+            <Button 
+              variant="link" 
+              size="sm" 
+              onClick={() => setScannedData('')}
+            >
+              Scansiona di nuovo
+            </Button>
           </div>
-        ) : <BarcodeScanner onScanSuccess={handleScanSuccess} onScanError={handleScanError}/>
+        ) : (
+          <BarcodeScanner 
+            onScanSuccess={handleScanSuccess} 
+            onScanError={handleScanError}
+          />
+        )
       ) : cameraPermission === 'denied' ? (
         <div className="p-4 bg-red-50 text-red-800 rounded-lg flex flex-col items-center gap-2 border border-red-200">
           <Lock className="w-8 h-8 text-red-500" />
           <p className="font-semibold">Accesso alla fotocamera negato</p>
+          <p className="text-sm">
+            Abilita i permessi nelle impostazioni del browser e ricarica la pagina
+          </p>
         </div>
-      ) : <div className="aspect-video bg-gray-200 animate-pulse rounded-lg flex items-center justify-center"><Camera className="w-12 h-12 text-gray-400"/></div>}
+      ) : (
+        <div className="aspect-video bg-gray-200 animate-pulse rounded-lg flex items-center justify-center">
+          <Camera className="w-12 h-12 text-gray-400"/>
+        </div>
+      )}
+      
       <div className="relative flex items-center py-2">
         <div className="flex-grow border-t border-gray-200"></div>
         <span className="flex-shrink mx-4 text-xs text-gray-400">OPPURE</span>
         <div className="flex-grow border-t border-gray-200"></div>
       </div>
-      <Button variant="outline" onClick={handleManualInput}><Edit className="w-4 h-4 mr-2" /> Inserisci Manualmente</Button>
+      
+      <Button variant="outline" onClick={handleManualInput}>
+        <Edit className="w-4 h-4 mr-2" /> Inserisci Manualmente
+      </Button>
+      
       <div className="flex gap-4 pt-4">
-        <Button variant="ghost" onClick={prevStep} className="w-full"><ArrowLeft className="w-4 h-4 mr-2" /> Indietro</Button>
-        <Button onClick={nextStep} disabled={!scannedData} className="w-full text-white" style={{ background: 'var(--burnt-newStyle)' }}>
+        <Button variant="ghost" onClick={prevStep} className="w-full">
+          <ArrowLeft className="w-4 h-4 mr-2" /> Indietro
+        </Button>
+        <Button 
+          onClick={nextStep} 
+          disabled={!scannedData} 
+          className="w-full text-white" 
+          style={{ background: 'var(--burnt-newStyle)' }}
+        >
           Continua <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
       </div>
@@ -306,14 +468,25 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: any) => {
         <p className="text-gray-600">Controlla i dati e salva la tua carta.</p>
         <Card className="mx-auto max-w-xs shadow-lg" style={{ backgroundColor: cardColor }}>
           <CardContent className="text-center text-white p-6 space-y-3">
-            <img src={viewImage(m.logo)} className="h-14 mx-auto drop-shadow-lg" alt={m.name} />
+            <img 
+              src={viewImage(m.logo)} 
+              className="h-14 mx-auto drop-shadow-lg" 
+              alt={m.name} 
+            />
             <h3 className="text-xl font-bold">{m.name} {m.type}</h3>
-            <p className="font-mono text-lg bg-white/20 px-2 py-1 rounded-md">{formatted}</p>
+            <p className="font-mono text-lg bg-white/20 px-2 py-1 rounded-md">
+              {formatted}
+            </p>
           </CardContent>
         </Card>
         <div className="flex gap-4 pt-4">
-          <Button variant="ghost" onClick={prevStep} className="w-full"><ArrowLeft className="w-4 h-4 mr-2" /> Indietro</Button>
-          <Button onClick={saveCard} className="w-full text-white bg-green-600 hover:bg-green-700">
+          <Button variant="ghost" onClick={prevStep} className="w-full">
+            <ArrowLeft className="w-4 h-4 mr-2" /> Indietro
+          </Button>
+          <Button 
+            onClick={saveCard} 
+            className="w-full text-white bg-green-600 hover:bg-green-700"
+          >
             <CheckCircle className="w-4 h-4 mr-2"/> Salva Carta
           </Button>
         </div>
@@ -326,10 +499,14 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: any) => {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
-             <div className="p-2 rounded-lg" style={{ background: 'var(--burnt-newStyle)' }}><Scan className="w-6 h-6 text-white" /></div>
+            <div className="p-2 rounded-lg" style={{ background: 'var(--burnt-newStyle)' }}>
+              <Scan className="w-6 h-6 text-white" />
+            </div>
             Aggiungi Carta Fedeltà
           </DialogTitle>
-          <DialogDescription>Passo {currentStep} di 3 - Seleziona, scansiona e conferma.</DialogDescription>
+          <DialogDescription>
+            Passo {currentStep} di 3 - Scanner ottimizzato per codici a barre
+          </DialogDescription>
         </DialogHeader>
         {currentStep === 1 && <SupermarketSelection />}
         {currentStep === 2 && <ScannerStep />}
