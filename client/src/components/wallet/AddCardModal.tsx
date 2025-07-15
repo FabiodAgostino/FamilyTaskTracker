@@ -61,6 +61,21 @@ const BarcodeScanner = ({
   // ==== CARICAMENTO QUAGGA2 CON DEBUG COMPLETO
   // ==========================================================
   useEffect(() => {
+    // Aggiungi CSS globale per contenere il video
+    const style = document.createElement('style');
+    style.textContent = `
+      #${scannerRegionId} video {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+      }
+      #${scannerRegionId} canvas {
+        width: 100% !important;
+        height: 100% !important;
+      }
+    `;
+    document.head.appendChild(style);
+    
     const loadQuagga = async () => {
       console.log('🔄 Tentativo caricamento Quagga2...');
       
@@ -175,7 +190,11 @@ const BarcodeScanner = ({
           'code_128_reader',    // CODE_128 (molto comune)
           'code_39_reader',     // CODE_39
           'codabar_reader',     // CODABAR
-          'ean_8_reader'        // EAN-8 specifico
+          'ean_8_reader',
+          'code_93_reader',
+          'i2of5_reader',
+          '2of5_reader',
+          'upc_reader'
         ]
       },
       locator: {
@@ -226,7 +245,17 @@ const BarcodeScanner = ({
     const onDetected = (result: any) => {
       const code = result.codeResult.code;
       const format = result.codeResult.format;
-      console.log(`🎉 BARCODE RILEVATO: ${code} (formato: ${format})`);
+      const confidence = result.codeResult.decodedCodes?.[0]?.confidence || 0;
+      
+      console.log(`🔍 LETTURA: ${code} (formato: ${format}, confidenza: ${confidence.toFixed(2)})`);
+      
+      // Accetta solo letture con buona confidenza
+      if (confidence < 50) {
+        console.log(`⚠️ IGNORATO: Confidenza troppo bassa (${confidence.toFixed(2)})`);
+        return;
+      }
+      
+      console.log(`🎉 BARCODE ACCETTATO: ${code} (formato: ${format})`);
       onScanSuccess(result);
     };
 
@@ -330,27 +359,6 @@ const BarcodeScanner = ({
           }}
         />
         
-        {/* CSS per contenere il video di Quagga2 */}
-        <style jsx>{`
-          #${scannerRegionId} video {
-            width: 100% !important;
-            height: 100% !important;
-            object-fit: cover !important;
-          }
-          #${scannerRegionId} canvas {
-            width: 100% !important;
-            height: 100% !important;
-          }
-        `}</style>
-        
-        {/* Overlay con stato */}
-        <div className="absolute top-2 left-2 right-2 bg-black/70 text-white text-xs p-2 rounded text-center">
-          {isScanning ? (
-            <span className="text-green-300">🟢 Scanner attivo - Inquadra il codice a barre</span>
-          ) : (
-            <span className="text-yellow-300">🟡 Inizializzazione scanner...</span>
-          )}
-        </div>
       </div>
 
       {/* Controlli */}
@@ -366,21 +374,9 @@ const BarcodeScanner = ({
             <RotateCcw size={20} />
           </Button>
         )}
-        <div className="text-xs text-gray-500">
-          {cameras.length > 0 ? `Camera: ${cameras[currentCameraIndex]?.label}` : 'Nessuna camera'}
-        </div>
       </div>
 
-      {/* Suggerimenti */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-        <h4 className="text-sm font-medium text-blue-800 mb-2">💡 Suggerimenti per la scansione:</h4>
-        <ul className="space-y-1 text-xs text-blue-700">
-          <li>• <strong>Mantieni distanza 10-15cm</strong> dal codice</li>
-          <li>• <strong>Illuminazione buona</strong> e codice ben visibile</li>
-          <li>• <strong>Tieni fermo</strong> il telefono per 2-3 secondi</li>
-          <li>• <strong>Codice dritto</strong> e ben inquadrato</li>
-        </ul>
-      </div>
+     
     </div>
   );
 };
