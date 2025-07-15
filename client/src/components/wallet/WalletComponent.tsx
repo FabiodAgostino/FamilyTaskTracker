@@ -170,7 +170,7 @@ const WalletStats = ({ stats, isMobile }: WalletStatsProps) => (
     )}
     <Badge variant="outline" className="text-indigo-600 border-indigo-300 bg-indigo-50">
       <Store className="w-3 h-3 mr-1" />
-      {stats.brands.length} brand
+      {stats.brands.length} negozi
     </Badge>
   </div>
 );
@@ -339,12 +339,6 @@ const CompactFidelityCard = ({ card, onCardClick }: CompactFidelityCardProps) =>
           </Badge>
         )}
       </div>
-
-      {card.priority > 0 && (
-        <div className="absolute top-2 right-2 bg-white/20 backdrop-blur-sm rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
-          {card.priority}
-        </div>
-      )}
     </CardContent>
   </Card>
 );

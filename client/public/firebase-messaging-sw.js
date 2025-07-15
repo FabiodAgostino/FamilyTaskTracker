@@ -25,7 +25,9 @@ const getIconPath = () => {
 
 const getBadgePath = () => {
   const hostname = self.location.hostname;
-
+  const fileName = isIOS
+    ? 'iconios.png'        // badge/notification icon iOS
+    : 'icon-192x192.png'; 
   if (hostname === 'fabiodagostino.github.io') {
     return `https://fabiodagostino.github.io/FamilyTaskTracker/icons/badge.png`;
   } else if (hostname === 'localhost' || hostname === '127.0.0.1') {

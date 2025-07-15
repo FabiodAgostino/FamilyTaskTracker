@@ -19,6 +19,7 @@ import { ShoppingItem } from '@/lib/models/shopping-item';
 import { ShoppingFood, CategoryFood, Supermarket } from '@/lib/models/food';
 import { FCMToken } from '@/lib/models/fcmtoken';
 import { Reminder } from '@/lib/models/reminder';
+import { FidelityCard } from '@/lib/models/FidelityCard';
 
 // Type mapping per la deserializzazione
 type CollectionTypeMap = {
@@ -73,6 +74,8 @@ function deserializeDocument<T>(collectionName: string, docData: any): T {
         return FCMToken.fromFirestore(processedData) as T;
       case 'reminders': 
         return Reminder.fromFirestore(processedData) as T;
+      case 'fidelity_cards': 
+        return FidelityCard.fromFirestore(processedData) as T;
       default:
         // Fallback per collection sconosciute - restituisce oggetto plain
         console.warn(`Collection "${collectionName}" non riconosciuta, usando deserializzazione di default`);
@@ -111,6 +114,7 @@ export function useFirestore<T>(
 
   useEffect(() => {
   if (!user) {
+    setLoading(true);
     setData([]);
     setLoading(false);
     return;
@@ -121,6 +125,7 @@ export function useFirestore<T>(
     setLoading(false);
     return;
   }
+  setLoading(true);
 
   const collectionRef = collection(db, collectionName);
   
@@ -134,9 +139,13 @@ export function useFirestore<T>(
       where('isDeleted', '==', true),
       orderBy('createdAt', 'desc')
     );
+    setLoading(false);
+
   } else if (options?.includeDeleted) {
     // Tutti gli elementi (cancellati e non)
     queryRef = query(collectionRef, orderBy('createdAt', 'desc'));
+    setLoading(false);
+
   } else {
     // Solo elementi NON cancellati (comportamento di default)
     queryRef = query(
@@ -144,6 +153,8 @@ export function useFirestore<T>(
       where('isDeleted', 'in', [false, null]),
       orderBy('createdAt', 'desc')
     );
+    setLoading(false);
+
   }
 } else {
   // Per tutte le altre collezioni, query normale
@@ -154,6 +165,7 @@ export function useFirestore<T>(
     queryRef,
     (snapshot) => {
       try {
+        setLoading(true);
         const items = snapshot.docs.map(doc => {
           const docData = { id: doc.id, ...doc.data() };
           // CRUCIALE: Deserializza usando le classi appropriate
@@ -170,12 +182,16 @@ export function useFirestore<T>(
             }
           }
         setData(filteredItems);
-        setLoading(false);
-        setError(null);
+       
       } catch (deserializationError) {
         console.error('Errore durante la deserializzazione batch:', deserializationError);
         setError('Errore durante il caricamento dei dati');
         setLoading(false);
+      }
+      finally
+      {
+        setLoading(false);
+        setError(null);
       }
     },
     (err) => {
