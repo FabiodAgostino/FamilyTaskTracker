@@ -72,57 +72,85 @@ const Html5QrcodePlugin = ({
 }) => {
   const qrcodeRegionId = 'html5qr-code-full-region';
   const qrRef = useRef<Html5Qrcode | null>(null);
-  const initState = useRef<'idle' | 'initializing' | 'initialized'>('idle');
   const [cameras, setCameras] = useState<{ id: string; label: string }[]>([]);
   const [currentCameraIndex, setCurrentCameraIndex] = useState(0);
 
+  // STEP 1: Inizializza l'istanza e ottieni le fotocamere una sola volta
   useEffect(() => {
-    if (initState.current !== 'idle' || cameraPermission !== 'granted') return;
-    initState.current = 'initializing';
+    if (cameraPermission !== 'granted' || qrRef.current) return;
+
+    // Crea l'istanza una sola volta
+    qrRef.current = new Html5Qrcode(qrcodeRegionId, {
+      verbose: false // Opzionale: riduce i log in console
+    });
 
     Html5Qrcode.getCameras()
       .then(devices => {
-        setCameras(devices);
-        const cameraId = devices[currentCameraIndex]?.id;
-        qrRef.current = new Html5Qrcode(qrcodeRegionId);
-        return qrRef.current.start(
-          cameraId,
-          { fps: 10, qrbox: { width: 420, height: 300 } } as any,
-          onScanSuccess,
-          onScanError
-        );
-      })
-      .then(() => {
-        initState.current = 'initialized';
+        if (devices && devices.length) {
+          setCameras(devices);
+        }
       })
       .catch(err => {
-        console.error('Errore init:', err);
-        initState.current = 'idle';
+        console.error("Errore nel recuperare le fotocamere:", err);
       });
+  }, [cameraPermission]);
 
+  // STEP 2: Avvia lo scanner quando le fotocamere sono state caricate
+  useEffect(() => {
+    if (!qrRef.current || cameras.length === 0 || qrRef.current.isScanning) return;
+
+    const cameraId = cameras[currentCameraIndex].id;
+    qrRef.current.start(
+      cameraId,
+      { fps: 10, qrbox: { width: 250, height: 250 } },
+      onScanSuccess,
+      onScanError
+    ).catch(err => {
+      console.error("Impossibile avviare lo scanner:", err);
+    });
+
+    // Funzione di pulizia per quando il componente viene smontato
     return () => {
-      if (qrRef.current && initState.current === 'initialized') {
-        qrRef.current.stop()
-          .then(() => {
-            qrRef.current!.clear();
-            initState.current = 'idle';
-          })
-          .catch(() => {
-            initState.current = 'idle';
-          });
+      if (qrRef.current?.isScanning) {
+        qrRef.current.stop().catch(err => console.error("Errore durante lo stop:", err));
       }
     };
-  }, [cameraPermission, currentCameraIndex]);
+  }, [cameras, currentCameraIndex]); // Si attiva solo se cambiano le fotocamere o l'indice
+
+  // STEP 3: Funzione dedicata e asincrona per il cambio fotocamera
+  const switchCamera = async () => {
+    if (!qrRef.current || cameras.length < 2) return;
+
+    // Assicurati che lo scanner sia in esecuzione prima di fermarlo
+    if (qrRef.current.isScanning) {
+      try {
+        // Ferma lo scanner e ATTENDI che l'operazione sia completata
+        await qrRef.current.stop();
+
+        // Calcola il nuovo indice e aggiorna lo stato
+        const newIndex = (currentCameraIndex + 1) % cameras.length;
+        setCurrentCameraIndex(newIndex);
+        
+        // Lo useEffect [cameras, currentCameraIndex] si occuperà di riavviare lo scanner
+        
+      } catch (err) {
+        console.error("Errore nello switch della fotocamera:", err);
+        // Se lo stop fallisce, prova comunque a riavviare lo scanner
+        const newIndex = (currentCameraIndex + 1) % cameras.length;
+        setCurrentCameraIndex(newIndex);
+      }
+    }
+  };
 
   return (
     <div className="relative w-full">
       <div id={qrcodeRegionId} style={{ width: '100%' }} />
       {cameras.length > 1 && (
         <button
-          onClick={() => setCurrentCameraIndex(i => (i + 1) % cameras.length)}
+          onClick={switchCamera} // Usa la nuova funzione
           className="absolute top-2 right-2 bg-white bg-opacity-50 p-2 rounded-full"
         >
-          ⇄
+          <RotateCcw size={20} color="black" /> {/* Icona più chiara */}
         </button>
       )}
     </div>
