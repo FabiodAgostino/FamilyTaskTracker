@@ -44,6 +44,7 @@ const Html5QrcodePlugin = ({
   const [currentCameraIndex, setCurrentCameraIndex] = useState(0);
 
   useEffect(() => {
+    // Questa parte rimane invariata
     if (cameraPermission !== 'granted' || qrRef.current) return;
     qrRef.current = new Html5Qrcode(qrcodeRegionId, { verbose: false });
     Html5Qrcode.getCameras()
@@ -61,14 +62,35 @@ const Html5QrcodePlugin = ({
 
   useEffect(() => {
     if (!qrRef.current || cameras.length === 0 || qrRef.current.isScanning) return;
+    
+    // ===============================================
+    // ==== LA MODIFICA È QUI DENTRO =================
+    // ===============================================
+    
+    // 1. Definiamo un oggetto di configurazione
+    const config = {
+      fps: 10,
+      qrbox: { width: 280, height: 150 },
+      // 2. Aggiungiamo la lista dei formati da scansionare
+      formatsToScan: [
+        (window as any).Html5QrcodeSupportedFormats.QR_CODE,
+        (window as any).Html5QrcodeSupportedFormats.EAN_13,
+        (window as any).Html5QrcodeSupportedFormats.CODE_128,
+        (window as any).Html5QrcodeSupportedFormats.EAN_8,
+        (window as any).Html5QrcodeSupportedFormats.CODE_39,
+      ]
+    };
+    
     const cameraId = cameras[currentCameraIndex].id;
+    
+    // 3. Passiamo il nuovo oggetto 'config' alla funzione start
     qrRef.current.start(
       cameraId,
-      // Usiamo la configurazione che sappiamo funzionare
-      { fps: 10, qrbox: { width: 280, height: 150 } },
+      config, // <-- Usiamo la configurazione completa
       onScanSuccess,
       onScanError
     ).catch(err => console.error("Impossibile avviare lo scanner:", err));
+
     return () => {
       if (qrRef.current?.isScanning) {
         qrRef.current.stop().catch(err => console.error("Errore durante lo stop:", err));
@@ -77,6 +99,7 @@ const Html5QrcodePlugin = ({
   }, [cameras, currentCameraIndex, onScanSuccess, onScanError]);
 
   const switchCamera = async () => {
+    // Questa parte rimane invariata
     if (!qrRef.current || cameras.length < 2 || !qrRef.current.isScanning) return;
     try {
       await qrRef.current.stop();
@@ -87,13 +110,10 @@ const Html5QrcodePlugin = ({
     }
   };
 
-  
   return (
+    // Questa parte rimane invariata
     <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden">
-      {/* L'area dove la libreria disegnerà il video e la sua UI di default */}
       <div id={qrcodeRegionId} style={{ width: '100%', height: '100%' }} />
-
-      {/* Il pulsante per cambiare fotocamera rimane */}
       {cameras.length > 1 && (
         <Button
           variant="outline"
