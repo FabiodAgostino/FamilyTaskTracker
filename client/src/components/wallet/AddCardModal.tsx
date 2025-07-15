@@ -54,18 +54,13 @@ const BarcodeScanner = ({
   useEffect(() => {
     if (!qrRef.current) {
       // ==========================================================
-      // ==== FORMATI OTTIMIZZATI SOLO PER CODICI A BARRE
-      // ==== RICERCA: Rimuovere QR_CODE migliora le performance
+      // ==== TENTATIVO 2: SOLO I FORMATI PIÙ SUPPORTATI
+      // ==== Dalle ricerche: troppi formati possono causare conflitti
       // ==========================================================
       const formatsToSupport: Html5QrcodeSupportedFormats[] = [
-        Html5QrcodeSupportedFormats.CODE_128,    // Più comune per loyalty cards
-        Html5QrcodeSupportedFormats.EAN_13,      // Standard europeo
+        Html5QrcodeSupportedFormats.EAN_13,      // Standard europeo - PRIORITÀ
+        Html5QrcodeSupportedFormats.CODE_128,    // Più comune per loyalty 
         Html5QrcodeSupportedFormats.UPC_A,       // Standard americano
-        Html5QrcodeSupportedFormats.EAN_8,       // Versione corta
-        Html5QrcodeSupportedFormats.CODE_39,     // Alfanumerico
-        Html5QrcodeSupportedFormats.CODE_93,     // Evoluzione di Code 39
-        Html5QrcodeSupportedFormats.CODABAR,     // Usato in alcune carte
-        Html5QrcodeSupportedFormats.ITF,         // Interleaved 2 of 5
       ];
       
       qrRef.current = new Html5Qrcode(qrcodeRegionId, {
