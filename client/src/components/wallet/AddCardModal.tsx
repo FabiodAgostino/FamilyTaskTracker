@@ -249,11 +249,11 @@ const BarcodeScanner = ({
       const format = result.codeResult.format;
       const confidence = result.codeResult.decodedCodes?.[0]?.confidence || 0;
       
-      console.log(`🔍 LETTURA: ${code} (formato: ${format}, confidenza: ${confidence.toFixed(2)})`);
-      
+      console.log(`🔍 LETTURA: ${code} (formato: ${format}, confidenza: ${confidence})`);
+      console.log(result.codeResult)
       // SOGLIA CONFIDENZA RIDOTTA (dalle ricerche sui problemi)
       if (confidence < 30) {
-        console.log(`⚠️ IGNORATO: Confidenza troppo bassa (${confidence.toFixed(2)})`);
+        console.log(`⚠️ IGNORATO: Confidenza troppo bassa (${confidence})`);
         return;
       }
       
