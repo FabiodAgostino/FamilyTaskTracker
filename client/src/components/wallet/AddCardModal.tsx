@@ -54,22 +54,15 @@ const BarcodeScanner = ({
   useEffect(() => {
     if (!qrRef.current) {
       // ==========================================================
-      // ==== TENTATIVO 2: SOLO I FORMATI PIÙ SUPPORTATI
-      // ==== Dalle ricerche: troppi formati possono causare conflitti
+      // ==== TENTATIVO 3: NESSUN FORMATO SPECIFICATO
+      // ==== Lascia che html5-qrcode usi TUTTI i formati di default
+      // ==== Questo risolve spesso "No MultiFormat Readers"
       // ==========================================================
-      const formatsToSupport: Html5QrcodeSupportedFormats[] = [
-        Html5QrcodeSupportedFormats.EAN_13,      // Standard europeo - PRIORITÀ
-        Html5QrcodeSupportedFormats.CODE_128,    // Più comune per loyalty 
-        Html5QrcodeSupportedFormats.UPC_A,       // Standard americano
-      ];
       
       qrRef.current = new Html5Qrcode(qrcodeRegionId, {
         verbose: false,
-        formatsToSupport: formatsToSupport,
-        // ==========================================================
-        // ==== CONFIGURAZIONE CRUCIALE DALLA RICERCA
-        // ==== Forza l'uso del decoder ZXing.js più stabile
-        // ==========================================================
+        // ❌ RIMUOVO formatsToSupport per evitare conflitti
+        // formatsToSupport: formatsToSupport,
         experimentalFeatures: {
           useBarCodeDetectorIfSupported: false,
         },
@@ -112,10 +105,7 @@ const BarcodeScanner = ({
         console.log('✅ SCANNER AVVIATO CON SUCCESSO');
         console.log('📊 Camera ID:', cameraId);
         console.log('📊 Config:', config);
-        console.log('📊 Formati supportati:', [
-          'CODE_128', 'EAN_13', 'UPC_A', 'EAN_8', 
-          'CODE_39', 'CODE_93', 'CODABAR', 'ITF'
-        ]);
+        console.log('📊 TENTATIVO 3: Usando TUTTI i formati di default (nessun filtro)');
         console.log('📊 useBarCodeDetectorIfSupported: false');
         console.log('🎯 ORA INQUADRA UN CODICE A BARRE PER TESTARE');
         
