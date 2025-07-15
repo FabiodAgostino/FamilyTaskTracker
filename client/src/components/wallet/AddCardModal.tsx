@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   Scan,
   Globe,
@@ -19,11 +19,35 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { cn, viewImage } from '@/lib/utils';
-import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from '@zxing/library';
 import { supermarketData, type SupermarketKey, suggestedColors } from './walletConstants';
 
-interface QRScanner {
-  stop: () => void;
+// Definizioni TypeScript per html5-qrcode
+declare global {
+  interface Window {
+    Html5QrcodeScanner?: new (
+      elementId: string,
+      config?: any,
+      verbose?: boolean
+    ) => any;
+    Html5QrcodeSupportedFormats?: {
+      QR_CODE: number;
+      CODE_128: number;
+      EAN_13: number;
+      UPC_A: number;
+      UPC_E: number;
+      EAN_8: number;
+      CODE_39: number;
+      CODE_93: number;
+      CODABAR: number;
+      ITF: number;
+      PDF_417: number;
+      DATA_MATRIX: number;
+    };
+    Html5QrcodeScanType?: {
+      SCAN_TYPE_CAMERA: number;
+      SCAN_TYPE_FILE: number;
+    };
+  }
 }
 
 interface AddCardModalProps {
@@ -32,50 +56,195 @@ interface AddCardModalProps {
   onSave: (cardData: any) => void;
 }
 
+// Hook per caricare html5-qrcode
+const useHtml5QrcodeLoader = () => {
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Verifica se già caricato
+    if (typeof window !== 'undefined' && window.Html5QrcodeScanner) {
+      setIsLoaded(true);
+      return;
+    }
+
+    // Polyfill per globalThis (risolve problemi versione 2.3.8)
+    if (typeof globalThis === 'undefined') {
+      (window as any).globalThis = window;
+    }
+
+    setIsLoading(true);
+
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
+    script.async = true;
+
+    script.onload = () => {
+      console.log('✅ html5-qrcode library loaded successfully');
+      setIsLoaded(true);
+      setIsLoading(false);
+    };
+
+    script.onerror = () => {
+      console.error('❌ Failed to load html5-qrcode library');
+      setError('Errore caricamento libreria scanner');
+      setIsLoading(false);
+    };
+
+    document.head.appendChild(script);
+
+    return () => {
+      if (document.head.contains(script)) {
+        document.head.removeChild(script);
+      }
+    };
+  }, []);
+
+  return { isLoaded, isLoading, error };
+};
+
+// Componente Scanner ottimizzato
+const Html5QrcodePlugin = ({ 
+  onScanSuccess, 
+  onScanError 
+}: {
+  onScanSuccess: (decodedText: string, decodedResult: any) => void;
+  onScanError?: (error: string) => void;
+}) => {
+  const qrcodeRegionId = "html5qr-code-full-region";
+  const html5QrcodeScannerRef = useRef<any>(null);
+  const initializationStateRef = useRef<'idle' | 'initializing' | 'initialized'>('idle');
+
+  // Callback memoization per prevenire re-render
+  const handleScanSuccess = useCallback((decodedText: string, decodedResult: any) => {
+    console.log('✅ Scan success:', decodedText);
+    onScanSuccess(decodedText, decodedResult);
+  }, [onScanSuccess]);
+
+  const handleScanError = useCallback((error: string) => {
+    // Filtra errori comuni durante la scansione
+    if (error.includes('No QR code found') || 
+        error.includes('couldn\'t find enough finder patterns') ||
+        error.includes('NotFoundException')) {
+      return;
+    }
+    if (onScanError) {
+      onScanError(error);
+    }
+  }, [onScanError]);
+
+  useEffect(() => {
+    // Prevenire doppia inizializzazione in React Strict Mode
+    if (initializationStateRef.current !== 'idle') {
+      return;
+    }
+
+    if (typeof window === 'undefined' || !window.Html5QrcodeScanner) {
+      console.error('Html5QrcodeScanner not available');
+      return;
+    }
+
+    initializationStateRef.current = 'initializing';
+
+    try {
+      // Configurazione ottimizzata per barcode retail
+      const config = {
+        fps: 10,
+        qrbox: { width: 350, height: 200 }, // Dimensioni ottimali per barcode
+        aspectRatio: 1.0,
+        disableFlip: false,
+        formatsToSupport: window.Html5QrcodeSupportedFormats ? [
+          window.Html5QrcodeSupportedFormats.QR_CODE,
+          window.Html5QrcodeSupportedFormats.CODE_128,
+          window.Html5QrcodeSupportedFormats.EAN_13,
+          window.Html5QrcodeSupportedFormats.UPC_A,
+          window.Html5QrcodeSupportedFormats.UPC_E,
+          window.Html5QrcodeSupportedFormats.EAN_8
+        ] : undefined,
+        showTorchButtonIfSupported: true,
+        showZoomSliderIfSupported: true,
+        supportedScanTypes: window.Html5QrcodeScanType ? 
+          [window.Html5QrcodeScanType.SCAN_TYPE_CAMERA] : undefined,
+        rememberLastUsedCamera: false,
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true
+        }
+      };
+
+      html5QrcodeScannerRef.current = new window.Html5QrcodeScanner(
+        qrcodeRegionId,
+        config,
+        false // verbose
+      );
+
+      html5QrcodeScannerRef.current.render(handleScanSuccess, handleScanError);
+      initializationStateRef.current = 'initialized';
+      console.log('✅ Html5QrcodeScanner initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize Html5QrcodeScanner:', error);
+      initializationStateRef.current = 'idle';
+    }
+
+    return () => {
+      if (html5QrcodeScannerRef.current && initializationStateRef.current === 'initialized') {
+        html5QrcodeScannerRef.current.clear()
+          .then(() => {
+            console.log('✅ Html5QrcodeScanner cleaned up successfully');
+            initializationStateRef.current = 'idle';
+          })
+          .catch((error: any) => {
+            console.error('Failed to clear html5QrcodeScanner:', error);
+            initializationStateRef.current = 'idle';
+          });
+      }
+    };
+  }, [handleScanSuccess, handleScanError]);
+
+  return <div id={qrcodeRegionId} style={{ width: '100%' }} />;
+};
+
 export const AddCardModal = ({ isOpen, onClose, onSave }: AddCardModalProps) => {
-  // Stati del componente
+  // Stati base
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedSupermarket, setSelectedSupermarket] = useState<SupermarketKey | null>(null);
   const [scannedData, setScannedData] = useState('');
-  const [qrStatus, setQrStatus] = useState('Clicca "Avvia Scanner" per iniziare');
   const [selectedColor, setSelectedColor] = useState('#6366F1');
   const [isCardPublic, setIsCardPublic] = useState(false);
   const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
-  
-  const qrScannerRef = useRef<QRScanner | null>(null);
+  const [cameraPermission, setCameraPermission] = useState<'unknown' | 'granted' | 'denied'>('unknown');
 
-  // Reset completo del modal
+  // Hook per caricare libreria
+  const { isLoaded, isLoading, error: loadError } = useHtml5QrcodeLoader();
+
+  // Verifica permessi camera
+  const checkCameraPermission = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      stream.getTracks().forEach(track => track.stop());
+      setCameraPermission('granted');
+      return true;
+    } catch (err) {
+      setCameraPermission('denied');
+      return false;
+    }
+  }, []);
+
+  // Reset modal
   const resetModal = () => {
     setCurrentStep(1);
     setSelectedSupermarket(null);
     setScannedData('');
-    setQrStatus('Clicca "Avvia Scanner" per iniziare');
     setSelectedColor('#6366F1');
     setIsCardPublic(false);
     setIsColorPickerOpen(false);
     setIsScanning(false);
-    stopScanner();
-  };
-
-  // Ferma lo scanner e pulisce le risorse
-  const stopScanner = () => {
-    if (qrScannerRef.current) {
-      qrScannerRef.current.stop();
-      qrScannerRef.current = null;
-    }
-    setIsScanning(false);
-    
-    // Nascondi il video
-    const video = document.getElementById('barcode-scanner-video') as HTMLVideoElement;
-    if (video) {
-      video.style.display = 'none';
-    }
+    setCameraPermission('unknown');
   };
 
   // Gestori eventi
   const handleClose = () => {
-    stopScanner();
     resetModal();
     onClose();
   };
@@ -88,116 +257,45 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: AddCardModalProps) => 
 
   const prevStep = () => {
     if (currentStep > 1) {
-      if (currentStep === 2) {
-        stopScanner();
-      }
       setCurrentStep(currentStep - 1);
     }
   };
 
-  // Inserimento manuale del codice
-  const handleManualInput = () => {
-    const manualCode = prompt('Inserisci il codice manualmente:');
-    if (manualCode && manualCode.trim()) {
-      setScannedData(manualCode.trim());
-      setQrStatus('✅ Codice inserito manualmente!');
-      stopScanner();
+  // Callbacks scanner
+  const handleScanSuccess = useCallback((decodedText: string, decodedResult: any) => {
+    setScannedData(decodedText);
+    setIsScanning(false);
+  }, []);
+
+  const handleScanError = useCallback((error: string) => {
+    // console.warn('Scan error:', error);
+  }, []);
+
+  // Avvia scanner
+  const startScanner = async () => {
+    if (!isLoaded) {
+      return;
     }
+
+    const hasPermission = await checkCameraPermission();
+    if (!hasPermission) {
+      alert('Permesso fotocamera necessario per la scansione.');
+      return;
+    }
+
+    setIsScanning(true);
   };
-
-  // Scanner ZXing semplice e funzionante
-  const startBarcodeScanner = () => {
-    try {
-      setIsScanning(true);
-      setQrStatus('🔄 Inizializzazione scanner...');
-
-      // Crea il code reader con configurazione ottimizzata
-      const hints = new Map();
-      hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-        BarcodeFormat.CODE_128,
-        BarcodeFormat.CODE_39,
-        BarcodeFormat.EAN_13,
-        BarcodeFormat.EAN_8,
-        BarcodeFormat.UPC_A,
-        BarcodeFormat.UPC_E,
-        BarcodeFormat.QR_CODE,
-        BarcodeFormat.DATA_MATRIX,
-        BarcodeFormat.CODABAR,
-        BarcodeFormat.CODE_93,
-        BarcodeFormat.ITF
-      ]);
-      hints.set(DecodeHintType.TRY_HARDER, true);
-      
-      const codeReader = new BrowserMultiFormatReader(hints);
-      
-      console.log('✅ Scanner inizializzato');
-      setQrStatus('📹 Avvio camera...');
-      
-      // Scansione continua dalla camera (null = auto-selezione camera posteriore)
-      codeReader.decodeFromVideoDevice(null, 'barcode-scanner-video', (result, error) => {
-        if (result) {
-          const scannedCode = result.getText();
-          console.log('✅ Codice trovato:', scannedCode);
-          
-          setScannedData(scannedCode);
-          setQrStatus('✅ Codice scansionato con successo!');
-          
-          // Ferma lo scanner
-          codeReader.reset();
-          
-          // Nascondi il video
-          const video = document.getElementById('barcode-scanner-video') as HTMLVideoElement;
-          if (video) video.style.display = 'none';
-          
-          setIsScanning(false);
-          return;
-        }
-        
-        // 🚫 IMPORTANTE: Ignora completamente i NotFoundException (sono normali!)
-        if (error && !error.name.includes('NotFoundException')) {
-          console.error('❌ Errore scanner reale:', error);
-          
-          // Gestisci solo errori reali
-          if (error.name.includes('NotAllowed')) {
-            setQrStatus('❌ Permessi camera negati. Abilita la camera nelle impostazioni del browser.');
-          } else if (error.name.includes('NotFound')) {
-            setQrStatus('❌ Camera non trovata. Verifica che sia collegata.');
-          } else if (error.name.includes('NotReadable')) {
-            setQrStatus('❌ Camera occupata da altra app. Chiudi altre applicazioni.');
-          } else {
-            setQrStatus('❌ Errore scanner. Riprova o usa inserimento manuale.');
-          }
-          
-          setIsScanning(false);
-        }
-        // NotFoundException vengono completamente ignorati senza log
-      });
-      
-      // Mostra il video
-      const video = document.getElementById('barcode-scanner-video') as HTMLVideoElement;
-      if (video) {
-        video.style.display = 'block';
-        setQrStatus('📹 Camera attiva - Inquadra il codice');
-      }
-      
-      // Salva il riferimento per poter fermare lo scanner
-      qrScannerRef.current = {
-        stop: () => {
-          codeReader.reset();
-          setIsScanning(false);
-          const video = document.getElementById('barcode-scanner-video') as HTMLVideoElement;
-          if (video) video.style.display = 'none';
-        }
-      };
-      
-    } catch (error) {
-      console.error('❌ Errore inizializzazione scanner:', error);
-      setQrStatus('❌ Impossibile avviare lo scanner. Verifica i permessi della camera.');
+  startScanner();
+  // Inserimento manuale
+  const handleManualInput = () => {
+    const code = prompt('Inserisci il codice manualmente:');
+    if (code?.trim()) {
+      setScannedData(code.trim());
       setIsScanning(false);
     }
   };
 
-  // Salva la carta
+  // Salva carta
   const saveCard = () => {
     if (!selectedSupermarket) return;
 
@@ -284,13 +382,11 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: AddCardModalProps) => 
               <div className="w-full h-full rounded-lg shadow-inner" style={{ backgroundColor: selectedColor }}></div>
             </Button>
 
-            {/* Color picker avanzato */}
             {isColorPickerOpen && (
               <div className="absolute z-50 mt-32 w-96 p-6 bg-white border-2 rounded-xl shadow-2xl">
                 <div className="space-y-4">
                   <div className="text-lg font-semibold text-gray-800">Seleziona Colore</div>
                   
-                  {/* Color picker nativo */}
                   <input
                     type="color"
                     value={selectedColor}
@@ -298,7 +394,6 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: AddCardModalProps) => 
                     className="w-full h-16 rounded-lg border-2 cursor-pointer"
                   />
                   
-                  {/* Colori predefiniti */}
                   <div className="space-y-3">
                     <div className="text-sm font-medium text-gray-600">Colori Popolari</div>
                     <div className="grid grid-cols-7 gap-2">
@@ -341,7 +436,6 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: AddCardModalProps) => 
             </div>
           </div>
 
-          {/* Anteprima carta */}
           <div className="text-center pt-4">
             <div className="text-sm font-medium text-gray-600 mb-3">Anteprima Carta</div>
             <div 
@@ -370,7 +464,7 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: AddCardModalProps) => 
   );
 
   // STEP 2: Scanner
-  const BarcodeScanner = () => (
+  const ScannerStep = () => (
     <div className="space-y-6">
       <div className="relative mx-auto w-full max-w-md">
         <Card className="bg-gradient-to-br from-gray-900 to-black text-white border-2">
@@ -378,61 +472,55 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: AddCardModalProps) => 
             <Scan className="mx-auto h-16 w-16 mb-4 text-blue-400" />
             <h3 className="text-xl font-bold mb-6">Scanner Codici a Barre</h3>
             
-            {/* Container video scanner */}
-            <div className="relative w-full h-56 bg-gray-900 rounded-xl overflow-hidden border-4 border-blue-400/50">
+            {/* Container per scanner */}
+            <div className="relative w-full bg-gray-900 rounded-xl overflow-hidden border-4 border-blue-400/50">
               
-              {/* Placeholder animato quando scanner non attivo */}
-              {!isScanning && !scannedData && (
-                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900">
-                  <div className="text-blue-400 text-center">
+              {/* Gestione stati */}
+              {isLoading && (
+                <div className="flex items-center justify-center h-[300px] text-blue-400 text-center p-8">
+                  <div>
                     <Camera className="w-16 h-16 mx-auto mb-4 animate-pulse" />
-                    <div className="text-lg font-semibold">Premi "Avvia Scanner"</div>
-                    <div className="text-sm opacity-75 mt-2">per iniziare la scansione</div>
+                    <div className="text-lg font-semibold">Caricamento Libreria...</div>
+                    <div className="text-sm opacity-75 mt-2">Attendere prego</div>
                   </div>
                 </div>
               )}
-              
-              {/* Video element per scanner reale */}
-              <video 
-                id="barcode-scanner-video" 
-                className="hidden w-full h-full object-cover rounded-lg"
-                autoPlay 
-                playsInline
-                muted
-              />
-              
-              {/* Linea di scansione animata quando attivo */}
-              {isScanning && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="w-4/5 h-1 bg-gradient-to-r from-transparent via-blue-400 to-transparent animate-pulse shadow-lg"></div>
-                </div>
-              )}
-              
-              {/* Angoli del mirino */}
-              <div className="absolute top-4 left-4 w-8 h-8 border-l-4 border-t-4 border-blue-400"></div>
-              <div className="absolute top-4 right-4 w-8 h-8 border-r-4 border-t-4 border-blue-400"></div>
-              <div className="absolute bottom-4 left-4 w-8 h-8 border-l-4 border-b-4 border-blue-400"></div>
-              <div className="absolute bottom-4 right-4 w-8 h-8 border-r-4 border-b-4 border-blue-400"></div>
 
-              {/* Stato scanner overlay */}
-              {isScanning && (
-                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-blue-500/90 text-white px-4 py-2 rounded-full text-sm font-semibold">
-                  🔍 Scansione in corso...
+              {loadError && (
+                <div className="flex items-center justify-center h-[300px] text-red-400 text-center p-8">
+                  <div>
+                    <div className="text-lg font-semibold">❌ Errore Caricamento</div>
+                    <div className="text-sm opacity-75 mt-2">{loadError}</div>
+                  </div>
                 </div>
               )}
+
+              {!isLoading && !loadError && !scannedData && (
+                <div className="w-full min-h-[300px]">
+                  {isScanning && isLoaded ? (
+                    <Html5QrcodePlugin
+                      onScanSuccess={handleScanSuccess}
+                      onScanError={handleScanError}
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-[300px] text-blue-400 text-center p-8">
+                      <div>
+                        <Camera className="w-16 h-16 mx-auto mb-4 animate-pulse" />
+                        <div className="text-lg font-semibold">Scanner Pronto</div>
+                        <div className="text-sm opacity-75 mt-2">
+                          {!isLoaded ? 'Libreria non caricata' : 
+                           cameraPermission === 'denied' ? 'Permessi camera negati' :
+                           'Premi "Avvia Scanner"'}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              
             </div>
           </CardContent>
         </Card>
-      </div>
-      
-      {/* Status message */}
-      <div className={cn(
-        "text-center font-semibold text-lg px-4 py-3 rounded-lg",
-        scannedData ? "text-green-700 bg-green-100" : 
-        qrStatus.includes('❌') ? "text-red-700 bg-red-100" : 
-        "text-blue-700 bg-blue-100"
-      )}>
-        {qrStatus}
       </div>
       
       {/* Risultato scansione */}
@@ -447,34 +535,36 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: AddCardModalProps) => 
       
       {/* Controlli scanner */}
       <div className="flex gap-3 justify-center">
-        {!isScanning && !scannedData && (
+        {/* {!isScanning && !scannedData && isLoaded && !loadError && (
           <Button 
-            onClick={startBarcodeScanner}
+            onClick={startScanner}
             className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3"
           >
             <Camera className="w-5 h-5 mr-2" />
             Avvia Scanner
           </Button>
-        )}
+        )} */}
         
-        {isScanning && (
+        {/* {isScanning && (
           <Button 
             variant="outline"
-            onClick={stopScanner}
+            onClick={() => setIsScanning(false)}
             className="px-6 py-3"
           >
             <RotateCcw className="w-5 h-5 mr-2" />
             Ferma Scanner
           </Button>
-        )}
+        )} */}
         
-        <Button 
-          variant="outline" 
-          onClick={handleManualInput}
-          className="px-6 py-3"
-        >
-          ✏️ Inserisci Manualmente
-        </Button>
+        {isLoaded && !loadError && (
+          <Button 
+            variant="outline" 
+            onClick={handleManualInput}
+            className="px-6 py-3"
+          >
+            ✏️ Inserisci Manualmente
+          </Button>
+        )}
       </div>
       
       <div className="flex gap-4 pt-4">
@@ -492,7 +582,7 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: AddCardModalProps) => 
     </div>
   );
 
-  // STEP 3: Conferma finale
+  // STEP 3: Conferma
   const ConfirmationStep = () => {
     if (!selectedSupermarket) return null;
     
@@ -503,7 +593,6 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: AddCardModalProps) => 
 
     return (
       <div className="space-y-6">
-        {/* Anteprima carta */}
         <div className="text-center">
           <Label className="text-lg font-semibold mb-4 block text-gray-800">Anteprima Carta</Label>
           <Card 
@@ -529,7 +618,6 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: AddCardModalProps) => 
           </Card>
         </div>
 
-        {/* Dettagli carta */}
         <div className="space-y-4">
           <div>
             <Label className="text-sm font-semibold text-gray-700">Nome Carta</Label>
@@ -556,7 +644,6 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: AddCardModalProps) => 
             />
           </div>
 
-          {/* Switch Visibilità */}
           <div className="flex flex-row items-center justify-between rounded-xl border-2 p-6 bg-gray-50">
             <div className="space-y-1">
               <Label className="text-base font-semibold flex items-center">
@@ -610,7 +697,7 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: AddCardModalProps) => 
             🎫 Aggiungi Carta Fedeltà
           </DialogTitle>
           <DialogDescription className="text-gray-600">
-            Seleziona il negozio e scansiona il codice a barre della tua carta
+            Scanner professionale per QR codes e codici a barre
           </DialogDescription>
         </DialogHeader>
 
@@ -642,10 +729,10 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: AddCardModalProps) => 
           ))}
         </div>
 
-        {/* Contenuto dei step */}
+        {/* Contenuto step */}
         <div className="min-h-[400px]">
           {currentStep === 1 && <SupermarketSelection />}
-          {currentStep === 2 && <BarcodeScanner />}
+          {currentStep === 2 && <ScannerStep />}
           {currentStep === 3 && <ConfirmationStep />}
         </div>
       </DialogContent>
