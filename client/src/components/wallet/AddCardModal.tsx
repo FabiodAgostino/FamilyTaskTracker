@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Scan,
-  Globe,
   Lock,
   Camera,
   RotateCcw,
@@ -13,9 +12,7 @@ import {
   Palette
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import {
   Dialog,
@@ -25,15 +22,49 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { cn, viewImage } from '@/lib/utils';
-import { supermarketData, type SupermarketKey, suggestedColors } from './walletConstants'; // Assicurati che questi dati siano corretti
+import { supermarketData, type SupermarketKey, suggestedColors } from './walletConstants';
 import { Html5Qrcode } from 'html5-qrcode';
 
+// Hook per caricare e tracciare la libreria dello scanner in modo sicuro
+const useHtml5QrcodeLoader = () => {
+  const [isLoaded, setIsLoaded] = useState(false);
 
+  useEffect(() => {
+    const SCRIPT_URL = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
+    
+    // Controlla se lo script è già presente per evitare duplicati
+    if (document.querySelector(`script[src="${SCRIPT_URL}"]`)) {
+      if ((window as any).Html5Qrcode) {
+        setIsLoaded(true);
+      }
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = SCRIPT_URL;
+    script.async = true;
+    script.onload = () => setIsLoaded(true);
+    script.onerror = () => console.error('Errore caricamento libreria scanner.');
+    document.head.appendChild(script);
+
+    return () => {
+      if (document.head.contains(script)) {
+        document.head.removeChild(script);
+      }
+    };
+  }, []);
+
+  return isLoaded;
+};
+
+// Componente Plugin per lo scanner, finale e corretto
 const Html5QrcodePlugin = ({
+  isLoaded,
   onScanSuccess,
   onScanError,
   cameraPermission
 }: {
+  isLoaded: boolean;
   onScanSuccess: (decodedText: string) => void;
   onScanError?: (error: string) => void;
   cameraPermission: 'granted';
@@ -44,62 +75,46 @@ const Html5QrcodePlugin = ({
   const [currentCameraIndex, setCurrentCameraIndex] = useState(0);
 
   useEffect(() => {
-    // Questa parte rimane invariata
-    if (cameraPermission !== 'granted' || qrRef.current) return;
+    if (!isLoaded || qrRef.current) return;
     qrRef.current = new Html5Qrcode(qrcodeRegionId, { verbose: false });
     Html5Qrcode.getCameras()
       .then(devices => {
         if (devices && devices.length) {
           setCameras(devices);
-          const rearCameraIndex = devices.findIndex(device =>
-            device.label.toLowerCase().includes('back') || device.label.toLowerCase().includes('environment')
-          );
+          const rearCameraIndex = devices.findIndex(d => d.label.toLowerCase().includes('back'));
           setCurrentCameraIndex(rearCameraIndex !== -1 ? rearCameraIndex : 0);
         }
       })
-      .catch(err => console.error("Errore nel recuperare le fotocamere:", err));
-  }, [cameraPermission]);
+      .catch(err => console.error("Errore recupero fotocamere:", err));
+  }, [isLoaded]);
 
   useEffect(() => {
-    if (!qrRef.current || cameras.length === 0 || qrRef.current.isScanning) return;
-    
-    // ===============================================
-    // ==== LA MODIFICA È QUI DENTRO =================
-    // ===============================================
-    
-    // 1. Definiamo un oggetto di configurazione
+    if (!isLoaded || !qrRef.current || cameras.length === 0 || qrRef.current.isScanning) {
+      return;
+    }
+
     const config = {
       fps: 10,
       qrbox: { width: 280, height: 150 },
-      // 2. Aggiungiamo la lista dei formati da scansionare
       formatsToScan: [
         (window as any).Html5QrcodeSupportedFormats.QR_CODE,
         (window as any).Html5QrcodeSupportedFormats.EAN_13,
         (window as any).Html5QrcodeSupportedFormats.CODE_128,
         (window as any).Html5QrcodeSupportedFormats.EAN_8,
-        (window as any).Html5QrcodeSupportedFormats.CODE_39,
       ]
     };
     
-    const cameraId = cameras[currentCameraIndex].id;
-    
-    // 3. Passiamo il nuovo oggetto 'config' alla funzione start
-    qrRef.current.start(
-      cameraId,
-      config, // <-- Usiamo la configurazione completa
-      onScanSuccess,
-      onScanError
-    ).catch(err => console.error("Impossibile avviare lo scanner:", err));
+    qrRef.current.start(cameras[currentCameraIndex].id, config, onScanSuccess, onScanError)
+      .catch(err => console.error("Impossibile avviare lo scanner:", err));
 
     return () => {
       if (qrRef.current?.isScanning) {
-        qrRef.current.stop().catch(err => console.error("Errore durante lo stop:", err));
+        qrRef.current.stop().catch(err => console.error("Errore stop:", err));
       }
     };
-  }, [cameras, currentCameraIndex, onScanSuccess, onScanError]);
+  }, [isLoaded, cameras, currentCameraIndex, onScanSuccess, onScanError]);
 
   const switchCamera = async () => {
-    // Questa parte rimane invariata
     if (!qrRef.current || cameras.length < 2 || !qrRef.current.isScanning) return;
     try {
       await qrRef.current.stop();
@@ -110,8 +125,11 @@ const Html5QrcodePlugin = ({
     }
   };
 
+  if (!isLoaded) {
+    return <div className="aspect-video bg-black flex items-center justify-center text-white rounded-lg">Caricamento scanner...</div>;
+  }
+
   return (
-    // Questa parte rimane invariata
     <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden">
       <div id={qrcodeRegionId} style={{ width: '100%', height: '100%' }} />
       {cameras.length > 1 && (
@@ -128,17 +146,16 @@ const Html5QrcodePlugin = ({
   );
 };
 
+// Componente Modale principale che unisce tutto
 export const AddCardModal = ({ isOpen, onClose, onSave }: any) => {
+  const isScannerLibraryLoaded = useHtml5QrcodeLoader();
+  
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedSupermarket, setSelectedSupermarket] = useState<SupermarketKey | null>(null);
   const [scannedData, setScannedData] = useState('');
   const [cameraPermission, setCameraPermission] = useState<'unknown' | 'granted' | 'denied'>('unknown');
-  
-  // Stati per lo Step 1 (reintrodotti)
   const [selectedColor, setSelectedColor] = useState('#536DFE');
-  const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
-
-
+  
   useEffect(() => {
     if (!isOpen) return;
     (async () => {
@@ -158,7 +175,6 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: any) => {
     setScannedData('');
     setCameraPermission('unknown');
     setSelectedColor('#536DFE');
-    setIsColorPickerOpen(false);
   }, []);
 
   const handleClose = () => {
@@ -201,9 +217,6 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: any) => {
     handleClose();
   };
   
-  // ===========================================
-  // STEP 1: SELEZIONE SUPERMERCATO (REINTRODOTTO)
-  // ===========================================
   const SupermarketSelection = () => (
     <div className="space-y-4">
       <Label className="text-base font-semibold text-gray-700">Seleziona il Negozio</Label>
@@ -211,33 +224,14 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: any) => {
         {Object.entries(supermarketData).map(([key, market]) => {
           if (market.name === "ALTRO") {
             return (
-              <button
-                key={key}
-                onClick={() => setSelectedSupermarket(key as SupermarketKey)}
-                className={cn(
-                  "flex flex-col items-center justify-center w-full p-4 min-h-[6rem] bg-gray-100 rounded-lg border-2 border-dashed transition-all duration-300",
-                  selectedSupermarket === key
-                    ? "border-solid bg-indigo-50 border-[#663EF3]"
-                    : "border-gray-300 hover:border-gray-400 hover:bg-gray-200"
-                )}
-              >
+              <button key={key} onClick={() => setSelectedSupermarket(key as SupermarketKey)} className={cn("flex flex-col items-center justify-center w-full p-4 min-h-[6rem] bg-gray-100 rounded-lg border-2 border-dashed transition-all duration-300", selectedSupermarket === key ? "border-solid bg-indigo-50 border-[#663EF3]" : "border-gray-300 hover:border-gray-400 hover:bg-gray-200")}>
                 <Plus className="w-6 h-6 mb-1 text-gray-500" />
                 <span className="text-sm font-semibold text-gray-700">Altro</span>
               </button>
             )
           }
           return (
-            <Card
-              key={key}
-              style={{ backgroundColor: market.color }}
-              className={cn(
-                "cursor-pointer transform transition-all duration-300 hover:scale-105 rounded-xl overflow-hidden border-2",
-                selectedSupermarket === key
-                  ? "ring-2 ring-offset-2 ring-[#663EF3] border-white"
-                  : "border-transparent"
-              )}
-              onClick={() => setSelectedSupermarket(key as SupermarketKey)}
-            >
+            <Card key={key} style={{ backgroundColor: market.color }} className={cn("cursor-pointer transform transition-all duration-300 hover:scale-105 rounded-xl overflow-hidden border-2", selectedSupermarket === key ? "ring-2 ring-offset-2 ring-[#663EF3] border-white" : "border-transparent")} onClick={() => setSelectedSupermarket(key as SupermarketKey)}>
               <CardContent className="flex flex-col items-center justify-center p-2 text-center min-h-[6rem] text-white">
                 <img src={viewImage(market.logo)} alt={`${market.name} Logo`} className="h-10 w-auto object-contain mb-2 drop-shadow-md" />
                 <div className="font-bold text-xs drop-shadow-sm">{market.name}</div>
@@ -246,52 +240,28 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: any) => {
           )
         })}
       </div>
-
       {selectedSupermarket === 'altro' && (
         <div className="space-y-3 bg-gray-50 p-4 rounded-lg border">
             <Label className="font-semibold text-gray-700 flex items-center gap-2"><Palette/> Personalizza Colore</Label>
             <div className="flex items-center gap-4">
-                 <input
-                   type="color"
-                   value={selectedColor}
-                   onChange={(e) => setSelectedColor(e.target.value)}
-                   className="w-14 h-14 p-0 bg-transparent border-none rounded-lg cursor-pointer"
-                 />
+                 <input type="color" value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)} className="w-14 h-14 p-0 bg-transparent border-none rounded-lg cursor-pointer"/>
                  <div className="grid grid-cols-7 gap-2 flex-1">
                    {suggestedColors.map((color) => (
-                     <button
-                       key={color}
-                       type="button"
-                       className={cn(
-                         "w-8 h-8 rounded-full border-2 transition-all duration-200 hover:scale-110",
-                         selectedColor === color ? "ring-2 ring-offset-2 ring-[#663EF3] border-white" : "border-gray-300"
-                       )}
-                       style={{ backgroundColor: color }}
-                       onClick={() => setSelectedColor(color)}
-                     />
+                     <button key={color} type="button" className={cn("w-8 h-8 rounded-full border-2 transition-all duration-200 hover:scale-110", selectedColor === color ? "ring-2 ring-offset-2 ring-[#663EF3] border-white" : "border-gray-300")} style={{ backgroundColor: color }} onClick={() => setSelectedColor(color)}/>
                    ))}
                  </div>
             </div>
         </div>
       )}
-
       <div className="flex gap-4 pt-4">
         <Button variant="ghost" onClick={handleClose} className="w-full">Annulla</Button>
-        <Button
-          onClick={nextStep}
-          disabled={!selectedSupermarket}
-          className="w-full text-white"
-          style={{ background: 'var(--burnt-newStyle)' }}
-        >
+        <Button onClick={nextStep} disabled={!selectedSupermarket} className="w-full text-white" style={{ background: 'var(--burnt-newStyle)' }}>
           Continua <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
       </div>
     </div>
   );
 
-  // ===========================================
-  // STEP 2: SCANNER (GIÀ CORRETTO)
-  // ===========================================
   const ScannerStep = () => (
     <div className="flex flex-col gap-4 text-center">
       <div className="text-sm text-gray-500">Inquadra il codice a barre o QR della tua carta fedeltà.</div>
@@ -304,7 +274,12 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: any) => {
             <Button variant="link" size="sm" onClick={() => setScannedData('')}>Scansiona di nuovo</Button>
           </div>
         ) : (
-          <Html5QrcodePlugin onScanSuccess={handleScanSuccess} onScanError={handleScanError} cameraPermission={cameraPermission} />
+          <Html5QrcodePlugin
+            isLoaded={isScannerLibraryLoaded}
+            onScanSuccess={handleScanSuccess}
+            onScanError={handleScanError}
+            cameraPermission={cameraPermission}
+          />
         )
       ) : cameraPermission === 'denied' ? (
         <div className="p-4 bg-red-50 text-red-800 rounded-lg flex flex-col items-center gap-2 border border-red-200">
@@ -325,9 +300,6 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: any) => {
     </div>
   );
 
-  // ===========================================
-  // STEP 3: CONFERMA (REINTRODOTTO)
-  // ===========================================
   const ConfirmationStep = () => {
     if (!selectedSupermarket) return null;
     const m = supermarketData[selectedSupermarket];
