@@ -188,13 +188,6 @@ const BarcodeScanner = ({
         readers: [
           'ean_reader',         // EAN-13 e EAN-8
           'code_128_reader',    // CODE_128 (molto comune)
-          'code_39_reader',     // CODE_39
-          'codabar_reader',     // CODABAR
-          'ean_8_reader',
-          'code_93_reader',
-          'i2of5_reader',
-          '2of5_reader',
-          'upc_reader'
         ]
       },
       locator: {
@@ -207,7 +200,7 @@ const BarcodeScanner = ({
         showCanvas: false,
         showPatches: false,
         showFoundPatches: false,
-        showSkeleton: false,
+        showSkeleton: true,
         showLabels: false,
         showPatchLabels: false,
         showRemainingPatchLabels: false,
@@ -247,11 +240,9 @@ const BarcodeScanner = ({
       const format = result.codeResult.format;
       const confidence = result.codeResult.decodedCodes?.[0]?.confidence || 0;
       
-      console.log(`🔍 LETTURA: ${code} (formato: ${format}, confidenza: ${confidence.toFixed(2)})`);
       
       // Accetta solo letture con buona confidenza
       if (confidence < 50) {
-        console.log(`⚠️ IGNORATO: Confidenza troppo bassa (${confidence.toFixed(2)})`);
         return;
       }
       
