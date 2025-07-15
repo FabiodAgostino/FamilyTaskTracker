@@ -105,13 +105,15 @@ const useHtml5QrcodeLoader = () => {
 };
 
 // Componente Scanner ottimizzato
-const Html5QrcodePlugin = ({ 
-  onScanSuccess, 
-  onScanError 
-}: {
-  onScanSuccess: (decodedText: string, decodedResult: any) => void;
-  onScanError?: (error: string) => void;
-}) => {
+  const Html5QrcodePlugin = ({ 
+    onScanSuccess,
+    onScanError,
+    cameraPermission
+  }: {
+    onScanSuccess: (decodedText: string, decodedResult: any) => void;
+    onScanError?: (error: string) => void;
+    cameraPermission: 'unknown' | 'granted' | 'denied';
+  }) => {
   const qrcodeRegionId = "html5qr-code-full-region";
   const html5QrcodeScannerRef = useRef<any>(null);
   const initializationStateRef = useRef<'idle' | 'initializing' | 'initialized'>('idle');
@@ -151,7 +153,7 @@ const Html5QrcodePlugin = ({
       // Configurazione ottimizzata per barcode retail
       const config = {
         fps: 10,
-        qrbox: { width: 350, height: 200 }, // Dimensioni ottimali per barcode
+        qrbox: { width: 420, height: 300 }, // Dimensioni ottimali per barcode
         aspectRatio: 1.0,
         disableFlip: false,
         formatsToSupport: window.Html5QrcodeSupportedFormats ? [
@@ -166,19 +168,27 @@ const Html5QrcodePlugin = ({
         showZoomSliderIfSupported: true,
         supportedScanTypes: window.Html5QrcodeScanType ? 
           [window.Html5QrcodeScanType.SCAN_TYPE_CAMERA] : undefined,
-        rememberLastUsedCamera: false,
+        rememberLastUsedCamera: true,
         experimentalFeatures: {
           useBarCodeDetectorIfSupported: true
         }
       };
 
-      html5QrcodeScannerRef.current = new window.Html5QrcodeScanner(
-        qrcodeRegionId,
-        config,
-        false // verbose
-      );
-
-      html5QrcodeScannerRef.current.render(handleScanSuccess, handleScanError);
+    if (cameraPermission !== 'granted') {
+      console.warn('Camera permission non valida, skip scanner init');
+      return;
+    }
+    // Se non ho il permesso, non inizializzo
+    if (cameraPermission !== 'granted') {
+      console.warn('Camera permission non valida, skip scanner init');
+      return;
+    }
+    html5QrcodeScannerRef.current = new window.Html5QrcodeScanner(
+      qrcodeRegionId,
+      config,
+      false // verbose
+    );
+    html5QrcodeScannerRef.current.render(handleScanSuccess, handleScanError);
       initializationStateRef.current = 'initialized';
       console.log('✅ Html5QrcodeScanner initialized successfully');
     } catch (error) {
@@ -205,6 +215,8 @@ const Html5QrcodePlugin = ({
 };
 
 export const AddCardModal = ({ isOpen, onClose, onSave }: AddCardModalProps) => {
+
+
   // Stati base
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedSupermarket, setSelectedSupermarket] = useState<SupermarketKey | null>(null);
@@ -215,21 +227,27 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: AddCardModalProps) => 
   const [isScanning, setIsScanning] = useState(false);
   const [cameraPermission, setCameraPermission] = useState<'unknown' | 'granted' | 'denied'>('unknown');
 
+  useEffect(() => {
+    if (!isOpen) return;
+    (async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        stream.getTracks().forEach(t => t.stop());
+        setCameraPermission('granted');
+      } catch {
+        setCameraPermission('denied');
+      }
+    })();
+  }, [isOpen]);
+
   // Hook per caricare libreria
   const { isLoaded, isLoading, error: loadError } = useHtml5QrcodeLoader();
 
-  // Verifica permessi camera
-  const checkCameraPermission = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      stream.getTracks().forEach(track => track.stop());
-      setCameraPermission('granted');
-      return true;
-    } catch (err) {
-      setCameraPermission('denied');
-      return false;
-    }
-  }, []);
+ const checkCameraPermission = useCallback(async () => {
+   // Usiamo direttamente lo stato già calcolato
+   return cameraPermission === 'granted';
+   }, [cameraPermission]);
+
 
   // Reset modal
   const resetModal = () => {
@@ -273,19 +291,14 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: AddCardModalProps) => 
 
   // Avvia scanner
   const startScanner = async () => {
-    if (!isLoaded) {
-      return;
-    }
-
+    if (!isLoaded) return;
     const hasPermission = await checkCameraPermission();
     if (!hasPermission) {
       alert('Permesso fotocamera necessario per la scansione.');
       return;
     }
-
     setIsScanning(true);
   };
-  startScanner();
   // Inserimento manuale
   const handleManualInput = () => {
     const code = prompt('Inserisci il codice manualmente:');
@@ -462,16 +475,17 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: AddCardModalProps) => 
       </div>
     </div>
   );
-
+  useEffect(() => {
+    if (currentStep === 2 && isLoaded && !isScanning) {
+      startScanner();
+    }
+  }, [currentStep, isLoaded]);
   // STEP 2: Scanner
   const ScannerStep = () => (
     <div className="space-y-6">
       <div className="relative mx-auto w-full max-w-md">
         <Card className="bg-gradient-to-br from-gray-900 to-black text-white border-2">
-          <CardContent className="p-8 text-center">
-            <Scan className="mx-auto h-16 w-16 mb-4 text-blue-400" />
-            <h3 className="text-xl font-bold mb-6">Scanner Codici a Barre</h3>
-            
+          <CardContent className="text-center">
             {/* Container per scanner */}
             <div className="relative w-full bg-gray-900 rounded-xl overflow-hidden border-4 border-blue-400/50">
               
@@ -500,8 +514,7 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: AddCardModalProps) => 
                   {isScanning && isLoaded ? (
                     <Html5QrcodePlugin
                       onScanSuccess={handleScanSuccess}
-                      onScanError={handleScanError}
-                    />
+                      onScanError={handleScanError} cameraPermission={cameraPermission}                    />
                   ) : (
                     <div className="flex items-center justify-center h-[300px] text-blue-400 text-center p-8">
                       <div>
