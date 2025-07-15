@@ -174,7 +174,7 @@ const BarcodeScanner = ({
     console.log('🚀 Inizializzazione Quagga2 con camera:', currentCamera.label);
     
     // ==========================================================
-    // ==== CONFIGURAZIONE OTTIMIZZATA BASATA SULLE RICERCHE
+    // ==== CONFIGURAZIONE ULTRA-PERFORMANCE (ANTI requestAnimationFrame)
     // ==========================================================
     const quaggaConfig = {
       inputStream: {
@@ -182,27 +182,26 @@ const BarcodeScanner = ({
         type: "LiveStream",
         target: scannerRef.current,
         constraints: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
+          width: { ideal: 640 },    // RIDOTTA da 1280 a 640
+          height: { ideal: 480 },   // RIDOTTA da 720 a 480
           facingMode: "environment",
           deviceId: currentCamera.id
         }
       },
       decoder: {
-        // FORMATI OTTIMIZZATI PER LOYALTY CARDS (dalle ricerche)
+        // SOLO UN READER ALLA VOLTA per performance massima
         readers: [
-          'code_39_reader',     // PIÙ POPOLARE per loyalty cards
-          'ean_reader',         // EAN-13 standard europeo  
-          'code_128_reader',    // Molto comune per variable data
+          'code_39_reader'          // Solo il più popolare
         ]
       },
       locator: {
-        patchSize: "medium",
+        patchSize: "small",         // Da "medium" a "small"
         halfSample: true
       },
-      // PERFORMANCE OTTIMIZZATE (dalle ricerche)
-      numOfWorkers: 2,           // Ridotto da 8 a 2 per performance
-      frequency: 3,              // Ridotto da 10 a 3 per non bloccare thread
+      locate: true,                 // Mantieni localizzazione ma ottimizzata
+      // PERFORMANCE ULTRA-AGGRESSIVE
+      numOfWorkers: 1,              // RIDOTTO a 1 solo worker
+      frequency: 1,                 // RIDOTTO a 1 FPS massimo
       debug: {
         showCanvas: false,
         showPatches: false,
@@ -249,11 +248,11 @@ const BarcodeScanner = ({
       const format = result.codeResult.format;
       const confidence = result.codeResult.decodedCodes?.[0]?.confidence || 0;
       
-      console.log(`🔍 LETTURA: ${code} (formato: ${format}, confidenza: ${confidence})`);
-      console.log(result.codeResult)
+      console.log(`🔍 LETTURA: ${code} (formato: ${format}, confidenza: ${confidence.toFixed(2)})`);
+      
       // SOGLIA CONFIDENZA RIDOTTA (dalle ricerche sui problemi)
       if (confidence < 30) {
-        console.log(`⚠️ IGNORATO: Confidenza troppo bassa (${confidence})`);
+        console.log(`⚠️ IGNORATO: Confidenza troppo bassa (${confidence.toFixed(2)})`);
         return;
       }
       
@@ -389,14 +388,14 @@ const BarcodeScanner = ({
         </div>
       </div>
 
-      {/* Suggerimenti ottimizzati */}
+      {/* Suggerimenti ultra-performance */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-        <h4 className="text-sm font-medium text-blue-800 mb-2">💡 Suggerimenti per la scansione:</h4>
+        <h4 className="text-sm font-medium text-blue-800 mb-2">💡 Scanner Performance Mode:</h4>
         <ul className="space-y-1 text-xs text-blue-700">
-          <li>• <strong>Mantieni distanza 10-15cm</strong> dal codice</li>
-          <li>• <strong>Illuminazione buona</strong> e codice ben visibile</li>
-          <li>• <strong>Tieni fermo</strong> il telefono per 2-3 secondi</li>
-          <li>• <strong>Funziona con</strong>: Code 39, EAN-13, Code 128</li>
+          <li>• <strong>1 FPS</strong> - Scansiona 1 volta al secondo</li>
+          <li>• <strong>Solo Code 39</strong> - Formato più comune loyalty cards</li>
+          <li>• <strong>Risoluzione ridotta</strong> - Ottimizzato per mobile</li>
+          <li>• <strong>Tieni fermo</strong> il telefono per 3-5 secondi</li>
         </ul>
       </div>
     </div>
