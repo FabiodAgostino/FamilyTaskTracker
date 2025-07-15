@@ -29,9 +29,6 @@ import { supermarketData, type SupermarketKey, suggestedColors } from './walletC
 import { Html5Qrcode } from 'html5-qrcode';
 
 
-// Il Plugin Scanner (già corretto, nessuna modifica qui)
-// Plugin scanner con la correzione per il doppio bordo
-// Plugin scanner con la correzione DEFINITIVA per il doppio bordo
 const Html5QrcodePlugin = ({
   onScanSuccess,
   onScanError,
@@ -67,6 +64,7 @@ const Html5QrcodePlugin = ({
     const cameraId = cameras[currentCameraIndex].id;
     qrRef.current.start(
       cameraId,
+      // Usiamo la configurazione che sappiamo funzionare
       { fps: 10, qrbox: { width: 280, height: 150 } },
       onScanSuccess,
       onScanError
@@ -91,35 +89,10 @@ const Html5QrcodePlugin = ({
 
   return (
     <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden">
-      
-      {/* ======================= */}
-      {/* LA CORREZIONE È QUESTA */}
-      {/* ======================= */}
-      <style>{`
-        /*
-          Questa regola è più efficace: rimuove il bordo da QUALSIASI
-          elemento figlio diretto (* = video, div, etc.) che la
-          libreria crea all'interno del nostro contenitore.
-        */
-        #${qrcodeRegionId} > * {
-          border: none !important;
-        }
-      `}</style>
-
+      {/* L'area dove la libreria disegnerà il video e la sua UI di default */}
       <div id={qrcodeRegionId} style={{ width: '100%', height: '100%' }} />
 
-      {/* Questo è il nostro overlay personalizzato, che rimane visibile */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="w-[280px] h-[150px] relative">
-          <div className="absolute inset-0" style={{ boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.5)' }}></div>
-          <div className="absolute -top-1 -left-1 w-10 h-10 border-t-4 border-l-4 border-white/80 rounded-tl-lg"></div>
-          <div className="absolute -top-1 -right-1 w-10 h-10 border-t-4 border-r-4 border-white/80 rounded-tr-lg"></div>
-          <div className="absolute -bottom-1 -left-1 w-10 h-10 border-b-4 border-l-4 border-white/80 rounded-bl-lg"></div>
-          <div className="absolute -bottom-1 -right-1 w-10 h-10 border-b-4 border-r-4 border-white/80 rounded-br-lg"></div>
-          <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-red-500/70 animate-pulse"></div>
-        </div>
-      </div>
-
+      {/* Il pulsante per cambiare fotocamera rimane */}
       {cameras.length > 1 && (
         <Button
           variant="outline"
