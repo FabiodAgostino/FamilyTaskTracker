@@ -103,24 +103,39 @@ const BarcodeScanner = ({
     const cameraId = cameras[currentCameraIndex].id;
     
     // ==========================================================
-    // ==== CONFIGURAZIONE OTTIMALE DALLA RICERCA APPROFONDITA
-    // ==== fps: 5 funziona meglio di fps: 10 per EAN-13
-    // ==== qrbox più largo per codici a barre lunghi
+    // ==== CONFIGURAZIONE BASATA SU PROBLEMI RISOLTI NELLE RICERCHE
+    // ==== Tentativo 1: Area molto più grande + FPS ancora più bassi
     // ==========================================================
     const config: Html5QrcodeCameraScanConfig = { 
-      fps: 5,                                    // ✅ RIDOTTO da 10 a 5 (ricerca)
-      qrbox: { width: 320, height: 160 }         // ✅ AUMENTATO da 280x150 (ricerca)
+      fps: 3,                                    // ✅ ULTERIORMENTE RIDOTTO da 5 a 3
+      qrbox: { width: 400, height: 200 },       // ✅ AREA MOLTO PIÙ GRANDE
+      aspectRatio: 1.777778                     // ✅ ASPECT RATIO 16:9 (alcuni hanno risolto così)
     };
 
     scanner.start(cameraId, config, onScanSuccess, onScanError)
       .then(() => {
-        console.log('✅ Scanner avviato con configurazione ottimizzata per codici a barre');
+        console.log('✅ SCANNER AVVIATO CON SUCCESSO');
+        console.log('📊 Camera ID:', cameraId);
+        console.log('📊 Config:', config);
+        console.log('📊 Formati supportati:', [
+          'CODE_128', 'EAN_13', 'UPC_A', 'EAN_8', 
+          'CODE_39', 'CODE_93', 'CODABAR', 'ITF'
+        ]);
+        console.log('📊 useBarCodeDetectorIfSupported: false');
+        console.log('🎯 ORA INQUADRA UN CODICE A BARRE PER TESTARE');
+        
         const capabilities = scanner.getRunningTrackCapabilities();
+        console.log('📊 Capabilities:', capabilities);
         if ((capabilities as any).torch) {
           setTorchAvailable(true);
+          console.log('🔦 Torcia disponibile');
         }
       })
-      .catch(err => console.error("Impossibile avviare lo scanner:", err));
+      .catch(err => {
+        console.error("❌ ERRORE AVVIO SCANNER:", err);
+        console.error("❌ Dettagli errore:", err.message);
+        console.error("❌ Stack:", err.stack);
+      });
 
     return () => {
       if (scanner.isScanning) {
@@ -143,6 +158,16 @@ const BarcodeScanner = ({
     <div className="w-full space-y-3">
       <div className="w-full bg-black rounded-lg overflow-hidden">
         <div id={qrcodeRegionId} />
+      </div>
+      
+      {/* Info sui miglioramenti applicati + DEBUG STATUS */}
+      <div className="space-y-2">
+        <div className="text-xs text-center text-green-700 bg-green-50 p-2 rounded border border-green-200">
+          🎯 Scanner ottimizzato: FPS ridotti, area estesa, solo codici a barre
+        </div>
+        <div className="text-xs text-center text-blue-700 bg-blue-50 p-2 rounded border border-blue-200">
+          🔍 DEBUG ATTIVO: Apri la console per vedere i dettagli di scansione
+        </div>
       </div>
       
       <div className="flex justify-center items-center gap-3 p-2 bg-gray-100 rounded-lg">
@@ -182,6 +207,16 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: any) => {
   const errorFrameCounter = useRef(0);
   const scanAttempts = useRef(0);
 
+  // Debug per monitorare i cambiamenti di scannedData
+  useEffect(() => {
+    if (scannedData) {
+      console.log(`🎉 SCANNED DATA AGGIORNATO: "${scannedData}"`);
+      console.log(`🎉 Lunghezza: ${scannedData.length}`);
+    } else {
+      console.log(`🔄 scannedData è vuoto o null`);
+    }
+  }, [scannedData]);
+
   useEffect(() => {
     if (!isOpen) return;
     (async () => {
@@ -214,29 +249,49 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: any) => {
   const prevStep = () => setCurrentStep(s => Math.max(s - 1, 1));
 
   // ==========================================================
-  // ==== GESTIONE SUCCESSO MIGLIORATA
+  // ==== GESTIONE SUCCESSO CON DEBUG COMPLETO
   // ==========================================================
   const handleScanSuccess: CustomQrCodeSuccessCallback = useCallback((decodedText, decodedResult) => {
     scanAttempts.current++;
-    console.log(`🎉 SUCCESSO SCANSIONE #${scanAttempts.current}!`);
-    console.log(`📊 Codice: ${decodedText}`);
-    console.log(`📋 Formato: ${decodedResult?.result?.format?.formatName || 'Non specificato'}`);
     
-    // Validazione del codice scansionato
-    if (decodedText && decodedText.trim().length >= 4) {
-      setScannedData(decodedText.trim());
+    // DEBUG COMPLETO - Vediamo TUTTO quello che arriva
+    console.log(`🎉 CALLBACK CHIAMATO! Scansione #${scanAttempts.current}`);
+    console.log(`📊 decodedText:`, decodedText);
+    console.log(`📊 Tipo decodedText:`, typeof decodedText);
+    console.log(`📊 Lunghezza:`, decodedText?.length);
+    console.log(`📋 decodedResult completo:`, decodedResult);
+    console.log(`📋 Formato:`, decodedResult?.result?.format?.formatName);
+    console.log(`📋 Formato Code:`, decodedResult?.result?.format?.format);
+    
+    // Validazione con debug
+    const trimmed = decodedText?.trim();
+    console.log(`🔍 Codice dopo trim: "${trimmed}"`);
+    console.log(`🔍 Lunghezza dopo trim: ${trimmed?.length}`);
+    
+    if (trimmed && trimmed.length >= 4) {
+      console.log(`✅ CODICE VALIDO! Impostando scannedData...`);
+      setScannedData(trimmed);
+      console.log(`✅ setScannedData chiamato con: "${trimmed}"`);
     } else {
-      console.warn('⚠️ Codice troppo corto o non valido, riprovo...');
+      console.warn(`⚠️ CODICE NON VALIDO!`);
+      console.warn(`⚠️ - decodedText originale: "${decodedText}"`);
+      console.warn(`⚠️ - dopo trim: "${trimmed}"`);
+      console.warn(`⚠️ - lunghezza: ${trimmed?.length}`);
     }
   }, []);
 
   // ==========================================================
-  // ==== GESTIONE ERRORI OTTIMIZZATA E SILENZIOSA
+  // ==== GESTIONE ERRORI CON DEBUG DETTAGLIATO
   // ==========================================================
   const handleScanError: CustomQrCodeErrorCallback = useCallback((errorMessage, _decodedResult) => {
     if (typeof errorMessage !== 'string') return;
     
     errorFrameCounter.current++;
+    
+    // DEBUG: Ogni 10 frame mostriamo lo stato
+    if (errorFrameCounter.current % 10 === 0) {
+      console.log(`🔍 SCANNER ATTIVO - Frame ${errorFrameCounter.current} - Tipo errore: ${errorMessage.substring(0, 50)}...`);
+    }
     
     // Errori comuni di scansione (da ignorare silenziosamente)
     const commonErrors = [
@@ -250,7 +305,7 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: any) => {
     if (commonErrors.some(error => errorMessage.includes(error))) {
       // Log di progresso ogni 30 frame (circa ogni 6 secondi a 5fps)
       if (errorFrameCounter.current % 30 === 0) {
-        console.log(`🔍 Scansione in corso... (tentativo ${errorFrameCounter.current}) - Inquadra bene il codice a barre`);
+        console.log(`🔍 SCANSIONE ATTIVA (${errorFrameCounter.current} tentativi) - Scanner sta funzionando, continua a inquadrare il codice`);
       }
       return;
     }
@@ -264,14 +319,12 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: any) => {
     ];
     
     if (criticalErrors.some(error => errorMessage.includes(error))) {
-      console.error('🚨 Errore critico scanner:', errorMessage);
+      console.error('🚨 ERRORE CRITICO scanner:', errorMessage);
       return;
     }
     
-    // Altri errori con throttling molto ridotto
-    if (errorFrameCounter.current % 100 === 0) {
-      console.warn('⚠️ Scanner warning:', errorMessage);
-    }
+    // Tutti gli altri errori
+    console.warn('⚠️ Scanner error:', errorMessage);
   }, []);
 
   const handleManualInput = () => {
@@ -395,6 +448,14 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: any) => {
     <div className="flex flex-col gap-4 text-center">
       <div className="text-sm text-gray-500">
         Inquadra il <strong>codice a barre</strong> della tua carta fedeltà.
+      </div>
+      
+      {/* Suggerimenti ottimizzati */}
+      <div className="text-xs text-blue-700 bg-blue-50 p-3 rounded-lg border border-blue-200">
+        <div className="font-semibold mb-1">💡 Per migliori risultati:</div>
+        <div>• Inquadra solo il codice a barre (non QR code)</div>
+        <div>• Mantieni distanza 10-15cm</div>
+        <div>• Buona illuminazione senza riflessi</div>
       </div>
       
       {cameraPermission === 'granted' ? (
