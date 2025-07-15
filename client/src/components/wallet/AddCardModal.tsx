@@ -87,6 +87,7 @@ const Html5QrcodePlugin = ({
     }
   };
 
+  
   return (
     <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden">
       {/* L'area dove la libreria disegnerà il video e la sua UI di default */}
