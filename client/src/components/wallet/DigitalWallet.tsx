@@ -322,7 +322,6 @@ const DigitalWallet = () => {
           )}
         </div>
 
-        {/* Filtri */}
         <WalletComponents.FilterPanel
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}
