@@ -484,41 +484,21 @@ export function EventModal({ isOpen, onClose, onSave, onDelete, editEvent, selec
                     <FormLabel className="text-sm font-medium text-delft-blue">
                       Data e Ora Inizio
                     </FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "w-full pl-3 text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            {field.value ? (
-                              format(field.value, watchedIsAllDay ? "PPP" : "PPP p", { locale: it })
-                            ) : (
-                              <span>Seleziona una data</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
                         <Calendar
                           mode="single"
                           selected={field.value}
+                          isAllDay={watchedIsAllDay}
+                          minTime={new Date()}
                           onSelect={(date) => {
                             if (date) {
                               if (!watchedIsAllDay) {
                                 const newDate = new Date(date);
-                                const currentTime = field.value;
-                                if (currentTime) {
-                                  newDate.setHours(currentTime.getHours(), currentTime.getMinutes());
-                                }
                                 field.onChange(newDate);
                               } else {
                                 field.onChange(date);
                               }
+                              console.log(field)
+
                             }
                           }}
                           disabled={(date) =>
@@ -526,24 +506,6 @@ export function EventModal({ isOpen, onClose, onSave, onDelete, editEvent, selec
                           }
                           initialFocus
                         />
-                        {!watchedIsAllDay && (
-                          <div className="p-3 border-t">
-                            <Input
-                              type="time"
-                              value={field.value ? format(field.value, "HH:mm") : ""}
-                              onChange={(e) => {
-                                if (field.value && e.target.value) {
-                                  const [hours, minutes] = e.target.value.split(':');
-                                  const newDate = new Date(field.value);
-                                  newDate.setHours(parseInt(hours), parseInt(minutes));
-                                  field.onChange(newDate);
-                                }
-                              }}
-                            />
-                          </div>
-                        )}
-                      </PopoverContent>
-                    </Popover>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -557,37 +519,15 @@ export function EventModal({ isOpen, onClose, onSave, onDelete, editEvent, selec
                     <FormLabel className="text-sm font-medium text-delft-blue">
                       Data e Ora Fine
                     </FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "w-full pl-3 text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                          >
-                            {field.value ? (
-                              format(field.value, watchedIsAllDay ? "PPP" : "PPP p", { locale: it })
-                            ) : (
-                              <span>Seleziona una data</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
                         <Calendar
                           mode="single"
                           selected={field.value}
+                          isAllDay={watchedIsAllDay}
+                          minTime={new Date()}
                           onSelect={(date) => {
                             if (date) {
                               if (!watchedIsAllDay) {
                                 const newDate = new Date(date);
-                                const currentTime = field.value;
-                                if (currentTime) {
-                                  newDate.setHours(currentTime.getHours(), currentTime.getMinutes());
-                                }
                                 field.onChange(newDate);
                               } else {
                                 field.onChange(date);
@@ -600,24 +540,6 @@ export function EventModal({ isOpen, onClose, onSave, onDelete, editEvent, selec
                           }}
                           initialFocus
                         />
-                        {!watchedIsAllDay && (
-                          <div className="p-3 border-t">
-                            <Input
-                              type="time"
-                              value={field.value ? format(field.value, "HH:mm") : ""}
-                              onChange={(e) => {
-                                if (field.value && e.target.value) {
-                                  const [hours, minutes] = e.target.value.split(':');
-                                  const newDate = new Date(field.value);
-                                  newDate.setHours(parseInt(hours), parseInt(minutes));
-                                  field.onChange(newDate);
-                                }
-                              }}
-                            />
-                          </div>
-                        )}
-                      </PopoverContent>
-                    </Popover>
                     <FormMessage />
                   </FormItem>
                 )}

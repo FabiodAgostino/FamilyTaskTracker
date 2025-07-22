@@ -438,60 +438,26 @@ export function ReminderModal({ isOpen, onClose, onSave, onDelete, editReminder 
                   <FormLabel className="text-sm font-medium text-delft-blue">
                     Data e Ora Promemoria *
                   </FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full pl-3 text-left font-normal",
-                            !field.value && "text-muted-foreground"
-                          )}
-                        >
-                          {field.value ? (
-                            format(field.value, "PPP 'alle' p", { locale: it })
-                          ) : (
-                            <span>Seleziona data e ora</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
+                      {/* 1. Calendario per selezionare la data */}
                       <Calendar
+                        locale={it}
                         mode="single"
+                        weekStartsOn={1}
                         selected={field.value}
+                        minTime={new Date()}
                         onSelect={(date) => {
                           if (date) {
                             const newDate = new Date(date);
-                            const currentTime = field.value;
-                            if (currentTime) {
-                              newDate.setHours(currentTime.getHours(), currentTime.getMinutes());
-                            }
+                            newDate.setHours(date.getHours());
+                            newDate.setMinutes(date.getMinutes());
                             field.onChange(newDate);
                           }
                         }}
-                        disabled={(date) =>
-                          date < new Date(new Date().setHours(0, 0, 0, 0))
-                        }
+                        disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                         initialFocus
                       />
-                      <div className="p-3 border-t">
-                        <Input
-                          type="time"
-                          value={field.value ? format(field.value, "HH:mm") : ""}
-                          onChange={(e) => {
-                            if (field.value && e.target.value) {
-                              const [hours, minutes] = e.target.value.split(':');
-                              const newDate = new Date(field.value);
-                              newDate.setHours(parseInt(hours), parseInt(minutes));
-                              field.onChange(newDate);
-                            }
-                          }}
-                        />
-                      </div>
-                    </PopoverContent>
-                  </Popover>
+
+     
                   <FormMessage />
                 </FormItem>
               )}

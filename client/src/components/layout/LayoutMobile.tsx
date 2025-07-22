@@ -1,0 +1,31 @@
+
+// src/components/layout/Layout.tsx
+import { useState } from 'react';
+import { Header } from './Header';
+import { Sidebar } from './Sidebar';
+import { MobileFooter } from './MobileFooter';
+import { MobileHeader } from './MobileHeader';
+
+interface LayoutProps {
+  children: React.ReactNode;
+}
+
+export function LayoutMobile({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="bg-background">
+      
+      {/* L'header è ora un normale blocco in cima alla pagina. */}
+      <MobileHeader />
+
+      {/* Il contenuto principale. Il padding-bottom evita che il footer copra l'ultimo elemento. */}
+      <main className="pb-24">
+        <div className="p-4">
+          {children}
+        </div>
+      </main>
+
+      {/* Il footer rimane fisso in fondo alla viewport, come prima. */}
+      <MobileFooter />
+    </div>
+  );
+}
