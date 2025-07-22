@@ -1,23 +1,39 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { 
-  Search, 
-  Globe,
+  Scan,
   Lock,
+  Camera,
+  RotateCcw,
+  Edit,
+  CheckCircle,
+  ArrowLeft,
+  ArrowRight,
+  Plus,
+  Palette,
+  AlertCircle,
+  Globe,
+  Search,
+  Tag,
+  X,
   ChevronDown,
   ChevronUp,
   Filter,
   Star,
-  RotateCcw,
-  Trash2,
   Store,
-  X
+  Trash2 // Aggiunto per il pulsante elimina
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -26,10 +42,68 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn, viewImage } from '@/lib/utils';
+import { supermarketData, type SupermarketKey, suggestedColors } from './walletConstants';
 import { FidelityCard } from '@/lib/models/FidelityCard';
+import { 
+  BrowserMultiFormatReader, 
+  DecodeHintType, 
+  BarcodeFormat, 
+  Result,
+  NotFoundException 
+} from '@zxing/library';
+import { Switch } from '@/components/ui/switch';
 import JsBarcode from 'jsbarcode';
 
-// Tipi per le props
+
+// ==========================================================
+// ==== INTERFACCE E TIPI
+// ==========================================================
+interface ZXingControls {
+  stop: () => void;
+}
+
+interface ZXingScanResult {
+  codeResult: {
+    code: string;
+    format: BarcodeFormat;
+  };
+}
+
+// Tipi per le props dei componenti
+type SupermarketSelectionProps = {
+  searchQuery: string;
+  setSearchQuery: React.Dispatch<React.SetStateAction<string>>;
+  selectedSupermarket: SupermarketKey | null;
+  setSelectedSupermarket: React.Dispatch<React.SetStateAction<SupermarketKey | null>>;
+  selectedColor: string;
+  setSelectedColor: React.Dispatch<React.SetStateAction<string>>;
+  handleClose: () => void;
+  nextStep: () => void;
+};
+
+type ScannerStepProps = {
+  cameraPermission: 'unknown' | 'granted' | 'denied';
+  scannedData: string;
+  setScannedData: React.Dispatch<React.SetStateAction<string>>;
+  handleScanSuccess: (result: ZXingScanResult) => void;
+  handleScanError: (error: unknown) => void;
+  handleManualInput: () => void;
+  prevStep: () => void;
+  nextStep: () => void;
+};
+
+type ConfirmationStepProps = {
+  selectedSupermarket: SupermarketKey | null;
+  scannedData: string;
+  selectedColor: string;
+  isPublic: boolean;
+  setIsPublic: React.Dispatch<React.SetStateAction<boolean>>;
+  tag: string;
+  setTag: React.Dispatch<React.SetStateAction<string>>;
+  prevStep: () => void;
+  saveCard: () => void;
+};
+
 interface WalletStatsProps {
   stats: {
     totalCards: number;
@@ -74,424 +148,520 @@ interface CardDetailModalProps {
   handleDeleteCard: (cardId: string) => void;
 }
 
-// Utility per generare barcode
+
+// ==========================================================
+// ==== HOOKS
+// ==========================================================
+
+// Hook per rilevare l'orientamento dello schermo
+const useOrientation = (): 'portrait' | 'landscape' => {
+  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>(
+    window.matchMedia("(orientation: portrait)").matches ? 'portrait' : 'landscape'
+  );
+
+  useEffect(() => {
+    const portraitMql = window.matchMedia("(orientation: portrait)");
+
+    const handleOrientationChange = (e: MediaQueryListEvent) => {
+      setOrientation(e.matches ? 'portrait' : 'landscape');
+    };
+
+    portraitMql.addEventListener('change', handleOrientationChange);
+
+    return () => {
+      portraitMql.removeEventListener('change', handleOrientationChange);
+    };
+  }, []);
+
+  return orientation;
+};
+
+const useZXingScanner = ({
+  videoRef,
+  onScanSuccess,
+  onScanError,
+  selectedDeviceId,
+  isActive = true
+}: {
+  videoRef: React.RefObject<HTMLVideoElement>;
+  onScanSuccess: (result: Result) => void;
+  onScanError: (error: unknown) => void;
+  selectedDeviceId?: string;
+  isActive: boolean;
+}) => {
+  const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const scanCount = useRef(0);
+  const lastScanTime = useRef(0);
+
+  const getOptimizedHints = useCallback(() => {
+    const hints = new Map();
+    hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+      BarcodeFormat.CODE_39,
+      BarcodeFormat.CODE_128,
+      BarcodeFormat.EAN_13,
+      BarcodeFormat.EAN_8
+    ]);
+    hints.set(DecodeHintType.TRY_HARDER, false);
+    hints.set(DecodeHintType.PURE_BARCODE, false);
+    return hints;
+  }, []);
+
+  useEffect(() => {
+    if (!isActive) return;
+
+    console.log('🚀 Inizializzazione ZXing Scanner...');
+    const hints = getOptimizedHints();
+    const reader = new BrowserMultiFormatReader(hints);
+    reader.timeBetweenDecodingAttempts = 300;
+    readerRef.current = reader;
+    setIsInitialized(true);
+    console.log('✅ ZXing Reader inizializzato');
+
+    return () => {
+      console.log('🧹 Cleanup ZXing Reader');
+      if (readerRef.current) {
+        try {
+          readerRef.current.reset();
+        } catch (err) {
+          console.warn('⚠️ Errore durante cleanup reader:', err);
+        }
+        readerRef.current = null;
+      }
+      setIsInitialized(false);
+      setIsScanning(false);
+    };
+  }, [isActive, getOptimizedHints]);
+
+  useEffect(() => {
+    if (!isInitialized || !readerRef.current || !videoRef.current || !isActive) {
+      return;
+    }
+
+    let isCurrentEffectActive = true;
+
+    const startScanning = async () => {
+      try {
+        const constraints = {
+          video: {
+            deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined,
+            facingMode: selectedDeviceId ? undefined : 'environment',
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            frameRate: { ideal: 15, max: 30 }
+          }
+        };
+
+        const controls = await readerRef.current!.decodeFromConstraints(
+          constraints,
+          videoRef.current!,
+          (result, error) => {
+            if (!isCurrentEffectActive) return;
+
+            if (result) {
+              const now = Date.now();
+              if (now - lastScanTime.current < 2000) {
+                console.log('🔄 Scansione troppo ravvicinata, ignorata');
+                return;
+              }
+              lastScanTime.current = now;
+              scanCount.current++;
+              const code = result.getText();
+              const format = result.getBarcodeFormat();
+              console.log(`🎉 BARCODE LETTO: ${code} (formato: ${format}, scan #${scanCount.current})`);
+              onScanSuccess(result);
+            } else if (error && !(error instanceof NotFoundException)) {
+              console.log('⚠️ Errore scanning (normale):', error.message);
+              onScanError(error);
+            }
+          }
+        ) as ZXingControls | undefined;
+
+        if (isCurrentEffectActive) {
+          setIsScanning(true);
+          console.log('✅ Scanning ZXing avviato');
+        }
+
+        return () => {
+          console.log('🛑 Stop scanning ZXing');
+          try {
+            if (controls && typeof controls.stop === 'function') {
+              controls.stop();
+            }
+          } catch (err) {
+            console.warn('⚠️ Errore stop scanning:', err instanceof Error ? err.message : String(err));
+          }
+          if (isCurrentEffectActive) {
+            setIsScanning(false);
+          }
+        };
+
+      } catch (err) {
+        console.error('❌ Errore avvio scanning:', err instanceof Error ? err.message : String(err));
+        if (isCurrentEffectActive) {
+          setIsScanning(false);
+          onScanError(err instanceof Error ? err : new Error(String(err)));
+        }
+      }
+    };
+
+    const cleanupPromise = startScanning();
+
+    return () => {
+      isCurrentEffectActive = false;
+      cleanupPromise.then(cleanup => cleanup?.());
+    };
+  }, [isInitialized, selectedDeviceId, isActive, onScanSuccess, onScanError, videoRef]);
+
+  return { isScanning, isInitialized };
+};
+
+
+// ==========================================================
+// ==== UTILITY
+// ==========================================================
 const generateBarcodeDataURL = (code: string, format: string = 'CODE128'): string => {
   try {
     const canvas = document.createElement('canvas');
-    
     JsBarcode(canvas, code, {
       format: format,
-      width: 2,
-      height: 100,
+      width: 4,
+      height: 200,
       displayValue: true,
-      fontSize: 14,
+      fontSize: 28,
       textAlign: 'center',
       textPosition: 'bottom',
       background: '#ffffff',
       lineColor: '#000000',
-      margin: 10,
-      marginTop: 10,
-      marginBottom: 10
+      margin: 20,
     });
-    
     return canvas.toDataURL();
   } catch (error) {
     console.error('Errore nella generazione barcode:', error);
-    return generateSimpleBarcode(code);
+    return ''; // Ritorna stringa vuota in caso di errore
   }
 };
 
-const generateSimpleBarcode = (code: string): string => {
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return '';
 
-  canvas.width = 300;
-  canvas.height = 100;
-  
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  
-  ctx.fillStyle = '#000000';
-  const barWidth = 2;
-  let x = 20;
-  
-  for (let i = 0; i < code.length; i++) {
-    const charCode = code.charCodeAt(i);
-    const pattern = charCode % 8;
-    
-    for (let j = 0; j < 8; j++) {
-      if ((pattern >> j) & 1) {
-        ctx.fillRect(x, 10, barWidth, 60);
+// ==========================================================
+// ==== COMPONENTI
+// ==========================================================
+
+const BarcodeScanner = ({
+  onScanSuccess,
+  onScanError
+}: {
+  onScanSuccess: (result: ZXingScanResult) => void;
+  onScanError: (error: unknown) => void;
+}) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [cameras, setCameras] = useState<{ id: string; label: string }[]>([]);
+  const [currentCameraIndex, setCurrentCameraIndex] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [permissionGranted, setPermissionGranted] = useState(false);
+
+  const handleScanSuccess = useCallback((result: Result) => {
+    const code = result.getText();
+    const quaggaCompatibleResult: ZXingScanResult = {
+      codeResult: { code, format: result.getBarcodeFormat() }
+    };
+    onScanSuccess(quaggaCompatibleResult);
+  }, [onScanSuccess]);
+
+  const handleScanErrorCB = useCallback((error: any) => {
+    onScanError(error);
+  }, [onScanError]);
+
+  const { isScanning } = useZXingScanner({
+    videoRef,
+    onScanSuccess: handleScanSuccess,
+    onScanError: handleScanErrorCB,
+    selectedDeviceId: cameras[currentCameraIndex]?.id,
+    isActive: permissionGranted && !error
+  });
+
+  useEffect(() => {
+    const initializeCamera = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        stream.getTracks().forEach(track => track.stop());
+        setPermissionGranted(true);
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices
+          .filter(device => device.kind === 'videoinput')
+          .map((device, index) => ({ id: device.deviceId, label: device.label || `Camera ${index + 1}` }));
+        setCameras(videoDevices);
+        const rearCameraIndex = videoDevices.findIndex(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('rear') || d.label.toLowerCase().includes('environment'));
+        if (rearCameraIndex !== -1) setCurrentCameraIndex(rearCameraIndex);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setIsLoading(false);
       }
-      x += barWidth;
-    }
-    x += barWidth;
-  }
-  
-  ctx.fillStyle = '#000000';
-  ctx.font = '12px monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText(code, canvas.width / 2, 85);
-  
-  return canvas.toDataURL();
+    };
+    initializeCamera();
+  }, []);
+
+  const switchCamera = useCallback(() => {
+    if (cameras.length > 1) setCurrentCameraIndex(prev => (prev + 1) % cameras.length);
+  }, [cameras.length]);
+
+  if (isLoading) return <div className="text-center p-4">Inizializzazione...</div>;
+  if (error) return <div className="text-center p-4 text-red-500">Errore: {error}</div>;
+
+  return (
+    <div className="w-full space-y-3">
+      <div className="relative w-full bg-black rounded-lg overflow-hidden">
+        <video ref={videoRef} className="w-full object-cover" style={{ height: '250px' }} playsInline muted />
+        {isScanning && <div className="absolute inset-x-4 top-1/2 h-0.5 bg-red-500 animate-pulse" />}
+      </div>
+      {cameras.length > 1 && <Button onClick={switchCamera} disabled={!isScanning}>Cambia Camera</Button>}
+    </div>
+  );
 };
 
-// Componente statistiche
+const SupermarketSelection = ({
+    searchQuery, setSearchQuery, selectedSupermarket, setSelectedSupermarket,
+    selectedColor, setSelectedColor, handleClose, nextStep
+}: SupermarketSelectionProps) => {
+    const filteredMarkets = useMemo(() => Object.entries(supermarketData).filter(([key, market]) => 
+        key === 'altro' || market.name.toLowerCase().includes(searchQuery.toLowerCase())
+    ), [searchQuery]);
+
+    return (
+        <div className="flex flex-col" style={{ height: '77vh' }}>
+            <div className="flex-shrink-0 space-y-4 pb-4 border-b">
+                <Label>Seleziona il Negozio</Label>
+                <Input placeholder="Cerca negozio..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+            </div>
+            <div className="flex-1 overflow-y-auto py-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-72 mx-auto">
+                    {filteredMarkets.map(([key, market]) => (
+                        <Card key={key} onClick={() => setSelectedSupermarket(key as SupermarketKey)} className={cn("cursor-pointer", selectedSupermarket === key && "ring-2 ring-blue-500")}>
+                            <CardContent className="p-2 text-center">
+                                <img src={viewImage(market.logo)} alt={market.name} className="h-16 mx-auto" />
+                                <span>{market.name}</span>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+                {selectedSupermarket === 'altro' && (
+                    <div className="mt-4">
+                        <Label>Personalizza Colore</Label>
+                        <input type="color" value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)} />
+                    </div>
+                )}
+            </div>
+            <div className="flex-shrink-0 flex gap-4 pt-4 border-t">
+                <Button variant="ghost" onClick={handleClose}>Annulla</Button>
+                <Button onClick={nextStep} disabled={!selectedSupermarket}>Continua</Button>
+            </div>
+        </div>
+    );
+};
+
+const ScannerStep = ({
+    cameraPermission, scannedData, setScannedData, handleScanSuccess, handleScanError,
+    handleManualInput, prevStep, nextStep
+}: ScannerStepProps) => (
+    <div>
+        {cameraPermission === 'granted' ? (
+            scannedData ? (
+                <div>
+                    <p>Codice Acquisito: {scannedData}</p>
+                    <Button onClick={() => setScannedData('')}>Scansiona di nuovo</Button>
+                </div>
+            ) : <BarcodeScanner onScanSuccess={handleScanSuccess} onScanError={handleScanError} />
+        ) : <p>Accesso alla fotocamera negato.</p>}
+        <Button onClick={handleManualInput}>Inserisci Manualmente</Button>
+        <Button onClick={prevStep}>Indietro</Button>
+        <Button onClick={nextStep} disabled={!scannedData}>Continua</Button>
+    </div>
+);
+
+const ConfirmationStep = ({
+    selectedSupermarket, scannedData, selectedColor, isPublic, setIsPublic,
+    tag, setTag, prevStep, saveCard
+}: ConfirmationStepProps) => {
+    if (!selectedSupermarket) return null;
+    const m = supermarketData[selectedSupermarket];
+    const cardColor = selectedSupermarket === 'altro' ? selectedColor : m.color;
+    return (
+        <div className="space-y-4">
+            <Card style={{ backgroundColor: cardColor }} className="text-white p-4">
+                <h3>{m.name} {m.type}</h3>
+                <p>{scannedData}</p>
+            </Card>
+            <Input placeholder="Tag (Opzionale)" value={tag} onChange={(e) => setTag(e.target.value)} />
+            <div className="flex items-center space-x-2">
+                <Switch id="public-switch" checked={isPublic} onCheckedChange={setIsPublic} />
+                <Label htmlFor="public-switch">Rendi Pubblica</Label>
+            </div>
+            <Button onClick={prevStep}>Indietro</Button>
+            <Button onClick={saveCard}>Salva Carta</Button>
+        </div>
+    );
+};
+
 const WalletStats = ({ stats, isMobile }: WalletStatsProps) => (
-  <div className={cn(
-    "flex flex-wrap gap-4",
-    isMobile && "mb-4"
-  )}>
-    <Badge variant="outline" className="text-cambridge-newStyle border-cambridge-newStyle">
-      {stats.totalCards} {stats.totalCards === 1 ? 'carta' : 'carte'}
-    </Badge>
-    <Badge variant="outline" className="text-blue-600 border-blue-300">
-      <Globe className="w-3 h-3 mr-1" />
-      {stats.publicCards} pubbliche
-    </Badge>
-    <Badge variant="outline" className="text-orange-600 border-orange-300">
-      <Lock className="w-3 h-3 mr-1" />
-      {stats.privateCards} private
-    </Badge>
-    <Badge variant="outline" className="text-purple-600 border-purple-300">
-      {stats.myCards} mie
-    </Badge>
-    {stats.newCards > 0 && (
-      <Badge variant="outline" className="text-green-600 border-green-300">
-        ✨ {stats.newCards} nuove
-      </Badge>
-    )}
-    {stats.popularCards > 0 && (
-      <Badge variant="destructive" className="bg-green-500 text-white-700">
-        <Star className="w-3 h-3 mr-1" />
-        {stats.popularCards} Popolare
-      </Badge>
-    )}
-    <Badge variant="outline" className="text-indigo-600 border-indigo-300 bg-indigo-50">
-      <Store className="w-3 h-3 mr-1" />
-      {stats.brands.length} negozi
-    </Badge>
+  <div className={cn("flex flex-wrap gap-4", isMobile && "mb-4")}>
+    <Badge variant="outline">{stats.totalCards} carte</Badge>
+    <Badge variant="outline"><Globe className="w-3 h-3 mr-1" />{stats.publicCards} pubbliche</Badge>
+    <Badge variant="outline"><Lock className="w-3 h-3 mr-1" />{stats.privateCards} private</Badge>
   </div>
 );
 
-// Componente pannello filtri
 const FilterPanel = ({
-  searchTerm,
-  setSearchTerm,
-  brandFilter,
-  setBrandFilter,
-  sortBy,
-  setSortBy,
-  showNewCards,
-  setShowNewCards,
-  isFiltersExpanded,
-  toggleFilters,
-  activeFiltersCount,
-  handleClearFilters,
-  isMobile,
-  brands
+  searchTerm, setSearchTerm, brandFilter, setBrandFilter, sortBy, setSortBy,
+  showNewCards, setShowNewCards, isFiltersExpanded, toggleFilters, activeFiltersCount,
+  handleClearFilters, isMobile, brands
 }: FilterPanelProps) => (
-  <Card className={cn("mb-8", isMobile && "mb-6")}>
-    <CardContent className={cn("p-6", isMobile && "p-4")}>
+  <Card className="mb-4">
+    <CardContent className="p-4">
       {isMobile && (
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-cambridge-newStyle" />
-            <span className="font-medium text-sm">Filtri di ricerca</span>
-            {activeFiltersCount > 0 && (
-              <Badge variant="secondary" className="bg-cambridge-newStyle/10 text-cambridge-newStyle text-xs">
-                {activeFiltersCount}
-              </Badge>
-            )}
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={toggleFilters}
-            className="p-1"
-          >
-            {isFiltersExpanded ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
+        <div className="flex justify-between items-center mb-2">
+          <span className="font-medium">Filtri</span>
+          <Button variant="ghost" size="sm" onClick={toggleFilters}>
+            {isFiltersExpanded ? <ChevronUp /> : <ChevronDown />}
           </Button>
         </div>
       )}
-
-      <div className={cn(
-        isMobile && !isFiltersExpanded ? "hidden" : "block"
-      )}>
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1 space-y-2">
-            <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Ricerca
-            </Label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="Cerca carte, brand, numero..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </div>
-
-          <div className="flex gap-2 flex-wrap">
-            <div className="space-y-2">
-              <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Brand
-              </Label>
-              <Select value={brandFilter} onValueChange={setBrandFilter}>
-                <SelectTrigger className={cn("w-[140px]", isMobile && "w-full")}>
-                  <SelectValue placeholder="Tutti i brand" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tutti i brand</SelectItem>
-                  {brands.map(brand => (
-                    <SelectItem key={brand} value={brand}>{brand}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Ordina per
-              </Label>
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className={cn("w-[140px]", isMobile && "w-full")}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="priority">Priorità</SelectItem>
-                  <SelectItem value="name">Nome</SelectItem>
-                  <SelectItem value="lastUsed">Ultimo uso</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+      <div className={cn(isMobile && !isFiltersExpanded ? "hidden" : "block")}>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Input placeholder="Cerca..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+          <Select value={brandFilter} onValueChange={setBrandFilter}>
+            <SelectTrigger><SelectValue placeholder="Brand" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tutti i brand</SelectItem>
+              {brands.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger><SelectValue placeholder="Ordina per" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="priority">Priorità</SelectItem>
+              <SelectItem value="name">Nome</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mt-4">
+        <div className="flex justify-between items-center mt-4">
           <div className="flex items-center space-x-2">
-            <Switch
-              id="show-new-cards"
-              checked={showNewCards}
-              onCheckedChange={setShowNewCards}
-              className="data-[state=checked]:bg-cambridge-newStyle"
-            />
-            <Label htmlFor="show-new-cards" className="text-sm font-medium cursor-pointer">
-              Includi carte nuove
-            </Label>
+            <Switch id="new-cards" checked={showNewCards} onCheckedChange={setShowNewCards} />
+            <Label htmlFor="new-cards">Includi nuove</Label>
           </div>
-
-          {activeFiltersCount > 0 && (
-            <Button
-              variant="ghost"
-              onClick={handleClearFilters}
-              size="sm"
-              className={cn("text-gray-500", isMobile && "w-full")}
-            >
-              <RotateCcw className="w-4 h-4 mr-2" />
-              Pulisci ({activeFiltersCount})
-            </Button>
-          )}
+          {activeFiltersCount > 0 && <Button variant="ghost" onClick={handleClearFilters}>Pulisci</Button>}
         </div>
       </div>
     </CardContent>
   </Card>
 );
 
-// Componente carta compatta
 const CompactFidelityCard = ({ card, onCardClick }: CompactFidelityCardProps) => (
   <Card 
-    className="relative overflow-hidden cursor-pointer transition-all duration-200 hover:shadow-lg hover:scale-105 group"
-    style={{ 
-      backgroundColor: card.color || '#6B7280',
-      aspectRatio: '3/2'
-    }}
+    className="relative overflow-hidden cursor-pointer group"
+    style={{ backgroundColor: card.color || '#6B7280', aspectRatio: '3/2' }}
     onClick={() => onCardClick(card)}
   >
-    <CardContent className="p-4 h-full flex flex-col justify-center items-center text-white text-center">
-      <img
-        src={viewImage(card.logo)}
-        alt="Wallet Logo"
-        className="group-hover:scale-110 transition-transform duration-200"
-      />
-      
-      <div className="font-bold text-sm uppercase tracking-wide mb-1">
-        {card.brand}
-      </div>
-      
-      <div className="flex gap-1 flex-wrap justify-center">
-        {card.isNew() && (
-          <Badge className="bg-green-500 text-white text-xs px-1.5 py-0.5">
-            NUOVA
-          </Badge>
-        )}
-        {card.isPopular() && (
-          <Badge className="bg-green-500 text-white text-xs px-1.5 py-0.5">
-            <Star className="w-2 h-2 mr-1" />
-            Popolare
-          </Badge>
-        )}
-      </div>
+    <CardContent className="p-4 h-full flex justify-center items-center">
+      <img src={viewImage(card.logo)} alt="Logo" className="max-h-16 w-auto" />
     </CardContent>
+    {card.tag && (
+      <Badge className="absolute bottom-2 left-2"><Tag className="w-3 h-3 mr-1" />{card.tag}</Badge>
+    )}
   </Card>
 );
 
-// Modal dettaglio carta
 const CardDetailModal = ({
-  selectedCard,
-  isDetailModalOpen,
-  showCardBack,
-  handleCloseDetail,
-  toggleCardView,
-  handleDeleteCard
+  selectedCard, isDetailModalOpen, showCardBack, handleCloseDetail,
+  toggleCardView, handleDeleteCard
 }: CardDetailModalProps) => {
+  const orientation = useOrientation();
+
   if (!selectedCard || !isDetailModalOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div 
-        className="absolute inset-0 bg-black/50" 
-        onClick={handleCloseDetail}
-      />
-      
-      <div className="relative bg-white rounded-lg border shadow-lg p-6 max-w-md mx-auto w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold">
-            {selectedCard.name}
-          </h2>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleCloseDetail}
-            className="h-8 w-8 p-0"
-          >
-            <X className="h-4 w-4" />
-          </Button>
+  // Vista Landscape: solo barcode con linguetta superiore
+  if (orientation === 'landscape') {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col bg-white animate-in fade-in-0">
+        {/* Linguetta colorata solo in alto */}
+        <div 
+          className="h-4 w-full flex-shrink-0"
+          style={{ backgroundColor: selectedCard.color || '#6B7280' }}
+        />
+        {/* Contenitore per il barcode */}
+        <div className="flex-grow flex items-center justify-center p-4 relative">
+          <img 
+            src={generateBarcodeDataURL(selectedCard.barcode || '123456789')}
+            alt={`Barcode per ${selectedCard.brand}`}
+            className="max-w-full max-h-full object-contain"
+            style={{ imageRendering: 'pixelated' }}
+          />
         </div>
-
-        <div className="space-y-6">
-          {/* Card con animazione 3D flip */}
-          <div className="mx-auto w-full" style={{ perspective: '1000px' }}>
-            <div 
-              className="cursor-pointer hover:shadow-lg transition-shadow duration-300 rounded-lg shadow-lg"
-              style={{ 
-                aspectRatio: '3/2',
-                transformStyle: 'preserve-3d',
-                transform: showCardBack ? 'rotateY(180deg)' : 'rotateY(0deg)',
-                transition: 'transform 0.7s ease-in-out',
-                position: 'relative'
-              }}
-              onClick={toggleCardView}
+         <p className="absolute bottom-5 left-1/2 -translate-x-1/2 text-xs text-gray-400 animate-pulse">
+            Ruota il dispositivo per tornare alla visualizzazione normale
+        </p>
+      </div>
+    );
+  }
+  
+  // Vista Portrait: card con flip
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleCloseDetail} />
+      
+      <div 
+        className="relative bg-white rounded-xl shadow-xl w-full max-w-md border border-gray-200/80 overflow-hidden"
+      >
+        <div className="p-6">
+          <div className="grid grid-flow-col justify-items-end mb-4">
+            <Button variant="ghost" size="icon" onClick={handleCloseDetail} className="h-8 w-8 text-gray-500 hover:bg-gray-100">
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+          
+          <div className="space-y-6">
+            <div style={{ perspective: '1200px' }}>
+              <div 
+                className="cursor-pointer transition-transform duration-700 w-full"
+                style={{ transformStyle: 'preserve-3d', transform: showCardBack ? 'rotateY(180deg)' : 'rotateY(0deg)', aspectRatio: '1.58' }}
+                onClick={toggleCardView}
+              >
+                {/* Fronte */}
+                <div className="absolute w-full h-full p-6 rounded-lg flex flex-col justify-between text-white shadow-lg" style={{ backgroundColor: selectedCard.color, backfaceVisibility: 'hidden' }}>
+                  <img src={viewImage(selectedCard.logo)} alt="Logo" className="h-16 w-auto object-contain self-center" />
+                  <p className="text-center text-xl font-mono tracking-widest">{selectedCard.brand}</p>
+                </div>
+                
+                {/* Retro con nuovo stile */}
+                <div className="absolute w-full h-full rounded-lg bg-gray-100" style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
+                  <div 
+                    className="bg-white rounded-md h-full w-full flex items-center justify-center border border-gray-200 shadow-inner overflow-hidden"
+                    style={{ borderTop: `12px solid ${selectedCard.color || '#6B7280'}`, borderRadius:'14px' }}
+                  >
+                    <img src={generateBarcodeDataURL(selectedCard.barcode || '123456789')} alt="Barcode" className="w-full h-auto object-contain px-2" />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p className="text-center text-sm text-gray-500">
+              {showCardBack ? "Mostra questo codice alla cassa" : "Clicca sulla carta per girarla"}
+            </p>
+          </div>
+        </div>
+        
+        {/* Footer con pulsante Elimina */}
+        <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 mt-6">
+          <div className="flex justify-end">
+            <Button 
+              variant="destructive" 
+              onClick={() => handleDeleteCard(selectedCard.id)}
+              className="bg-red-500 hover:bg-red-600 text-white"
             >
-              {/* Fronte carta */}
-              <div 
-                className="absolute inset-0 p-6 flex flex-col justify-between text-white rounded-lg border-2 border-white/20"
-                style={{
-                  backgroundColor: selectedCard.color || '#6B7280',
-                  backfaceVisibility: 'hidden'
-                }}
-              >
-                <div className="flex items-center justify-center h-full">
-                <img
-                  src={viewImage(selectedCard.logo)}
-                  alt="Wallet Logo"
-                  className="h-[30%] group-hover:scale-110 transition-transform duration-200"
-                />
-              </div>
-                
-                <div className="font-mono text-lgtracking-wider">
-                  {selectedCard.number}
-                </div>
-                
-                <div className="text-xs opacity-80">
-                  Ultima: {new Date(selectedCard.lastUsed).toLocaleDateString()}
-                </div>
-
-                <div className="absolute bottom-2 right-2 text-xs opacity-60">
-                  Clicca per girare →
-                </div>
-              </div>
-
-              {/* Retro carta */}
-              <div 
-                className="absolute inset-0 p-4 flex flex-col justify-center items-center rounded-lg border-2 border-white/20"
-                style={{
-                  backgroundColor: selectedCard.color || '#6B7280',
-                  backfaceVisibility: 'hidden',
-                  transform: 'rotateY(180deg)'
-                }}
-              >
-              <div className="bg-white rounded-lg p-4 pt-8 w-full shadow-inner">
-              <div className="text-center space-y-3">
-                {/* Barcode */}
-                <div className="flex items-center justify-center h-40 w-full bg-white overflow-hidden">
-                  <img 
-                    src={generateBarcodeDataURL(selectedCard.barcode || '1378305867585143')}
-                    alt={`Barcode ${selectedCard.barcode}`}
-                    className="w-[110%] h-full object-contain"
-                    style={{ imageRendering: 'crisp-edges' }}
-                  />
-                </div>
-              </div>
-            </div>
-
-
-                <div className="absolute bottom-2 right-2 text-xs opacity-60 text-white">
-                  ← Clicca per girare
-                </div>
-              </div>
-            </div>
-            
-            <div className="text-center mt-3 text-sm text-gray-500">
-              {showCardBack 
-                ? "Mostra questo codice alla cassa per utilizzare la carta"
-                : "Clicca sulla carta per vedere il codice a barre"
-              }
-            </div>
-          </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div className="space-y-1">
-              <div className="text-2xl font-bold text-cambridge-newStyle">
-                {selectedCard.priority}
-              </div>
-              <div className="text-xs text-gray-500">Utilizzi</div>
-              <div className="text-xs text-green-600">✨ Auto-incrementati</div>
-            </div>
-            <div className="space-y-1">
-            </div>
-            <div className="space-y-1">
-              <div className="text-2xl">
-                {selectedCard.isPublic ? '🌐' : '🔒'}
-              </div>
-              <div className="text-xs text-gray-500">
-                {selectedCard.isPublic ? 'Pubblica' : 'Privata'}
-              </div>
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div className="space-y-3">
-            <div className="grid grid-cols-1 gap-1">
-              <Button 
-                variant="destructive"
-                onClick={() => {
-                  handleDeleteCard(selectedCard.id);
-                  handleCloseDetail();
-                }}
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Elimina
-              </Button>
-            </div>
+              <Trash2 className="w-4 h-4 mr-2" />
+              Elimina Carta
+            </Button>
           </div>
         </div>
       </div>
@@ -499,10 +669,122 @@ const CardDetailModal = ({
   );
 };
 
-// Export di tutti i componenti
+
+// ==========================================================
+// ==== COMPONENTE PRINCIPALE: AddCardModal
+// ==========================================================
+export const AddCardModal = ({ isOpen, onClose, onSave }: { isOpen: boolean; onClose: () => void; onSave: (card: any) => void; }) => {
+    const [currentStep, setCurrentStep] = useState(1);
+    const [selectedSupermarket, setSelectedSupermarket] = useState<SupermarketKey | null>(null);
+    const [scannedData, setScannedData] = useState('');
+    const [cameraPermission, setCameraPermission] = useState<'unknown' | 'granted' | 'denied'>('unknown');
+    const [selectedColor, setSelectedColor] = useState('#536DFE');
+    const [isPublic, setIsPublic] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [tag, setTag] = useState('');
+
+    useEffect(() => {
+        if (!isOpen) return;
+        (async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                stream.getTracks().forEach(track => track.stop());
+                setCameraPermission('granted');
+            } catch {
+                setCameraPermission('denied');
+            }
+        })();
+    }, [isOpen]);
+
+    const resetModal = useCallback(() => {
+        setCurrentStep(1);
+        setSelectedSupermarket(null);
+        setScannedData('');
+        setCameraPermission('unknown');
+        setSelectedColor('#536DFE');
+        setSearchQuery('');
+        setIsPublic(false);
+        setTag('');
+    }, []);
+
+    const handleClose = () => {
+        resetModal();
+        onClose();
+    };
+
+    const nextStep = () => setCurrentStep(s => Math.min(s + 1, 3));
+    const prevStep = () => setCurrentStep(s => Math.max(s - 1, 1));
+
+    const handleScanSuccess = useCallback((result: ZXingScanResult) => {
+        setScannedData(result.codeResult.code);
+    }, []);
+
+    const handleScanError = useCallback((error: unknown) => {
+        console.error('Scan Error:', error);
+    }, []);
+
+    const handleManualInput = () => {
+        const code = prompt('Inserisci il codice manualmente:');
+        if (code) setScannedData(code.trim());
+    };
+
+    const saveCard = () => {
+        if (!selectedSupermarket) return;
+        const m = supermarketData[selectedSupermarket];
+        onSave({
+            name: `${m.name} ${m.type}`,
+            number: scannedData,
+            brand: m.name,
+            logo: m.logo,
+            barcode: scannedData,
+            color: selectedSupermarket === 'altro' ? selectedColor : m.color,
+            isPublic: isPublic,
+            tag: tag
+        });
+        handleClose();
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={handleClose}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Aggiungi Carta Fedeltà</DialogTitle>
+                    <DialogDescription>Passo {currentStep} di 3</DialogDescription>
+                </DialogHeader>
+                {currentStep === 1 &&
+                    <SupermarketSelection
+                        searchQuery={searchQuery} setSearchQuery={setSearchQuery}
+                        selectedSupermarket={selectedSupermarket} setSelectedSupermarket={setSelectedSupermarket}
+                        selectedColor={selectedColor} setSelectedColor={setSelectedColor}
+                        handleClose={handleClose} nextStep={nextStep}
+                    />
+                }
+                {currentStep === 2 &&
+                    <ScannerStep
+                        cameraPermission={cameraPermission} scannedData={scannedData}
+                        setScannedData={setScannedData} handleScanSuccess={handleScanSuccess}
+                        handleScanError={handleScanError} handleManualInput={handleManualInput}
+                        prevStep={prevStep} nextStep={nextStep}
+                    />
+                }
+                {currentStep === 3 &&
+                    <ConfirmationStep
+                        selectedSupermarket={selectedSupermarket} scannedData={scannedData}
+                        selectedColor={selectedColor} isPublic={isPublic} setIsPublic={setIsPublic}
+                        tag={tag} setTag={setTag}
+                        prevStep={prevStep} saveCard={saveCard}
+                    />
+                }
+            </DialogContent>
+        </Dialog>
+    );
+};
+
+// Export aggregato per un utilizzo più semplice
 export const WalletComponents = {
   WalletStats,
   FilterPanel,
   CompactFidelityCard,
-  CardDetailModal
+  CardDetailModal,
+  AddCardModal
 };

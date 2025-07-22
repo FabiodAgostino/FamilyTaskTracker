@@ -15,7 +15,8 @@ export class FidelityCard implements FirestoreSerializable {
     public createdAt: Date = new Date(),
     public updatedAt?: Date | undefined,
     public createdBy?: string,
-    public color?: string
+    public color?: string,
+    public tag?: string
   ) {}
 
   static fromFirestore(data: any): FidelityCard {
@@ -43,7 +44,8 @@ export class FidelityCard implements FirestoreSerializable {
         parseDate(data.createdAt),
         data.updatedAt ? parseDate(data.updatedAt) : undefined,
         data.createdBy,
-        data.color
+        data.color,
+        data.tag
       );
     } catch (error) {
       console.error('Error in FidelityCard.fromFirestore:', error, data);
@@ -60,7 +62,8 @@ export class FidelityCard implements FirestoreSerializable {
         new Date(),
         undefined,
         data.createdBy,
-        data.color
+        data.color,
+        data.tag
       );
     }
   }
@@ -78,7 +81,8 @@ export class FidelityCard implements FirestoreSerializable {
       createdAt: this.createdAt,
       updatedAt: new Date(),
       createdBy: this.createdBy,
-      color:this.color
+      color:this.color,
+      tag:this.tag
     };
     return removeUndefinedFields(data);
   }
@@ -196,7 +200,8 @@ export class FidelityCardFactory {
       new Date(),
       undefined,
       createdBy,
-      data.color
+      data.color,
+      data.tag
     );
   }
 }

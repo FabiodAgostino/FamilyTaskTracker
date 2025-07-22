@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   Scan,
   Lock,
@@ -10,9 +10,10 @@ import {
   ArrowRight,
   Plus,
   Palette,
-  Zap,
-  ZapOff,
-  AlertCircle
+  AlertCircle,
+  Globe,
+  Search,
+  Tag // Aggiunta icona Tag
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -26,10 +27,6 @@ import {
 } from '@/components/ui/dialog';
 import { cn, viewImage } from '@/lib/utils';
 import { supermarketData, type SupermarketKey, suggestedColors } from './walletConstants';
-
-// ==========================================================
-// ==== ZXING IMPORTS E TIPI
-// ==========================================================
 import { 
   BrowserMultiFormatReader, 
   DecodeHintType, 
@@ -37,9 +34,10 @@ import {
   Result,
   NotFoundException 
 } from '@zxing/library';
+import { Switch } from '@/components/ui/switch';
 
 // ==========================================================
-// ==== INTERFACCE TYPESCRIPT PER ZXING
+// ==== INTERFACCE E TIPI
 // ==========================================================
 interface ZXingControls {
   stop: () => void;
@@ -51,6 +49,42 @@ interface ZXingScanResult {
     format: BarcodeFormat;
   };
 }
+
+// Tipi per le props dei componenti estratti
+type SupermarketSelectionProps = {
+  searchQuery: string;
+  setSearchQuery: React.Dispatch<React.SetStateAction<string>>;
+  selectedSupermarket: SupermarketKey | null;
+  setSelectedSupermarket: React.Dispatch<React.SetStateAction<SupermarketKey | null>>;
+  selectedColor: string;
+  setSelectedColor: React.Dispatch<React.SetStateAction<string>>;
+  handleClose: () => void;
+  nextStep: () => void;
+};
+
+type ScannerStepProps = {
+  cameraPermission: 'unknown' | 'granted' | 'denied';
+  scannedData: string;
+  setScannedData: React.Dispatch<React.SetStateAction<string>>;
+  handleScanSuccess: (result: ZXingScanResult) => void;
+  handleScanError: (error: unknown) => void;
+  handleManualInput: () => void;
+  prevStep: () => void;
+  nextStep: () => void;
+};
+
+type ConfirmationStepProps = {
+  selectedSupermarket: SupermarketKey | null;
+  scannedData: string;
+  selectedColor: string;
+  isPublic: boolean;
+  setIsPublic: React.Dispatch<React.SetStateAction<boolean>>;
+  tag: string; // Aggiunto prop tag
+  setTag: React.Dispatch<React.SetStateAction<string>>; // Aggiunto prop setTag
+  prevStep: () => void;
+  saveCard: () => void;
+};
+
 
 // ==========================================================
 // ==== HOOK CUSTOM PER ZXING SCANNER OTTIMIZZATO
@@ -64,7 +98,7 @@ const useZXingScanner = ({
 }: {
   videoRef: React.RefObject<HTMLVideoElement>;
   onScanSuccess: (result: Result) => void;
-  onScanError: (error: any) => void;
+  onScanError: (error: unknown) => void;
   selectedDeviceId?: string;
   isActive: boolean;
 }) => {
@@ -74,40 +108,28 @@ const useZXingScanner = ({
   const scanCount = useRef(0);
   const lastScanTime = useRef(0);
 
-  // Configurazione ZXing ottimizzata per loyalty cards
   const getOptimizedHints = useCallback(() => {
     const hints = new Map();
-    
-    // Formati specifici per carte fedeltà (Code 39 è il più comune)
     hints.set(DecodeHintType.POSSIBLE_FORMATS, [
       BarcodeFormat.CODE_39,
       BarcodeFormat.CODE_128,
       BarcodeFormat.EAN_13,
       BarcodeFormat.EAN_8
     ]);
-    
-    // Performance ottimizzate per mobile
-    hints.set(DecodeHintType.TRY_HARDER, false); // Disabilitato per performance
-    hints.set(DecodeHintType.PURE_BARCODE, false); // Per immagini reali con rumore
-    
+    hints.set(DecodeHintType.TRY_HARDER, false);
+    hints.set(DecodeHintType.PURE_BARCODE, false);
     return hints;
   }, []);
 
-  // Inizializzazione reader
   useEffect(() => {
     if (!isActive) return;
 
     console.log('🚀 Inizializzazione ZXing Scanner...');
-    
     const hints = getOptimizedHints();
     const reader = new BrowserMultiFormatReader(hints);
-    
-    // Configurazione timing ottimizzata (equivalente a 1 FPS di Quagga)
-    reader.timeBetweenDecodingAttempts = 300; // 1 secondo tra i tentativi
-    
+    reader.timeBetweenDecodingAttempts = 300;
     readerRef.current = reader;
     setIsInitialized(true);
-    
     console.log('✅ ZXing Reader inizializzato');
 
     return () => {
@@ -125,7 +147,6 @@ const useZXingScanner = ({
     };
   }, [isActive, getOptimizedHints]);
 
-  // Avvio scanning con device specifico
   useEffect(() => {
     if (!isInitialized || !readerRef.current || !videoRef.current || !isActive) {
       return;
@@ -135,16 +156,13 @@ const useZXingScanner = ({
 
     const startScanning = async () => {
       try {
-        console.log('🎯 Avvio scanning ZXing...');
-        
-        // Configurazione constraints per performance
         const constraints = {
           video: {
             deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined,
             facingMode: selectedDeviceId ? undefined : 'environment',
-            width: { ideal: 640 },    // Risoluzione ottimizzata
+            width: { ideal: 640 },
             height: { ideal: 480 },
-            frameRate: { ideal: 15, max: 30 } // Frame rate limitato
+            frameRate: { ideal: 15, max: 30 }
           }
         };
 
@@ -156,24 +174,17 @@ const useZXingScanner = ({
 
             if (result) {
               const now = Date.now();
-              
-              // Debounce per evitare scansioni multiple
               if (now - lastScanTime.current < 2000) {
                 console.log('🔄 Scansione troppo ravvicinata, ignorata');
                 return;
               }
-
               lastScanTime.current = now;
               scanCount.current++;
-              
               const code = result.getText();
               const format = result.getBarcodeFormat();
-              
               console.log(`🎉 BARCODE LETTO: ${code} (formato: ${format}, scan #${scanCount.current})`);
-              
               onScanSuccess(result);
             } else if (error && !(error instanceof NotFoundException)) {
-              // Logga solo errori significativi, non i "non trovato"
               console.log('⚠️ Errore scanning (normale):', error.message);
               onScanError(error);
             }
@@ -185,7 +196,6 @@ const useZXingScanner = ({
           console.log('✅ Scanning ZXing avviato');
         }
 
-        // Cleanup per questo specifico avvio
         return () => {
           console.log('🛑 Stop scanning ZXing');
           try {
@@ -220,6 +230,7 @@ const useZXingScanner = ({
   return { isScanning, isInitialized };
 };
 
+
 // ==========================================================
 // ==== COMPONENTE SCANNER ZXING OTTIMIZZATO
 // ==========================================================
@@ -227,8 +238,8 @@ const BarcodeScanner = ({
   onScanSuccess,
   onScanError
 }: {
-  onScanSuccess: (result: any) => void;
-  onScanError: (error: any) => void;
+  onScanSuccess: (result: ZXingScanResult) => void;
+  onScanError: (error: unknown) => void;
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [cameras, setCameras] = useState<{ id: string; label: string }[]>([]);
@@ -237,56 +248,40 @@ const BarcodeScanner = ({
   const [error, setError] = useState<string | null>(null);
   const [permissionGranted, setPermissionGranted] = useState(false);
 
-  // Gestione risultati scansione
   const handleScanSuccess = useCallback((result: Result) => {
     const code = result.getText();
     console.log(`🎉 SUCCESSO SCANSIONE ZXing: ${code}`);
-    
-    // Trasforma il risultato ZXing nel formato atteso dal componente parent
     const quaggaCompatibleResult: ZXingScanResult = {
       codeResult: {
         code: code,
         format: result.getBarcodeFormat()
       }
     };
-    
     onScanSuccess(quaggaCompatibleResult);
   }, [onScanSuccess]);
 
-  const handleScanError = useCallback((error: any) => {
+  const handleScanErrorCB = useCallback((error: any) => {
     console.log('⚠️ Errore scansione ZXing:', error.message);
     onScanError(error);
   }, [onScanError]);
 
-  // Hook ZXing
-  const { isScanning, isInitialized } = useZXingScanner({
+  const { isScanning } = useZXingScanner({
     videoRef,
     onScanSuccess: handleScanSuccess,
-    onScanError: handleScanError,
+    onScanError: handleScanErrorCB,
     selectedDeviceId: cameras[currentCameraIndex]?.id,
     isActive: permissionGranted && !error
   });
 
-  // ==========================================================
-  // ==== RILEVAMENTO FOTOCAMERE E PERMESSI
-  // ==========================================================
   useEffect(() => {
     const initializeCamera = async () => {
       try {
         console.log('📱 Richiesta permessi camera...');
-        
-        // Richiesta permessi
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { facingMode: 'environment' } 
-        });
-        
-        // Ferma il stream temporaneo
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
         stream.getTracks().forEach(track => track.stop());
-        
         console.log('✅ Permessi camera ottenuti');
         setPermissionGranted(true);
 
-        // Enumera dispositivi
         console.log('🔍 Rilevamento fotocamere...');
         const devices = await navigator.mediaDevices.enumerateDevices();
         const videoDevices = devices
@@ -299,13 +294,12 @@ const BarcodeScanner = ({
         console.log('📱 Fotocamere trovate:', videoDevices.length);
         setCameras(videoDevices);
 
-        // Preferenza per fotocamera posteriore
-        const rearCameraIndex = videoDevices.findIndex(d => 
-          d.label.toLowerCase().includes('back') || 
+        const rearCameraIndex = videoDevices.findIndex(d =>
+          d.label.toLowerCase().includes('back') ||
           d.label.toLowerCase().includes('rear') ||
           d.label.toLowerCase().includes('environment')
         );
-        
+
         if (rearCameraIndex !== -1) {
           setCurrentCameraIndex(rearCameraIndex);
           console.log('📷 Camera posteriore selezionata');
@@ -322,9 +316,6 @@ const BarcodeScanner = ({
     initializeCamera();
   }, []);
 
-  // ==========================================================
-  // ==== CONTROLLI CAMERA
-  // ==========================================================
   const switchCamera = useCallback(() => {
     if (cameras.length > 1) {
       console.log('🔄 Cambio fotocamera ZXing');
@@ -332,9 +323,6 @@ const BarcodeScanner = ({
     }
   }, [cameras.length]);
 
-  // ==========================================================
-  // ==== RENDERING CON STATI DIVERSI
-  // ==========================================================
   if (isLoading) {
     return (
       <div className="w-full space-y-3">
@@ -356,9 +344,9 @@ const BarcodeScanner = ({
             <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-2" />
             <p className="text-sm text-red-600 font-medium">Errore Scanner</p>
             <p className="text-xs text-red-500 mt-1">{error}</p>
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               className="mt-3"
               onClick={() => {
                 setError(null);
@@ -376,27 +364,21 @@ const BarcodeScanner = ({
 
   return (
     <div className="w-full space-y-3">
-      {/* Area scanner compatta */}
       <div className="relative w-full bg-black rounded-lg overflow-hidden">
-        <video 
+        <video
           ref={videoRef}
           className="w-full object-cover"
-          style={{ 
+          style={{
             height: '250px',
             maxWidth: '100%'
           }}
           playsInline
           muted
         />
-        
-        {/* Overlay di scanning */}
         <div className="absolute inset-0 pointer-events-none">
-          {/* Linea di scanning animata quando attivo */}
           {isScanning && (
             <div className="absolute inset-x-4 top-1/2 transform -translate-y-1/2 h-0.5 bg-red-500 shadow-lg animate-pulse" />
           )}
-          
-          {/* Cornice di targeting */}
           <div className="absolute inset-4 border-2 border-white/70 rounded-lg">
             <div className="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-red-500 rounded-tl-lg" />
             <div className="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-red-500 rounded-tr-lg" />
@@ -405,14 +387,12 @@ const BarcodeScanner = ({
           </div>
         </div>
       </div>
-
-      {/* Controlli */}
       <div className="flex justify-center items-center gap-3 p-2 bg-gray-100 rounded-lg">
         {cameras.length > 1 && (
-          <Button 
-            variant="outline" 
-            size="icon" 
-            onClick={switchCamera} 
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={switchCamera}
             title="Cambia fotocamera"
             disabled={!isScanning}
           >
@@ -424,196 +404,413 @@ const BarcodeScanner = ({
   );
 };
 
+
 // ==========================================================
-// ==== RESTO DEL COMPONENTE IDENTICO ALL'ORIGINALE
+// ==== COMPONENTE STEP 1: SupermarketSelection
 // ==========================================================
-export const AddCardModal = ({ isOpen, onClose, onSave }: any) => {
-  const [currentStep, setCurrentStep] = useState(1);
-  const [selectedSupermarket, setSelectedSupermarket] = useState<SupermarketKey | null>(null);
-  const [scannedData, setScannedData] = useState('');
-  const [cameraPermission, setCameraPermission] = useState<'unknown' | 'granted' | 'denied'>('unknown');
-  const [selectedColor, setSelectedColor] = useState('#536DFE');
-  
-  useEffect(() => {
-    if (!isOpen) return;
-    (async () => {
-      try { 
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true }); 
-        stream.getTracks().forEach(track => track.stop());
-        setCameraPermission('granted'); 
-      } catch { 
-        setCameraPermission('denied'); 
-      }
-    })();
-  }, [isOpen]);
+const SupermarketSelection = ({
+    searchQuery,
+    setSearchQuery,
+    selectedSupermarket,
+    setSelectedSupermarket,
+    selectedColor,
+    setSelectedColor,
+    handleClose,
+    nextStep
+}: SupermarketSelectionProps) => {
+    const filteredMarkets = useMemo(() => {
+        return Object.entries(supermarketData).filter(([key, market]) => {
+            if (key === 'altro') return true; 
+            return market.name.toLowerCase().includes(searchQuery.toLowerCase());
+        });
+    }, [searchQuery]);
 
-  const resetModal = useCallback(() => {
-    setCurrentStep(1);
-    setSelectedSupermarket(null);
-    setScannedData('');
-    setCameraPermission('unknown');
-    setSelectedColor('#536DFE');
-  }, []);
-
-  const handleClose = () => {
-    resetModal();
-    onClose();
-  };
-
-  const nextStep = () => setCurrentStep(s => Math.min(s + 1, 3));
-  const prevStep = () => setCurrentStep(s => Math.max(s - 1, 1));
-
-  const handleScanSuccess = useCallback((result: any) => {
-    const decodedText = result.codeResult.code;
-    console.log(`🎉 SUCCESSO SCANSIONE FINALE: ${decodedText}`);
-    setScannedData(decodedText);
-  }, []);
-
-  const handleScanError = useCallback((error: any) => {
-    // Gestione silenziosa degli errori
-    console.log('⚠️ Errore scansione (normale):', error);
-  }, []);
-
-  const handleManualInput = () => {
-    const code = prompt('Inserisci il codice manualmente:');
-    if (code && code.trim()) {
-      setScannedData(code.trim());
-    }
-  };
-  
-  const saveCard = () => {
-    if (!selectedSupermarket) return;
-    const m = supermarketData[selectedSupermarket];
-    const formatted = scannedData.length > 12 ? scannedData.replace(/(.{4})/g, '$1 ').trim() : scannedData;
-    onSave({
-      name: `${m.name} ${m.type}`, 
-      number: formatted, 
-      brand: m.name, 
-      logo: m.logo, 
-      barcode: scannedData, 
-      color: selectedSupermarket === 'altro' ? selectedColor : m.color,
-    });
-    handleClose();
-  };
-  
-  const SupermarketSelection = () => (
-    <div className="space-y-4">
-      <Label className="text-base font-semibold text-gray-700">Seleziona il Negozio</Label>
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        {Object.entries(supermarketData).map(([key, market]) => {
-          if (market.name === "ALTRO") {
-            return (
-              <button key={key} onClick={() => setSelectedSupermarket(key as SupermarketKey)} className={cn("flex flex-col items-center justify-center w-full p-4 min-h-[6rem] bg-gray-100 rounded-lg border-2 border-dashed transition-all duration-300", selectedSupermarket === key ? "border-solid bg-indigo-50 border-[#663EF3]" : "border-gray-300 hover:border-gray-400 hover:bg-gray-200")}>
-                <Plus className="w-6 h-6 mb-1 text-gray-500" />
-                <span className="text-sm font-semibold text-gray-700">Altro</span>
-              </button>
-            )
-          }
-          return (
-            <Card key={key} style={{ backgroundColor: market.color }} className={cn("cursor-pointer transform transition-all duration-300 hover:scale-105 rounded-xl overflow-hidden border-2", selectedSupermarket === key ? "ring-2 ring-offset-2 ring-[#663EF3] border-white" : "border-transparent")} onClick={() => setSelectedSupermarket(key as SupermarketKey)}>
-              <CardContent className="flex flex-col items-center justify-center p-2 text-center min-h-[6rem] text-white">
-                <img src={viewImage(market.logo)} alt={`${market.name} Logo`} className="h-10 w-auto object-contain mb-2 drop-shadow-md" />
-                <div className="font-bold text-xs drop-shadow-sm">{market.name}</div>
-              </CardContent>
-            </Card>
-          )
-        })}
-      </div>
-      {selectedSupermarket === 'altro' && (
-        <div className="space-y-3 bg-gray-50 p-4 rounded-lg border">
-            <Label className="font-semibold text-gray-700 flex items-center gap-2"><Palette/> Personalizza Colore</Label>
-            <div className="flex items-center gap-4">
-                 <input type="color" value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)} className="w-14 h-14 p-0 bg-transparent border-none rounded-lg cursor-pointer"/>
-                 <div className="grid grid-cols-7 gap-2 flex-1">
-                   {suggestedColors.map((color) => (
-                     <button key={color} type="button" className={cn("w-8 h-8 rounded-full border-2 transition-all duration-200 hover:scale-110", selectedColor === color ? "ring-2 ring-offset-2 ring-[#663EF3] border-white" : "border-gray-300")} style={{ backgroundColor: color }} onClick={() => setSelectedColor(color)}/>
-                   ))}
-                 </div>
+    return (
+        <div className="flex flex-col" style={{ height: '77vh' }}>
+            <div className="flex-shrink-0 space-y-4 pb-4 border-b border-gray-200">
+                <Label className="text-base font-semibold text-gray-700">Seleziona il Negozio</Label>
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                        type="text"
+                        placeholder="Cerca negozio..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#663EF3] focus:border-transparent"
+                    />
+                </div>
+            </div>
+            <div className="flex-1 overflow-y-auto overflow-x-hidden py-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-72 mx-auto">
+                    {filteredMarkets.map(([key, market]) => {
+                        if (market.name === "ALTRO") {
+                            return (
+                                <button
+                                    key={key}
+                                    onClick={() => setSelectedSupermarket(key as SupermarketKey)}
+                                    className={cn(
+                                        "flex flex-col items-center justify-center w-full p-4 min-h-[6rem] bg-gray-100 rounded-lg border-2 border-dashed transition-all duration-300",
+                                        selectedSupermarket === key
+                                            ? "border-solid bg-indigo-50 border-[#663EF3]"
+                                            : "border-gray-300 hover:border-gray-400 hover:bg-gray-200"
+                                    )}
+                                >
+                                    <Plus className="w-6 h-6 mb-1 text-gray-500" />
+                                    <span className="text-sm font-semibold text-gray-700">Altro</span>
+                                </button>
+                            )
+                        }
+                        return (
+                            <Card
+                                key={key}
+                                style={{ backgroundColor: market.color }}
+                                className={cn(
+                                    "cursor-pointer transform transition-all duration-300 hover:scale-105 rounded-xl overflow-hidden border-2",
+                                    selectedSupermarket === key
+                                        ? "ring-2 ring-offset-2 ring-[#663EF3] border-white"
+                                        : "border-transparent"
+                                )}
+                                onClick={() => setSelectedSupermarket(key as SupermarketKey)}
+                            >
+                                <CardContent className="flex flex-col items-center justify-center p-2 text-center min-h-[6rem] text-white">
+                                    <img
+                                        src={viewImage(market.logo)}
+                                        alt={`${market.name} Logo`}
+                                        className="h-16 w-auto object-contain mb-1 drop-shadow-md"
+                                    />
+                                    <span className="text-xs font-semibold truncate w-full">{market.name}</span>
+                                </CardContent>
+                            </Card>
+                        )
+                    })}
+                </div>
+                {filteredMarkets.length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                        <Search className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                        <p>Nessun negozio trovato per "{searchQuery}"</p>
+                    </div>
+                )}
+                {selectedSupermarket === 'altro' && (
+                    <div className="mt-4 space-y-3 bg-gray-50 p-4 rounded-lg border">
+                        <Label className="font-semibold text-gray-700 flex items-center gap-2">
+                            <Palette /> Personalizza Colore
+                        </Label>
+                        <div className="flex items-center gap-4">
+                            <input
+                                type="color"
+                                value={selectedColor}
+                                onChange={(e) => setSelectedColor(e.target.value)}
+                                className="w-14 h-14 p-0 bg-transparent border-none rounded-lg cursor-pointer"
+                            />
+                            <div className="grid grid-cols-7 gap-2 flex-1">
+                                {suggestedColors.map((color) => (
+                                    <button
+                                        key={color}
+                                        type="button"
+                                        className={cn(
+                                            "w-8 h-8 rounded-full border-2 transition-all duration-200 hover:scale-110",
+                                            selectedColor === color
+                                                ? "ring-2 ring-offset-2 ring-[#663EF3] border-white"
+                                                : "border-gray-300"
+                                        )}
+                                        style={{ backgroundColor: color }}
+                                        onClick={() => setSelectedColor(color)}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+            <div className="flex-shrink-0 flex gap-4 pt-4 border-t border-gray-200">
+                <Button variant="ghost" onClick={handleClose} className="w-full">
+                    Annulla
+                </Button>
+                <Button
+                    onClick={nextStep}
+                    disabled={!selectedSupermarket}
+                    className="w-full text-white"
+                    style={{ background: 'var(--burnt-newStyle)' }}
+                >
+                    Continua <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
             </div>
         </div>
-      )}
-      <div className="flex gap-4 pt-4">
-        <Button variant="ghost" onClick={handleClose} className="w-full">Annulla</Button>
-        <Button onClick={nextStep} disabled={!selectedSupermarket} className="w-full text-white" style={{ background: 'var(--burnt-newStyle)' }}>
-          Continua <ArrowRight className="w-4 h-4 ml-2" />
-        </Button>
-      </div>
-    </div>
-  );
+    );
+};
 
-  const ScannerStep = () => (
+
+// ==========================================================
+// ==== COMPONENTE STEP 2: ScannerStep
+// ==========================================================
+const ScannerStep = ({
+    cameraPermission,
+    scannedData,
+    setScannedData,
+    handleScanSuccess,
+    handleScanError,
+    handleManualInput,
+    prevStep,
+    nextStep
+}: ScannerStepProps) => (
     <div className="flex flex-col gap-4 text-center">
-      <div className="text-sm text-gray-500">Inquadra il codice a barre della tua carta fedeltà.</div>
-      {cameraPermission === 'granted' ? (
-        scannedData ? (
-          <div className="p-4 bg-green-50 text-green-800 rounded-lg flex flex-col items-center gap-3 border border-green-200">
-            <CheckCircle className="w-10 h-10 text-green-500" />
-            <p className="font-semibold text-lg">Codice Acquisito!</p>
-            <p className="font-mono bg-white p-2 rounded">{scannedData}</p>
-            <Button variant="link" size="sm" onClick={() => setScannedData('')}>Scansiona di nuovo</Button>
-          </div>
-        ) : <BarcodeScanner onScanSuccess={handleScanSuccess} onScanError={handleScanError}/>
-      ) : cameraPermission === 'denied' ? (
-        <div className="p-4 bg-red-50 text-red-800 rounded-lg flex flex-col items-center gap-2 border border-red-200">
-          <Lock className="w-8 h-8 text-red-500" />
-          <p className="font-semibold">Accesso alla fotocamera negato</p>
+        <div className="text-sm text-gray-500">Inquadra il codice a barre della tua carta fedeltà.</div>
+        {cameraPermission === 'granted' ? (
+            scannedData ? (
+                <div className="p-4 bg-green-50 text-green-800 rounded-lg flex flex-col items-center gap-3 border border-green-200">
+                    <CheckCircle className="w-10 h-10 text-green-500" />
+                    <p className="font-semibold text-lg">Codice Acquisito!</p>
+                    <p className="font-mono bg-white p-2 rounded">{scannedData}</p>
+                    <Button variant="link" size="sm" onClick={() => setScannedData('')}>Scansiona di nuovo</Button>
+                </div>
+            ) : <BarcodeScanner onScanSuccess={handleScanSuccess} onScanError={handleScanError} />
+        ) : cameraPermission === 'denied' ? (
+            <div className="p-4 bg-red-50 text-red-800 rounded-lg flex flex-col items-center gap-2 border border-red-200">
+                <Lock className="w-8 h-8 text-red-500" />
+                <p className="font-semibold">Accesso alla fotocamera negato</p>
+            </div>
+        ) : <div className="aspect-video bg-gray-200 animate-pulse rounded-lg flex items-center justify-center"><Camera className="w-12 h-12 text-gray-400" /></div>}
+        <div className="relative flex items-center py-2">
+            <div className="flex-grow border-t border-gray-200"></div>
+            <span className="flex-shrink mx-4 text-xs text-gray-400">OPPURE</span>
+            <div className="flex-grow border-t border-gray-200"></div>
         </div>
-      ) : <div className="aspect-video bg-gray-200 animate-pulse rounded-lg flex items-center justify-center"><Camera className="w-12 h-12 text-gray-400"/></div>}
-      <div className="relative flex items-center py-2">
-        <div className="flex-grow border-t border-gray-200"></div>
-        <span className="flex-shrink mx-4 text-xs text-gray-400">OPPURE</span>
-        <div className="flex-grow border-t border-gray-200"></div>
-      </div>
-      <Button variant="outline" onClick={handleManualInput}><Edit className="w-4 h-4 mr-2" /> Inserisci Manualmente</Button>
-      <div className="flex gap-4 pt-4">
-        <Button variant="ghost" onClick={prevStep} className="w-full"><ArrowLeft className="w-4 h-4 mr-2" /> Indietro</Button>
-        <Button onClick={nextStep} disabled={!scannedData} className="w-full text-white" style={{ background: 'var(--burnt-newStyle)' }}>
-          Continua <ArrowRight className="w-4 h-4 ml-2" />
-        </Button>
-      </div>
+        <Button variant="outline" onClick={handleManualInput}><Edit className="w-4 h-4 mr-2" /> Inserisci Manualmente</Button>
+        <div className="flex gap-4 pt-4">
+            <Button variant="ghost" onClick={prevStep} className="w-full"><ArrowLeft className="w-4 h-4 mr-2" /> Indietro</Button>
+            <Button onClick={nextStep} disabled={!scannedData} className="w-full text-white" style={{ background: 'var(--burnt-newStyle)' }}>
+                Continua <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+        </div>
     </div>
-  );
+);
 
-  const ConfirmationStep = () => {
-    if (!selectedSupermarket) return null;
+
+// ==========================================================
+// ==== COMPONENTE STEP 3: ConfirmationStep
+// ==========================================================
+const ConfirmationStep = ({
+    selectedSupermarket,
+    scannedData,
+    selectedColor,
+    isPublic,
+    setIsPublic,
+    tag,
+    setTag,
+    prevStep,
+    saveCard
+}: ConfirmationStepProps) => {
+    if (!selectedSupermarket) {
+        return null;
+    }
     const m = supermarketData[selectedSupermarket];
     const cardColor = selectedSupermarket === 'altro' ? selectedColor : m.color;
     const formatted = scannedData.length > 12 ? scannedData.replace(/(.{4})/g, '$1 ').trim() : scannedData;
-    
+
     return (
-      <div className="space-y-6 text-center">
-        <p className="text-gray-600">Controlla i dati e salva la tua carta.</p>
-        <Card className="mx-auto max-w-xs shadow-lg" style={{ backgroundColor: cardColor }}>
-          <CardContent className="text-center text-white p-6 space-y-3">
-            <img src={viewImage(m.logo)} className="h-14 mx-auto drop-shadow-lg" alt={m.name} />
-            <h3 className="text-xl font-bold">{m.name} {m.type}</h3>
-            <p className="font-mono text-lg bg-white/20 px-2 py-1 rounded-md">{formatted}</p>
-          </CardContent>
-        </Card>
-        <div className="flex gap-4 pt-4">
-          <Button variant="ghost" onClick={prevStep} className="w-full"><ArrowLeft className="w-4 h-4 mr-2" /> Indietro</Button>
-          <Button onClick={saveCard} className="w-full text-white bg-green-600 hover:bg-green-700">
-            <CheckCircle className="w-4 h-4 mr-2"/> Salva Carta
-          </Button>
+        <div className="space-y-6 text-center">
+            <p className="text-gray-600">Controlla i dati e salva la tua carta.</p>
+            <Card className="mx-auto max-w-xs shadow-lg" style={{ backgroundColor: cardColor }}>
+                <CardContent className="text-center text-white p-6 space-y-3">
+                    <img src={viewImage(m.logo)} className="h-14 mx-auto drop-shadow-lg" alt={m.name} />
+                    <h3 className="text-xl font-bold">{m.name} {m.type}</h3>
+                    <p className="font-mono text-lg bg-white/20 px-2 py-1 rounded-md">{formatted}</p>
+                </CardContent>
+            </Card>
+
+            {/* Nuovo Input per il Tag */}
+            <div className="w-full space-y-1 text-left">
+                <Label htmlFor="card-tag" className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                    <Tag className="h-4 w-4" />
+                    Tag (Opzionale)
+                </Label>
+                <input
+                    id="card-tag"
+                    type="text"
+                    placeholder="Es. Carta Famiglia, Lavoro..."
+                    value={tag}
+                    onChange={(e) => setTag(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#663EF3] focus:border-transparent"
+                />
+            </div>
+
+            <div className="flex flex-row items-center justify-between rounded-lg border p-4 bg-gray-50">
+                <div className="space-y-0.5 text-left">
+                    <Label className="text-base flex items-center">
+                        {isPublic ? (
+                            <>
+                                <Globe className="mr-2 h-4 w-4 text-green-600" />
+                                Carta Pubblica
+                            </>
+                        ) : (
+                            <>
+                                <Lock className="mr-2 h-4 w-4 text-orange-600" />
+                                Carta Privata
+                            </>
+                        )}
+                    </Label>
+                    <p className="text-xs text-gray-600">
+                        {isPublic
+                            ? 'Questa carta sarà visibile a tutti i membri della famiglia'
+                            : 'Questa carta sarà visibile solo a te'
+                        }
+                    </p>
+                </div>
+                <Switch
+                    checked={isPublic}
+                    onCheckedChange={setIsPublic}
+                />
+            </div>
+            <div className="flex gap-4 pt-4">
+                <Button variant="ghost" onClick={prevStep} className="w-full">
+                    <ArrowLeft className="w-4 h-4 mr-2" /> Indietro
+                </Button>
+                <Button onClick={saveCard} className="w-full text-white bg-green-600 hover:bg-green-700">
+                    <CheckCircle className="w-4 h-4 mr-2" /> Salva Carta
+                </Button>
+            </div>
         </div>
-      </div>
+    )
+};
+
+
+// ==========================================================
+// ==== COMPONENTE PRINCIPALE: AddCardModal
+// ==========================================================
+export const AddCardModal = ({ isOpen, onClose, onSave }: { isOpen: boolean; onClose: () => void; onSave: (card: any) => void; }) => {
+    const [currentStep, setCurrentStep] = useState(1);
+    const [selectedSupermarket, setSelectedSupermarket] = useState<SupermarketKey | null>(null);
+    const [scannedData, setScannedData] = useState('');
+    const [cameraPermission, setCameraPermission] = useState<'unknown' | 'granted' | 'denied'>('unknown');
+    const [selectedColor, setSelectedColor] = useState('#536DFE');
+    const [isPublic, setIsPublic] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [tag, setTag] = useState(''); // Stato per il nuovo input
+
+    useEffect(() => {
+        if (!isOpen) return;
+        (async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                stream.getTracks().forEach(track => track.stop());
+                setCameraPermission('granted');
+            } catch {
+                setCameraPermission('denied');
+            }
+        })();
+    }, [isOpen]);
+
+    const resetModal = useCallback(() => {
+        setCurrentStep(1);
+        setSelectedSupermarket(null);
+        setScannedData('');
+        setCameraPermission('unknown');
+        setSelectedColor('#536DFE');
+        setSearchQuery('');
+        setIsPublic(false);
+        setTag(''); // Reset del tag
+    }, []);
+
+    const handleClose = () => {
+        resetModal();
+        onClose();
+    };
+
+    const nextStep = () => setCurrentStep(s => Math.min(s + 1, 3));
+
+    const prevStep = () => {
+        setCurrentStep(s => {
+            const newStep = Math.max(s - 1, 1);
+            if (s === 2 && newStep === 1) {
+                setScannedData('');
+                console.log('🔄 Reset codice scansionato - torno indietro dal scanner');
+            }
+            return newStep;
+        });
+    };
+
+    const handleScanSuccess = useCallback((result: ZXingScanResult) => {
+        const decodedText = result.codeResult.code;
+        console.log(`🎉 SUCCESSO SCANSIONE FINALE: ${decodedText}`);
+        setScannedData(decodedText);
+    }, []);
+
+    const handleScanError = useCallback((error: unknown) => {
+        console.log('⚠️ Errore scansione (normale):', error);
+    }, []);
+
+    const handleManualInput = () => {
+        const code = prompt('Inserisci il codice manualmente:');
+        if (code && code.trim()) {
+            setScannedData(code.trim());
+        }
+    };
+
+    const saveCard = () => {
+        if (!selectedSupermarket) return;
+        const m = supermarketData[selectedSupermarket];
+        const formatted = scannedData.length > 12 ? scannedData.replace(/(.{4})/g, '$1 ').trim() : scannedData;
+        onSave({
+            name: `${m.name} ${m.type}`,
+            number: formatted,
+            brand: m.name,
+            logo: m.logo,
+            barcode: scannedData,
+            color: selectedSupermarket === 'altro' ? selectedColor : m.color,
+            isPublic: isPublic,
+            tag: tag
+        });
+        handleClose();
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={handleClose}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg" style={{ background: 'var(--burnt-newStyle)' }}><Scan className="w-6 h-6 text-white" /></div>
+                        Aggiungi Carta Fedeltà
+                    </DialogTitle>
+                    <DialogDescription>Passo {currentStep} di 3 - Seleziona, scansiona e conferma.</DialogDescription>
+                </DialogHeader>
+                {currentStep === 1 &&
+                    <SupermarketSelection
+                        searchQuery={searchQuery}
+                        setSearchQuery={setSearchQuery}
+                        selectedSupermarket={selectedSupermarket}
+                        setSelectedSupermarket={setSelectedSupermarket}
+                        selectedColor={selectedColor}
+                        setSelectedColor={setSelectedColor}
+                        handleClose={handleClose}
+                        nextStep={nextStep}
+                    />
+                }
+                {currentStep === 2 &&
+                    <ScannerStep
+                        cameraPermission={cameraPermission}
+                        scannedData={scannedData}
+                        setScannedData={setScannedData}
+                        handleScanSuccess={handleScanSuccess}
+                        handleScanError={handleScanError}
+                        handleManualInput={handleManualInput}
+                        prevStep={prevStep}
+                        nextStep={nextStep}
+                    />
+                }
+                {currentStep === 3 &&
+                    <ConfirmationStep
+                        selectedSupermarket={selectedSupermarket}
+                        scannedData={scannedData}
+                        selectedColor={selectedColor}
+                        isPublic={isPublic}
+                        setIsPublic={setIsPublic}
+                        tag={tag}
+                        setTag={setTag}
+                        prevStep={prevStep}
+                        saveCard={saveCard}
+                    />
+                }
+            </DialogContent>
+        </Dialog>
     );
-  };
-  
-  return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-3">
-             <div className="p-2 rounded-lg" style={{ background: 'var(--burnt-newStyle)' }}><Scan className="w-6 h-6 text-white" /></div>
-            Aggiungi Carta Fedeltà
-          </DialogTitle>
-          <DialogDescription>Passo {currentStep} di 3 - Seleziona, scansiona e conferma.</DialogDescription>
-        </DialogHeader>
-        {currentStep === 1 && <SupermarketSelection />}
-        {currentStep === 2 && <ScannerStep />}
-        {currentStep === 3 && <ConfirmationStep />}
-      </DialogContent>
-    </Dialog>
-  );
 };
