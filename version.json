@@ -1,9 +1,9 @@
 {
-  "major": 1,
+  "major": 2,
   "minor": 0,
-  "patch": 20,
+  "patch": 0,
   "build": 0,
-  "lastUpdated": "2025-07-22T11:58:57.164Z",
+  "lastUpdated": "2025-07-22T12:05:19.763Z",
   "environment": "production",
-  "deploymentId": "1753185537164-9w6ur"
+  "deploymentId": "1753185919763-8368b"
 }
