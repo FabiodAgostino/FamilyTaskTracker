@@ -28,16 +28,200 @@ import { cn, viewImage } from '@/lib/utils';
 import { supermarketData, type SupermarketKey, suggestedColors } from './walletConstants';
 
 // ==========================================================
-// ==== QUAGGA2 TIPI E DICHIARAZIONI
+// ==== ZXING IMPORTS E TIPI
 // ==========================================================
-declare global {
-  interface Window {
-    Quagga: any;
-  }
+import { 
+  BrowserMultiFormatReader, 
+  DecodeHintType, 
+  BarcodeFormat, 
+  Result,
+  NotFoundException 
+} from '@zxing/library';
+
+// ==========================================================
+// ==== INTERFACCE TYPESCRIPT PER ZXING
+// ==========================================================
+interface ZXingControls {
+  stop: () => void;
+}
+
+interface ZXingScanResult {
+  codeResult: {
+    code: string;
+    format: BarcodeFormat;
+  };
 }
 
 // ==========================================================
-// ==== COMPONENTE SCANNER QUAGGA2 OTTIMIZZATO
+// ==== HOOK CUSTOM PER ZXING SCANNER OTTIMIZZATO
+// ==========================================================
+const useZXingScanner = ({
+  videoRef,
+  onScanSuccess,
+  onScanError,
+  selectedDeviceId,
+  isActive = true
+}: {
+  videoRef: React.RefObject<HTMLVideoElement>;
+  onScanSuccess: (result: Result) => void;
+  onScanError: (error: any) => void;
+  selectedDeviceId?: string;
+  isActive: boolean;
+}) => {
+  const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const scanCount = useRef(0);
+  const lastScanTime = useRef(0);
+
+  // Configurazione ZXing ottimizzata per loyalty cards
+  const getOptimizedHints = useCallback(() => {
+    const hints = new Map();
+    
+    // Formati specifici per carte fedeltà (Code 39 è il più comune)
+    hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+      BarcodeFormat.CODE_39,
+      BarcodeFormat.CODE_128,
+      BarcodeFormat.EAN_13,
+      BarcodeFormat.EAN_8
+    ]);
+    
+    // Performance ottimizzate per mobile
+    hints.set(DecodeHintType.TRY_HARDER, false); // Disabilitato per performance
+    hints.set(DecodeHintType.PURE_BARCODE, false); // Per immagini reali con rumore
+    
+    return hints;
+  }, []);
+
+  // Inizializzazione reader
+  useEffect(() => {
+    if (!isActive) return;
+
+    console.log('🚀 Inizializzazione ZXing Scanner...');
+    
+    const hints = getOptimizedHints();
+    const reader = new BrowserMultiFormatReader(hints);
+    
+    // Configurazione timing ottimizzata (equivalente a 1 FPS di Quagga)
+    reader.timeBetweenDecodingAttempts = 1000; // 1 secondo tra i tentativi
+    
+    readerRef.current = reader;
+    setIsInitialized(true);
+    
+    console.log('✅ ZXing Reader inizializzato');
+
+    return () => {
+      console.log('🧹 Cleanup ZXing Reader');
+      if (readerRef.current) {
+        try {
+          readerRef.current.reset();
+        } catch (err) {
+          console.warn('⚠️ Errore durante cleanup reader:', err);
+        }
+        readerRef.current = null;
+      }
+      setIsInitialized(false);
+      setIsScanning(false);
+    };
+  }, [isActive, getOptimizedHints]);
+
+  // Avvio scanning con device specifico
+  useEffect(() => {
+    if (!isInitialized || !readerRef.current || !videoRef.current || !isActive) {
+      return;
+    }
+
+    let isCurrentEffectActive = true;
+
+    const startScanning = async () => {
+      try {
+        console.log('🎯 Avvio scanning ZXing...');
+        
+        // Configurazione constraints per performance
+        const constraints = {
+          video: {
+            deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined,
+            facingMode: selectedDeviceId ? undefined : 'environment',
+            width: { ideal: 640 },    // Risoluzione ottimizzata
+            height: { ideal: 480 },
+            frameRate: { ideal: 15, max: 30 } // Frame rate limitato
+          }
+        };
+
+        const controls = await readerRef.current!.decodeFromConstraints(
+          constraints,
+          videoRef.current!,
+          (result, error) => {
+            if (!isCurrentEffectActive) return;
+
+            if (result) {
+              const now = Date.now();
+              
+              // Debounce per evitare scansioni multiple
+              if (now - lastScanTime.current < 2000) {
+                console.log('🔄 Scansione troppo ravvicinata, ignorata');
+                return;
+              }
+
+              lastScanTime.current = now;
+              scanCount.current++;
+              
+              const code = result.getText();
+              const format = result.getBarcodeFormat();
+              
+              console.log(`🎉 BARCODE LETTO: ${code} (formato: ${format}, scan #${scanCount.current})`);
+              
+              onScanSuccess(result);
+            } else if (error && !(error instanceof NotFoundException)) {
+              // Logga solo errori significativi, non i "non trovato"
+              console.log('⚠️ Errore scanning (normale):', error.message);
+              onScanError(error);
+            }
+          }
+        ) as ZXingControls | undefined;
+
+        if (isCurrentEffectActive) {
+          setIsScanning(true);
+          console.log('✅ Scanning ZXing avviato');
+        }
+
+        // Cleanup per questo specifico avvio
+        return () => {
+          console.log('🛑 Stop scanning ZXing');
+          try {
+            if (controls && typeof controls.stop === 'function') {
+              controls.stop();
+            }
+          } catch (err) {
+            console.warn('⚠️ Errore stop scanning:', err instanceof Error ? err.message : String(err));
+          }
+          if (isCurrentEffectActive) {
+            setIsScanning(false);
+          }
+        };
+
+      } catch (err) {
+        console.error('❌ Errore avvio scanning:', err instanceof Error ? err.message : String(err));
+        if (isCurrentEffectActive) {
+          setIsScanning(false);
+          onScanError(err instanceof Error ? err : new Error(String(err)));
+        }
+      }
+    };
+
+    const cleanupPromise = startScanning();
+
+    return () => {
+      isCurrentEffectActive = false;
+      cleanupPromise.then(cleanup => cleanup?.());
+    };
+  }, [isInitialized, selectedDeviceId, isActive, onScanSuccess, onScanError, videoRef]);
+
+  return { isScanning, isInitialized };
+};
+
+// ==========================================================
+// ==== COMPONENTE SCANNER ZXING OTTIMIZZATO
 // ==========================================================
 const BarcodeScanner = ({
   onScanSuccess,
@@ -46,264 +230,107 @@ const BarcodeScanner = ({
   onScanSuccess: (result: any) => void;
   onScanError: (error: any) => void;
 }) => {
-  const scannerRegionId = 'quagga-scanner-region';
-  const scannerRef = useRef<HTMLDivElement>(null);
-  const isInitialized = useRef(false);
-  
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [cameras, setCameras] = useState<{ id: string; label: string }[]>([]);
   const [currentCameraIndex, setCurrentCameraIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isScanning, setIsScanning] = useState(false);
-  const [quaggaLoaded, setQuaggaLoaded] = useState(false);
+  const [permissionGranted, setPermissionGranted] = useState(false);
 
-  // ==========================================================
-  // ==== CARICAMENTO QUAGGA2 CON PERFORMANCE OTTIMIZZATE
-  // ==========================================================
-  useEffect(() => {
-    // CSS ottimizzato con willReadFrequently per performance
-    const style = document.createElement('style');
-    style.textContent = `
-      #${scannerRegionId} video {
-        width: 100% !important;
-        height: 100% !important;
-        object-fit: cover !important;
-      }
-      #${scannerRegionId} canvas {
-        width: 100% !important;
-        height: 100% !important;
-        /* Performance fix per Canvas2D */
-        will-change: contents;
-      }
-    `;
-    document.head.appendChild(style);
+  // Gestione risultati scansione
+  const handleScanSuccess = useCallback((result: Result) => {
+    const code = result.getText();
+    console.log(`🎉 SUCCESSO SCANSIONE ZXing: ${code}`);
     
-    const loadQuagga = async () => {
-      console.log('🔄 Tentativo caricamento Quagga2...');
-      
-      if (window.Quagga) {
-        console.log('✅ Quagga2 già caricato');
-        setQuaggaLoaded(true);
-        setIsLoading(false);
-        return;
-      }
-      
-      try {
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/@ericblade/quagga2/dist/quagga.min.js';
-        script.async = true;
-        
-        const loadPromise = new Promise((resolve, reject) => {
-          script.onload = () => {
-            console.log('✅ Script Quagga2 caricato');
-            setTimeout(() => {
-              if (window.Quagga) {
-                console.log('✅ Quagga2 disponibile globalmente');
-                setQuaggaLoaded(true);
-                resolve(true);
-              } else {
-                console.error('❌ Quagga2 non disponibile dopo il caricamento');
-                reject(new Error('Quagga2 non disponibile'));
-              }
-            }, 100);
-          };
-          script.onerror = () => {
-            console.error('❌ Errore nel caricamento script Quagga2');
-            reject(new Error('Impossibile caricare Quagga2'));
-          };
-        });
-        
-        document.head.appendChild(script);
-        await loadPromise;
-      } catch (err) {
-        console.error('❌ Errore caricamento Quagga2:', err);
-        setError('Impossibile caricare il motore di scansione');
-      } finally {
-        setIsLoading(false);
+    // Trasforma il risultato ZXing nel formato atteso dal componente parent
+    const quaggaCompatibleResult: ZXingScanResult = {
+      codeResult: {
+        code: code,
+        format: result.getBarcodeFormat()
       }
     };
+    
+    onScanSuccess(quaggaCompatibleResult);
+  }, [onScanSuccess]);
 
-    loadQuagga();
-  }, []);
+  const handleScanError = useCallback((error: any) => {
+    console.log('⚠️ Errore scansione ZXing:', error.message);
+    onScanError(error);
+  }, [onScanError]);
+
+  // Hook ZXing
+  const { isScanning, isInitialized } = useZXingScanner({
+    videoRef,
+    onScanSuccess: handleScanSuccess,
+    onScanError: handleScanError,
+    selectedDeviceId: cameras[currentCameraIndex]?.id,
+    isActive: permissionGranted && !error
+  });
 
   // ==========================================================
-  // ==== RILEVAMENTO FOTOCAMERE
+  // ==== RILEVAMENTO FOTOCAMERE E PERMESSI
   // ==========================================================
   useEffect(() => {
-    if (!quaggaLoaded) return;
-    
-    const detectCameras = async () => {
+    const initializeCamera = async () => {
       try {
+        console.log('📱 Richiesta permessi camera...');
+        
+        // Richiesta permessi
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'environment' } 
+        });
+        
+        // Ferma il stream temporaneo
+        stream.getTracks().forEach(track => track.stop());
+        
+        console.log('✅ Permessi camera ottenuti');
+        setPermissionGranted(true);
+
+        // Enumera dispositivi
         console.log('🔍 Rilevamento fotocamere...');
         const devices = await navigator.mediaDevices.enumerateDevices();
         const videoDevices = devices
           .filter(device => device.kind === 'videoinput')
-          .map(device => ({
+          .map((device, index) => ({
             id: device.deviceId,
-            label: device.label || `Camera ${device.deviceId.slice(0, 5)}`
+            label: device.label || `Camera ${index + 1}`
           }));
-        
+
         console.log('📱 Fotocamere trovate:', videoDevices.length);
         setCameras(videoDevices);
-        
+
         // Preferenza per fotocamera posteriore
         const rearCameraIndex = videoDevices.findIndex(d => 
           d.label.toLowerCase().includes('back') || 
           d.label.toLowerCase().includes('rear') ||
           d.label.toLowerCase().includes('environment')
         );
-        setCurrentCameraIndex(rearCameraIndex !== -1 ? rearCameraIndex : 0);
+        
+        if (rearCameraIndex !== -1) {
+          setCurrentCameraIndex(rearCameraIndex);
+          console.log('📷 Camera posteriore selezionata');
+        }
+
       } catch (err) {
-        console.error('❌ Errore rilevamento fotocamere:', err);
-        setError('Impossibile accedere alle fotocamere');
+        console.error('❌ Errore inizializzazione camera:', err instanceof Error ? err.message : String(err));
+        setError(`Impossibile accedere alla fotocamera: ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    detectCameras();
-  }, [quaggaLoaded]);
-
-  // ==========================================================
-  // ==== INIZIALIZZAZIONE QUAGGA2 OTTIMIZZATA
-  // ==========================================================
-  useEffect(() => {
-    if (!quaggaLoaded || !window.Quagga || !scannerRef.current || cameras.length === 0 || isInitialized.current) {
-      return;
-    }
-
-    const currentCamera = cameras[currentCameraIndex];
-    console.log('🚀 Inizializzazione Quagga2 con camera:', currentCamera.label);
-    
-    // ==========================================================
-    // ==== CONFIGURAZIONE ULTRA-PERFORMANCE (ANTI requestAnimationFrame)
-    // ==========================================================
-    const quaggaConfig = {
-      inputStream: {
-        name: "Live",
-        type: "LiveStream",
-        target: scannerRef.current,
-        constraints: {
-          width: { ideal: 640 },    // RIDOTTA da 1280 a 640
-          height: { ideal: 480 },   // RIDOTTA da 720 a 480
-          facingMode: "environment",
-          deviceId: currentCamera.id
-        }
-      },
-      decoder: {
-        // SOLO UN READER ALLA VOLTA per performance massima
-        readers: [
-          'code_39_reader'          // Solo il più popolare
-        ]
-      },
-      locator: {
-        patchSize: "small",         // Da "medium" a "small"
-        halfSample: true
-      },
-      locate: true,                 // Mantieni localizzazione ma ottimizzata
-      // PERFORMANCE ULTRA-AGGRESSIVE
-      numOfWorkers: 1,              // RIDOTTO a 1 solo worker
-      frequency: 1,                 // RIDOTTO a 1 FPS massimo
-      debug: {
-        showCanvas: false,
-        showPatches: false,
-        showFoundPatches: false,
-        showSkeleton: false,      // Disabilitato per performance
-        showLabels: false,
-        showPatchLabels: false,
-        showRemainingPatchLabels: false,
-        boxFromPatches: {
-          showTransformed: false,
-          showTransformedBox: false,
-          showBB: false
-        }
-      }
-    };
-
-    console.log('⚙️ Configurazione Quagga2 ottimizzata:', quaggaConfig);
-
-    window.Quagga.init(quaggaConfig, (err: any) => {
-      if (err) {
-        console.error('❌ Errore inizializzazione Quagga2:', err);
-        setError(`Errore scanner: ${err.message || err}`);
-        return;
-      }
-
-      console.log('✅ Quagga2 inizializzato con successo');
-      
-      try {
-        window.Quagga.start();
-        isInitialized.current = true;
-        setIsScanning(true);
-        console.log('🎯 Scanner Quagga2 avviato');
-      } catch (startErr) {
-        console.error('❌ Errore avvio Quagga2:', startErr);
-        setError('Impossibile avviare lo scanner');
-      }
-    });
-
-    // ==========================================================
-    // ==== EVENT LISTENERS CON ERROR DETECTION CORRETTA
-    // ==========================================================
-    const onDetected = (result: any) => {
-      const code = result.codeResult.code;
-      const format = result.codeResult.format;
-      const firstDecoded = result.codeResult.decodedCodes?.[0];
-      const error = firstDecoded?.error || 1; // Default alto se non trovato
-      
-      console.log(`🔍 LETTURA: ${code} (formato: ${format}, errore: ${(error * 100).toFixed(1)}%)`);
-      
-      // LOGICA CORRETTA: Scarta se ERROR troppo alto (qualità bassa)
-      if (error > 0.15) { // 15% di errore massimo
-        console.log(`⚠️ IGNORATO: Errore troppo alto (${(error * 100).toFixed(1)}%)`);
-        return;
-      }
-      
-      console.log(`🎉 BARCODE ACCETTATO: ${code} (formato: ${format}, errore: ${(error * 100).toFixed(1)}%)`);
-      onScanSuccess(result);
-    };
-
-    const onProcessed = (result: any) => {
-      // Gestione silenziosa degli errori per performance
-      if (!result) {
-        // onScanError('Nessun codice rilevato');
-      }
-    };
-
-    window.Quagga.onDetected(onDetected);
-    window.Quagga.onProcessed(onProcessed);
-
-    // Cleanup
-    return () => {
-      console.log('🧹 Cleanup Quagga2');
-      if (isInitialized.current && window.Quagga) {
-        try {
-          window.Quagga.offDetected(onDetected);
-          window.Quagga.offProcessed(onProcessed);
-          window.Quagga.stop();
-          isInitialized.current = false;
-          setIsScanning(false);
-          console.log('✅ Quagga2 fermato');
-        } catch (err) {
-          console.warn('⚠️ Errore durante cleanup:', err);
-        }
-      }
-    };
-  }, [quaggaLoaded, cameras, currentCameraIndex, onScanSuccess, onScanError]);
+    initializeCamera();
+  }, []);
 
   // ==========================================================
   // ==== CONTROLLI CAMERA
   // ==========================================================
-  const switchCamera = () => {
-    if (cameras.length > 1 && isInitialized.current) {
-      console.log('🔄 Cambio fotocamera');
-      // Ferma scanner corrente
-      window.Quagga.stop();
-      isInitialized.current = false;
-      setIsScanning(false);
-      
-      // Cambia camera
+  const switchCamera = useCallback(() => {
+    if (cameras.length > 1) {
+      console.log('🔄 Cambio fotocamera ZXing');
       setCurrentCameraIndex(prev => (prev + 1) % cameras.length);
     }
-  };
+  }, [cameras.length]);
 
   // ==========================================================
   // ==== RENDERING CON STATI DIVERSI
@@ -314,7 +341,7 @@ const BarcodeScanner = ({
         <div className="w-full bg-gray-200 rounded-lg aspect-video flex items-center justify-center">
           <div className="text-center">
             <Camera className="w-12 h-12 text-gray-400 mx-auto mb-2 animate-pulse" />
-            <p className="text-sm text-gray-500">Caricamento scanner...</p>
+            <p className="text-sm text-gray-500">Inizializzazione scanner ZXing...</p>
           </div>
         </div>
       </div>
@@ -351,22 +378,41 @@ const BarcodeScanner = ({
     <div className="w-full space-y-3">
       {/* Area scanner compatta */}
       <div className="relative w-full bg-black rounded-lg overflow-hidden">
-        <div 
-          id={scannerRegionId} 
-          ref={scannerRef}
-          className="w-full"
+        <video 
+          ref={videoRef}
+          className="w-full object-cover"
           style={{ 
             height: '250px',
             maxWidth: '100%'
           }}
+          playsInline
+          muted
         />
+        
+        {/* Overlay di scanning */}
+        <div className="absolute inset-0 pointer-events-none">
+          {/* Linea di scanning animata quando attivo */}
+          {isScanning && (
+            <div className="absolute inset-x-4 top-1/2 transform -translate-y-1/2 h-0.5 bg-red-500 shadow-lg animate-pulse" />
+          )}
+          
+          {/* Cornice di targeting */}
+          <div className="absolute inset-4 border-2 border-white/70 rounded-lg">
+            <div className="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-red-500 rounded-tl-lg" />
+            <div className="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-red-500 rounded-tr-lg" />
+            <div className="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-red-500 rounded-bl-lg" />
+            <div className="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-red-500 rounded-br-lg" />
+          </div>
+        </div>
         
         {/* Overlay con stato */}
         <div className="absolute top-2 left-2 right-2 bg-black/70 text-white text-xs p-2 rounded text-center">
           {isScanning ? (
-            <span className="text-green-300">🟢 Scanner attivo - Inquadra il codice a barre</span>
+            <span className="text-green-300">🟢 ZXing Scanner attivo - Inquadra il codice a barre</span>
+          ) : isInitialized ? (
+            <span className="text-yellow-300">🟡 Inizializzazione camera...</span>
           ) : (
-            <span className="text-yellow-300">🟡 Inizializzazione scanner...</span>
+            <span className="text-blue-300">🔵 Caricamento ZXing...</span>
           )}
         </div>
       </div>
@@ -384,19 +430,24 @@ const BarcodeScanner = ({
             <RotateCcw size={20} />
           </Button>
         )}
-        <div className="text-xs text-gray-500">
-          {cameras.length > 0 ? `Camera: ${cameras[currentCameraIndex]?.label}` : 'Nessuna camera'}
+        <div className="text-xs text-gray-500 flex items-center gap-2">
+          <Zap size={14} className="text-blue-500" />
+          {cameras.length > 0 ? `ZXing: ${cameras[currentCameraIndex]?.label}` : 'Nessuna camera'}
         </div>
       </div>
 
-      {/* Suggerimenti ultra-performance */}
+      {/* Suggerimenti ottimizzazione ZXing */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-        <h4 className="text-sm font-medium text-blue-800 mb-2">💡 Scanner Performance Mode:</h4>
+        <h4 className="text-sm font-medium text-blue-800 mb-2 flex items-center gap-2">
+          <Zap size={16} className="text-blue-600" />
+          ZXing Performance Mode v0.21.3:
+        </h4>
         <ul className="space-y-1 text-xs text-blue-700">
-          <li>• <strong>1 FPS</strong> - Scansiona 1 volta al secondo</li>
-          <li>• <strong>Solo Code 39</strong> - Formato più comune loyalty cards</li>
-          <li>• <strong>Risoluzione ridotta</strong> - Ottimizzato per mobile</li>
-          <li>• <strong>Tieni fermo</strong> il telefono per 3-5 secondi</li>
+          <li>• <strong>Multi-format</strong> - Code 39, Code 128, EAN-13/8</li>
+          <li>• <strong>1 scan/sec</strong> - Ottimizzato per mobile</li>
+          <li>• <strong>Risoluzione 640x480</strong> - Performance superiori</li>
+          <li>• <strong>Tieni fermo</strong> il telefono per 2-3 secondi</li>
+          <li>• <strong>Anti-duplicate</strong> - Previene scansioni multiple</li>
         </ul>
       </div>
     </div>
@@ -404,7 +455,7 @@ const BarcodeScanner = ({
 };
 
 // ==========================================================
-// ==== RESTO DEL COMPONENTE IDENTICO AL TUO ORIGINALE
+// ==== RESTO DEL COMPONENTE IDENTICO ALL'ORIGINALE
 // ==========================================================
 export const AddCardModal = ({ isOpen, onClose, onSave }: any) => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -444,7 +495,7 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: any) => {
 
   const handleScanSuccess = useCallback((result: any) => {
     const decodedText = result.codeResult.code;
-    console.log(`🎉 SUCCESSO SCANSIONE: ${decodedText}`);
+    console.log(`🎉 SUCCESSO SCANSIONE FINALE: ${decodedText}`);
     setScannedData(decodedText);
   }, []);
 

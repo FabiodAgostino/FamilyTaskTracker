@@ -218,4 +218,326 @@ exports.onShoppingItemCreated = functions
   });
 
 
+
+
+
+
+
+
+
+
+
+
+exports.debugCssSelector = functions
+    .region('europe-west1')
+    .runWith({
+        memory: '512MB',
+        timeoutSeconds: 300
+    })
+    .https
+    .onRequest(async (req, res) => {
+    
+    // Handle preflight OPTIONS request
+    const startTime = Date.now();
+    
+    try {
+        console.log(`🔍 Debug CSS Selector endpoint chiamato - Metodo: ${req.method}`);
+        
+        // ✅ ESTRAI URL dal request (GET query param o POST body)
+        let testUrl = null;
+        
+        if (req.method === 'GET') {
+            testUrl = req.query.url;
+        } else if (req.method === 'POST') {
+            testUrl = req.body?.url;
+        }
+        
+        // ✅ URL di default per test rapido
+        if (!testUrl) {
+            testUrl = "https://maisonroel.com/products/helena-black?variant=51190186737930";
+            console.log(`⚠️ Nessun URL fornito, uso URL di default: ${testUrl}`);
+        }
+        
+        // ✅ VALIDAZIONE URL
+        if (!testUrl.startsWith('http')) {
+            return res.status(400).json({
+                success: false,
+                error: 'URL non valido. Deve iniziare con http:// o https://',
+                providedUrl: testUrl,
+                timestamp: new Date().toISOString()
+            });
+        }
+        
+        console.log(`🎯 Testando URL: ${testUrl}`);
+        
+        // ✅ STEP 1: Trova il documento nel database
+        console.log('🔍 Step 1: Ricerca documento per URL...');
+        const existingDoc = await priceMonitorService.findDocumentByUrl(testUrl);
+        
+        if (!existingDoc) {
+            console.log(`❌ Documento non trovato per URL: ${testUrl}`);
+            return res.status(404).json({
+                success: false,
+                error: `Nessun documento trovato nel database per questo URL`,
+                url: testUrl,
+                suggestion: "Assicurati che l'URL sia stato aggiunto al sistema e sia esattamente uguale a quello salvato",
+                timestamp: new Date().toISOString(),
+                duration: Date.now() - startTime
+            });
+        }
+        
+        const itemData = existingDoc.data();
+        const documentId = existingDoc.id;
+        
+        console.log(`✅ Documento trovato: ${documentId} - ${itemData.name}`);
+        
+        // ✅ STEP 2: Verifica che l'item abbia i dati necessari per il debug
+        if (!itemData.priceSelection || !itemData.priceSelection.selectedCssSelector) {
+            console.log(`⚠️ Item senza priceSelection valida`);
+            return res.status(400).json({
+                success: false,
+                error: "L'item non ha una selezione CSS valida per il debug",
+                itemId: documentId,
+                itemName: itemData.name,
+                hasPriceSelection: !!itemData.priceSelection,
+                hasSelectedCssSelector: !!itemData.priceSelection?.selectedCssSelector,
+                timestamp: new Date().toISOString(),
+                duration: Date.now() - startTime
+            });
+        }
+        
+        // ✅ STEP 3: Esegui il debug CSS selector SEMPLIFICATO
+        console.log('\n🔬 Avvio debug CSS selector...');
+        
+        let debugResult;
+        try {
+            // Prova prima il metodo originale se esiste
+            if (typeof priceMonitorService.debugCssSelectorMismatch === 'function') {
+                debugResult = await priceMonitorService.debugCssSelectorMismatch(testUrl, itemData);
+            } else {
+                // Fallback a debug semplificato
+                debugResult = await performSimpleDebug(testUrl, itemData);
+            }
+        } catch (debugError) {
+            console.error('❌ Errore nel debug:', debugError);
+            debugResult = {
+                success: false,
+                error: debugError.message,
+                exactMatch: false,
+                detectedPrices: 0,
+                analysis: {
+                    hasExactMatch: false,
+                    hasSimilarSelectors: false,
+                    hasNumericMatch: false,
+                    elementExists: false
+                }
+            };
+        }
+        
+        // ✅ STEP 4: Prepara risposta dettagliata
+        const response = {
+            success: true,
+            timestamp: new Date().toISOString(),
+            duration: Date.now() - startTime,
+            
+            // Info dell'item testato
+            item: {
+                id: documentId,
+                name: itemData.name,
+                category: itemData.category || 'Senza categoria',
+                estimatedPrice: itemData.estimatedPrice,
+                link: testUrl,
+                createdBy: itemData.createdBy,
+                completed: itemData.completed
+            },
+            
+            // Info CSS selector salvato
+            savedCssSelector: {
+                selector: itemData.priceSelection.selectedCssSelector,
+                selectedPriceIndex: itemData.priceSelection.selectedPriceIndex || 0,
+                selectionTimestamp: itemData.priceSelection.selectionTimestamp,
+                status: itemData.priceSelection.status,
+                hasAlternativeSelectors: !!(itemData.priceSelection.detectedPrices?.[0]?.alternativeSelectors?.length)
+            },
+            
+            // Risultati del debug
+            debug: debugResult,
+            
+            // ✅ NUOVO: Sommario esecutivo CORRETTO
+            summary: {
+                problemFound: !debugResult.exactMatch,
+                canBeFixed: debugResult.analysis?.hasSimilarSelectors || debugResult.analysis?.hasNumericMatch || false,
+                recommendation: generateRecommendationSafe(debugResult),
+                confidence: calculateConfidenceLevelSafe(debugResult)
+            }
+        };
+        
+        // ✅ Log del risultato
+        console.log('\n📊 RISULTATO DEBUG ENDPOINT:');
+        console.log(`   ✅ Success: ${response.success}`);
+        console.log(`   🎯 Exact Match: ${debugResult.exactMatch || false}`);
+        console.log(`   📊 Detected Prices: ${debugResult.detectedPrices || 0}`);
+        console.log(`   ⏱️ Duration: ${response.duration}ms`);
+        
+        // ✅ RITORNA RISPOSTA
+        return res.status(200).json(response);
+        
+    } catch (error) {
+        console.error('❌ Errore nell\'endpoint debug CSS selector:', error);
+        
+        const errorResponse = {
+            success: false,
+            error: error.message,
+            timestamp: new Date().toISOString(),
+            duration: Date.now() - startTime,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        };
+        
+        return res.status(500).json(errorResponse);
+    }
+});
+
+
+
+function generateRecommendationSafe(debugResult) {
+    try {
+        if (!debugResult || debugResult.success === false) {
+            return "❌ Errore durante il debug. Controlla i log per dettagli.";
+        }
+        
+        if (debugResult.exactMatch) {
+            return "✅ Il CSS selector funziona correttamente. Nessuna azione richiesta.";
+        }
+        
+        const analysis = debugResult.analysis || {};
+        
+        if (analysis.elementExists && !analysis.hasExactMatch) {
+            return "🔧 Il selector esiste nell'HTML ma non contiene prezzi. Potrebbe essere necessario un selector più specifico per l'elemento figlio contenente il prezzo.";
+        }
+        
+        if (analysis.hasSimilarSelectors) {
+            return "🎯 Trovati selettori simili. Il sistema può auto-aggiornare il selector durante il monitoraggio.";
+        }
+        
+        if (analysis.hasNumericMatch) {
+            return "💰 Trovato prezzo simile con selector diverso. Il sistema può utilizzare il match numerico come fallback.";
+        }
+        
+        if (debugResult.detectedPrices > 0) {
+            return "⚠️ Prezzi rilevati nella pagina ma nessun match per il selector. Potrebbe essere necessario riselezionare il prezzo corretto.";
+        }
+        
+        return "❌ Nessun prezzo rilevato nella pagina. Il sito potrebbe essere cambiato significativamente o richiedere JavaScript.";
+    } catch (error) {
+        console.error('❌ Errore in generateRecommendationSafe:', error);
+        return "❌ Errore durante la generazione della raccomandazione.";
+    }
+}
+
+/**
+ * 📊 Calcola livello di confidenza SICURO (senza errori undefined)
+ */
+function calculateConfidenceLevelSafe(debugResult) {
+    try {
+        if (!debugResult || debugResult.success === false) return "NONE";
+        
+        if (debugResult.exactMatch) return "HIGH";
+        
+        const analysis = debugResult.analysis || {};
+        
+        if (analysis.hasSimilarSelectors && analysis.hasNumericMatch) return "HIGH";
+        if (analysis.hasSimilarSelectors || analysis.hasNumericMatch) return "MEDIUM";
+        if (debugResult.detectedPrices > 0) return "LOW";
+        
+        return "NONE";
+    } catch (error) {
+        console.error('❌ Errore in calculateConfidenceLevelSafe:', error);
+        return "NONE";
+    }
+}
+
+/**
+ * 🔍 Debug semplificato SICURO (fallback se debugCssSelectorMismatch non esiste)
+ */
+async function performSimpleDebug(testUrl, itemData) {
+    try {
+        const { WebScraper } = require('./services/web-scraper');
+        const { PriceDetectorService } = require('./services/price-detector-service');
+        
+        const scraper = new WebScraper({
+            useRealHeaders: true,
+            enableDelays: false,
+            maxRetries: 1
+        });
+        
+        const priceDetector = new PriceDetectorService();
+        
+        // Scraping
+        const scrapingResult = await scraper.scrapeComplete(testUrl, {
+            useNavigation: false,
+            fallbackToAggressive: true
+        });
+        
+        if (!scrapingResult.success) {
+            return {
+                success: false,
+                error: `Scraping fallito: ${scrapingResult.error}`,
+                exactMatch: false,
+                detectedPrices: 0
+            };
+        }
+        
+        // Rilevamento prezzi
+        const detectionResult = await priceDetector.detectMultiplePrices(scrapingResult.html || scrapingResult.content.text);
+        
+        const savedSelector = itemData.priceSelection.selectedCssSelector;
+        const currentPrice = itemData.estimatedPrice;
+        
+        let exactMatch = false;
+        let hasNumericMatch = false;
+        
+        if (detectionResult.detectedPrices && detectionResult.detectedPrices.length > 0) {
+            // Check exact match
+            exactMatch = detectionResult.detectedPrices.some(price => 
+                price.cssSelector === savedSelector
+            );
+            
+            // Check numeric match (±5%)
+            const tolerance = currentPrice * 0.05;
+            hasNumericMatch = detectionResult.detectedPrices.some(price => 
+                Math.abs(price.numericValue - currentPrice) <= tolerance
+            );
+        }
+        
+        return {
+            success: true,
+            savedSelector: savedSelector,
+            exactMatch: exactMatch,
+            detectedPrices: detectionResult.detectedPrices?.length || 0,
+            htmlLength: scrapingResult.content.text.length,
+            analysis: {
+                hasExactMatch: exactMatch,
+                hasSimilarSelectors: false, // Semplificato
+                hasNumericMatch: hasNumericMatch,
+                elementExists: true // Assume true per semplicità
+            }
+        };
+        
+    } catch (error) {
+        console.error('❌ Errore in performSimpleDebug:', error);
+        return {
+            success: false,
+            error: error.message,
+            exactMatch: false,
+            detectedPrices: 0,
+            analysis: {
+                hasExactMatch: false,
+                hasSimilarSelectors: false,
+                hasNumericMatch: false,
+                elementExists: false
+            }
+        };
+    }
+}
+
 console.log("📦 FamilyTaskTracker Functions inizializzate");

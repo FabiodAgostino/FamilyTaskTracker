@@ -222,7 +222,8 @@ class WebScraper {
       return {
         text: allText,
         detectedPrices: detectedPrices,
-        length: allText.length
+        length: allText.length,
+        raw: raw
       };
       
     } catch (error) {
@@ -255,7 +256,7 @@ class WebScraper {
         success: false,
         step: 'scraping',
         error: scrapingResult.error,
-        url: url
+        url: url,
       };
     }
     
@@ -269,7 +270,8 @@ class WebScraper {
       content: {
         text: content.text,
         detectedPrices: content.detectedPrices,
-        length: content.length
+        length: content.length,
+        raw: content.raw
       },
       metadata: {
         originalLength: scrapingResult.originalLength,

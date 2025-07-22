@@ -263,8 +263,12 @@ class PriceDetectorService {
     /**
      * Estrae prezzi dai dati JSON embedded
      */
-    extractJsonPrices(htmlContent, $ = null){
-         const prices = [];
+  extractJsonPrices(htmlContent, $ = null){
+    // ✅ AGGIUNGI QUESTO DEBUG ALL'INIZIO
+    console.log(`🧪 DEBUG: extractJsonPrices chiamato, htmlContent length: ${htmlContent.length}`);
+    console.log(`🧪 DEBUG: Numero pattern JSON da testare: ${this.jsonPatterns.length}`);
+    
+    const prices = [];
     const seenValues = new Set();
     
     // ✅ Se $ non è passato, crea cheerio instance
@@ -273,152 +277,313 @@ class PriceDetectorService {
         $ = cheerio.load(htmlContent);
     }
 
-        for (const pattern of this.jsonPatterns) {
-            let match;
-            pattern.lastIndex = 0;
-            
-            while ((match = pattern.exec(htmlContent)) !== null) {
-                if (match[1]) {
-                    try {
-                        const rawValue = match[1];
-                        let finalPrice = null;
-                        let conversionType = 'standard';
-                        
-                        if (/^\d+$/.test(rawValue)) {
-                            const numericValue = parseInt(rawValue);
-                            
-                            if (numericValue >= 50 && numericValue <= 5000000) {
-                                // Logica intelligente per distinguere centesimi vs euro/dollari
-                                if (numericValue > 1000) {
-                                    // > 1000: probabilmente centesimi (es: 29800 → $298)
-                                    finalPrice = numericValue / 100;
-                                    conversionType = 'centesimi';
-                                } else {
-                                    // <= 1000: probabilmente dollari/euro (es: 298 → $298)
-                                    finalPrice = numericValue;
-                                    conversionType = 'currency';
-                                }
-                            }
-                        } else {
-                            // Formato già con decimali o con simbolo dollaro
-                            const cleanValue = rawValue.replace(/[\$€£]/, '').replace(/[^\d.,]/g, '').replace(',', '.');
-                            const numericValue = parseFloat(cleanValue);
-                            if (numericValue >= 0.50 && numericValue <= 50000) {
-                                finalPrice = numericValue;
-                                conversionType = 'formatted';
-                            }
-                        }
-                        
-                        if (finalPrice && !seenValues.has(finalPrice.toFixed(2))) {
-                            seenValues.add(finalPrice.toFixed(2));
-                            
-                            // ✅ MIGLIORATO: Determina simbolo valuta dal contesto
-                            let currencySymbol = '$'; // Default per LightInTheBox
-                            if (rawValue.includes('€') || rawValue.includes('EUR')) {
-                                currencySymbol = '€';
-                            } else if (rawValue.includes('£') || rawValue.includes('GBP')) {
-                                currencySymbol = '£';
-                            }
-                            
-                            const correlatedElement = this.correlatePriceToElement(finalPrice, $);
-                            const priceData = {
-                                value: `${currencySymbol}${finalPrice.toFixed(2)}`,
-                                numericValue: finalPrice,
-                                source: 'json',
-                                conversionType: conversionType,
-                                jsonPattern: rawValue,  // Pattern JSON originale
-                                confidence: 0.85
-                            };
+    let totalMatches = 0;
+    let totalProcessed = 0;
 
-                            if (correlatedElement) {
-                                // ✅ USA GERARCHIA ESISTENTE per elemento correlato
-                                priceData.cssSelector = this.generateCssSelector(correlatedElement, $);
-                                priceData.parentClasses = this.getParentClasses(correlatedElement, $);
-                                priceData.elementText = correlatedElement.text().substring(0, 100);
-                                priceData.context = {
-                                    nearbyText: this.getNearbyText(correlatedElement, $),
-                                    isProminent: this.isElementProminent(correlatedElement, $)
-                                };
-                                priceData.source = 'json-correlated';
+    for (const pattern of this.jsonPatterns) {
+        let match;
+        pattern.lastIndex = 0;
+        
+        while ((match = pattern.exec(htmlContent)) !== null) {
+            totalMatches++;
+            if (match[1]) {
+                try {
+                    const rawValue = match[1];
+                    let finalPrice = null;
+                    let conversionType = 'standard';
+                    
+                    if (/^\d+$/.test(rawValue)) {
+                        const numericValue = parseInt(rawValue);
+                        
+                        if (numericValue >= 50 && numericValue <= 5000000) {
+                            // Logica intelligente per distinguere centesimi vs euro/dollari
+                            if (numericValue > 1000) {
+                                // > 1000: probabilmente centesimi (es: 29800 → $298)
+                                finalPrice = numericValue / 100;
+                                conversionType = 'centesimi';
                             } else {
-                                // ✅ FALLBACK migliorato se non trova correlazione
-                                priceData.cssSelector = `[data-json-fallback="${finalPrice.toFixed(2)}"]`;
-                                priceData.parentClasses = [];
-                                priceData.elementText = `JSON: ${rawValue} → ${finalPrice}`;
-                                priceData.context = { nearbyText: 'Estratto da JSON', isProminent: true };
+                                // <= 1000: probabilmente dollari/euro (es: 298 → $298)
+                                finalPrice = numericValue;
+                                conversionType = 'currency';
                             }
-
-                            prices.push(priceData);
+                        }
+                    } else {
+                        // Formato già con decimali o con simbolo dollaro
+                        const cleanValue = rawValue.replace(/[\$€£]/, '').replace(/[^\d.,]/g, '').replace(',', '.');
+                        const numericValue = parseFloat(cleanValue);
+                        if (numericValue >= 0.50 && numericValue <= 50000) {
+                            finalPrice = numericValue;
+                            conversionType = 'formatted';
+                        }
+                    }
+                    
+                    if (finalPrice && !seenValues.has(finalPrice.toFixed(2))) {
+                        seenValues.add(finalPrice.toFixed(2));
+                        totalProcessed++;
+                        
+                        // ✅ AGGIUNGI QUESTO DEBUG PRIMA DELLA CORRELAZIONE
+                        console.log(`🧪 DEBUG: Prezzo JSON ${totalProcessed}: ${finalPrice} (raw: ${rawValue})`);
+                        console.log(`🧪 DEBUG: Chiamando correlatePriceToElement per prezzo ${finalPrice}`);
+                        
+                        // ✅ MIGLIORATO: Determina simbolo valuta dal contesto
+                        let currencySymbol = '$'; // Default per LightInTheBox
+                        if (rawValue.includes('€') || rawValue.includes('EUR')) {
+                            currencySymbol = '€';
+                        } else if (rawValue.includes('£') || rawValue.includes('GBP')) {
+                            currencySymbol = '£';
                         }
                         
-                    } catch (e) {
-                        // JSON non valido, ignora
+                        const correlatedElement = this.correlatePriceToElement(finalPrice, $);
+                        
+                        // ✅ AGGIUNGI QUESTO DEBUG DOPO LA CORRELAZIONE
+                        console.log(`🧪 DEBUG: correlatePriceToElement ha restituito: ${correlatedElement ? 'ELEMENTO TROVATO' : 'NULL'}`);
+                        if (correlatedElement) {
+                            const foundSelector = this.generateCssSelector(correlatedElement, $);
+                            console.log(`🧪 DEBUG: CSS Selector trovato: "${foundSelector}"`);
+                        }
+                        
+                        const priceData = {
+                            value: `${currencySymbol}${finalPrice.toFixed(2)}`,
+                            numericValue: finalPrice,
+                            source: 'json',
+                            conversionType: conversionType,
+                            jsonPattern: rawValue,  // Pattern JSON originale
+                            confidence: 0.85
+                        };
+
+                        if (correlatedElement) {
+                            // ✅ USA GERARCHIA ESISTENTE per elemento correlato
+                            priceData.cssSelector = this.generateCssSelector(correlatedElement, $);
+                            priceData.parentClasses = this.getParentClasses(correlatedElement, $);
+                            priceData.elementText = correlatedElement.text().substring(0, 100);
+                            priceData.context = {
+                                nearbyText: this.getNearbyText(correlatedElement, $),
+                                isProminent: this.isElementProminent(correlatedElement, $)
+                            };
+                            priceData.source = 'json-correlated';
+                            
+                            // ✅ AGGIUNGI QUESTO DEBUG PER IL RISULTATO FINALE
+                            console.log(`🧪 DEBUG: Prezzo ${finalPrice} → CORRELATO con "${priceData.cssSelector}"`);
+                        } else {
+                            // ✅ FALLBACK migliorato se non trova correlazione
+                            priceData.cssSelector = `[data-json-fallback="${finalPrice.toFixed(2)}"]`;
+                            priceData.parentClasses = [];
+                            priceData.elementText = `JSON: ${rawValue} → ${finalPrice}`;
+                            priceData.context = { nearbyText: 'Estratto da JSON', isProminent: true };
+                            
+                            // ✅ AGGIUNGI QUESTO DEBUG PER IL FALLBACK
+                            console.log(`🧪 DEBUG: Prezzo ${finalPrice} → FALLBACK selector "[data-json-fallback="${finalPrice.toFixed(2)}"]"`);
+                        }
+
+                        prices.push(priceData);
                     }
+                    
+                } catch (e) {
+                    // JSON non valido, ignora
                 }
             }
         }
-
-        return prices;
     }
+
+    // ✅ AGGIUNGI QUESTO DEBUG ALLA FINE
+    console.log(`🧪 DEBUG: extractJsonPrices completato:`);
+    console.log(`   - Total matches: ${totalMatches}`);
+    console.log(`   - Total processed: ${totalProcessed}`);
+    console.log(`   - Final prices: ${prices.length}`);
+    console.log(`   - Sources: ${prices.map(p => p.source).join(', ')}`);
+    
+    return prices;
+}
     /**
  * ✅ NUOVO: Correlazione JSON → HTML
  * Trova l'elemento HTML che mostra visivamente il prezzo estratto dal JSON
  */
 correlatePriceToElement(jsonPrice, $) {
     const priceString = jsonPrice.toFixed(2);
-    const variations = [
-        priceString,                          // "65.95"
-        priceString.replace('.', ','),        // "65,95" (formato italiano)
-        `€${priceString}`,                   // "€65.95"
-        `${priceString}€`,                   // "65.95€"
-        `$${priceString}`,                   // "$65.95"
-        `${priceString} €`,                  // "65.95 €"
-        `€ ${priceString}`,                  // "€ 65.95"
-        priceString.replace(/\.(\d{2})$/, ',$1')  // "65,95"
-    ];
     
+    // ✅ MANTIENE tutte le variazioni per flessibilità
+    const variations = [
+        priceString,                          // "176.00"
+        priceString.replace('.', ','),        // "176,00" (formato italiano)
+        `€${priceString}`,                   // "€176.00"
+        `${priceString}€`,                   // "176.00€"
+        `$${priceString}`,                   // "$176.00"
+        `${priceString} €`,                  // "176.00 €"
+        `€ ${priceString}`,                  // "€ 176.00"
+        `${priceString.replace('.', ',')} €`, // "176,00 €"
+        `€${priceString.replace('.', ',')}`,   // "€176,00"
+        `${priceString.replace('.', ',')}€`,   // "176,00€"
+        `${priceString.replace('.', ',')}&nbsp;€`, // "176,00&nbsp;€"
+        `${priceString}&nbsp;€`,                   // "176.00&nbsp;€"
+        `€&nbsp;${priceString.replace('.', ',')}`, // "€&nbsp;176,00"
+        `${priceString.replace('.', ',')}\u00a0€`, // Unicode non-breaking space
+        `${priceString.replace('.', ',')}\xa0€`,   // Alternative encoding
+        // ✅ DOLLARI (per altri siti)
+        `$${priceString}`, `${priceString}$`, `${priceString} $`, `$ ${priceString}`,
+        // ✅ STERLINE
+        `£${priceString}`, `${priceString}£`, `${priceString} £`, `£ ${priceString}`,
+    ];
+
     console.log(`🔗 Cercando correlazione HTML per prezzo JSON: ${priceString}`);
     
-    for (const variation of variations) {
-        // Cerca elementi che contengono esattamente questa variazione di prezzo
-        const elements = $(`*:contains("${variation}")`).filter((i, el) => {
-            const $el = $(el);
-            const text = $el.text().trim();
+    // ✅ OTTIMIZZAZIONE 1: Set per evitare duplicati
+    const processedElements = new Set();
+    const foundElements = [];
+    
+    // ✅ OTTIMIZZAZIONE 2: Selettori prioritari in ordine di importanza
+    const searchSelectors = [
+        // Priorità 1: Selettori specifici per prezzi
+        'span[class*="price"]', 'div[class*="price"]', 
+        'span[class*="money"]', 'div[class*="money"]',
+        'span[class*="cost"]', 'div[class*="cost"]',
+        
+        // Priorità 2: Zalando specifici
+        '.voFjEy', 'span.voFjEy', 
+        
+        // Priorità 3: Altri specifici
+        '[data-testid*="price"]', '[class*="amount"]',
+        
+        // Priorità 4: Generici (limitati)
+        'span', 'div', 'p', 'strong'
+    ];
+    
+    let totalChecked = 0;
+    const MAX_ELEMENTS = 100; // ✅ LIMITA per evitare timeout
+    
+    for (const selector of searchSelectors) {
+        if (totalChecked >= MAX_ELEMENTS) break;
+        
+        const elements = $(selector);
+        const elementsArray = elements.toArray().slice(0, 20); // Max 20 per selector
+        
+        for (const element of elementsArray) {
+            if (totalChecked >= MAX_ELEMENTS) break;
             
-            // Deve contenere il prezzo ma non essere troppo lungo o rumoroso
-            const containsPrice = text.includes(variation);
-            const notTooLong = text.length < 200;
-            const notNoise = !this.isNoiseElement($el, text, $);
-            const hasReasonableText = text.replace(/[^\w€$£.,\s]/g, '').length > 2;
+            const $element = $(element);
             
-            return containsPrice && notTooLong && notNoise && hasReasonableText;
+            // ✅ OTTIMIZZAZIONE 3: Deduplicazione per posizione DOM
+            const elementKey = $element.get(0); // Riferimento DOM unico
+            if (processedElements.has(elementKey)) continue;
+            processedElements.add(elementKey);
+            
+            totalChecked++;
+            
+            const text = $element.text().trim();
+            const html = $element.html() || '';
+            
+            // ✅ OTTIMIZZAZIONE 4: Skip veloce per elementi ovviamente non prezzo
+            if (text.length > 100 || text.split(' ').length > 10) continue;
+            if (this.isNoiseElement($element, text, $)) continue;
+            
+            // ✅ CHECK variazioni
+            for (const variation of variations) {
+                if (text.includes(variation) || html.includes(variation)) {
+                    
+                    const cssSelector = this.generateCssSelector($element, $);
+                    
+                    // ✅ OTTIMIZZAZIONE 5: Skip se già trovato questo selector
+                    if (foundElements.some(f => f.cssSelector === cssSelector)) continue;
+                    
+                    const elementData = {
+                        element: $element,
+                        text: text,
+                        html: html,
+                        variation: variation,
+                        cssSelector: cssSelector,
+                        matchType: text.includes(variation) ? 'text' : 'html',
+                        score: this.calculateElementScore($element, text, variation, $)
+                    };
+                    
+                    foundElements.push(elementData);
+                    
+                    // ✅ OTTIMIZZAZIONE 6: Log solo per elementi con score alto
+                    if (elementData.score >= 5) {
+                        console.log(`✅ Elemento promettente (score ${elementData.score}): ${cssSelector} → "${text}"`);
+                    }
+                    
+                    // ✅ OTTIMIZZAZIONE 7: Early exit per match perfetti
+                    if (elementData.score >= 10) {
+                        console.log(`🎯 Match perfetto trovato, interrompo ricerca`);
+                        return $element;
+                    }
+                    
+                    break; // Trovato match per questo elemento, passa al prossimo
+                }
+            }
+        }
+    }
+
+    console.log(`🔍 Controllati ${totalChecked} elementi, trovati ${foundElements.length} candidati`);
+
+    if (foundElements.length > 0) {
+        // ✅ RANKING FINALE
+        foundElements.sort((a, b) => b.score - a.score);
+        
+        console.log(`🏆 Top 3 candidati:`);
+        foundElements.slice(0, 3).forEach((item, i) => {
+            console.log(`   ${i + 1}. Score ${item.score}: ${item.cssSelector} → "${item.text}"`);
         });
         
-        if (elements.length > 0) {
-            console.log(`✅ Trovati ${elements.length} elementi HTML per "${variation}"`);
-            
-            // Ordina per specificità (meno elementi figli = più specifico)
-            const sortedElements = elements.toArray().sort((a, b) => {
-                const aChildCount = $(a).find('*').length;
-                const bChildCount = $(b).find('*').length;
-                const aTextLength = $(a).text().trim().length;
-                const bTextLength = $(b).text().trim().length;
-                
-                // Preferisci elementi con meno figli e testo più corto
-                if (aChildCount !== bChildCount) {
-                    return aChildCount - bChildCount;
-                }
-                return aTextLength - bTextLength;
-            });
-            
-            const bestElement = $(sortedElements[0]);
-            console.log(`🎯 Elemento migliore: ${this.generateCssSelector(bestElement, $)}`);
-            return bestElement;
-        }
+        const bestElement = foundElements[0].element;
+        console.log(`🎯 Elemento migliore selezionato: ${foundElements[0].cssSelector}`);
+        return bestElement;
     }
     
     console.log(`❌ Nessuna correlazione HTML trovata per prezzo ${priceString}`);
     return null;
+}
+calculateElementScore($element, text, matchedVariation, $) {
+    let score = 1; // Base score
+    
+    const classes = ($element.attr('class') || '').toLowerCase();
+    const id = ($element.attr('id') || '').toLowerCase();
+    const tagName = $element.prop('tagName')?.toLowerCase() || '';
+    
+    // ✅ BONUS PER CLASSI RILEVANTI
+    if (classes.includes('price')) score += 4;
+    if (classes.includes('money')) score += 4;
+    if (classes.includes('cost')) score += 3;
+    if (classes.includes('amount')) score += 3;
+    if (classes.includes('current')) score += 2;
+    if (classes.includes('sale')) score += 2;
+    if (classes.includes('final')) score += 2;
+    
+    // ✅ BONUS SPECIFICI PER SITO (Zalando)
+    if (classes.includes('vofjey')) score += 3;
+    if (classes.includes('_4sa1ca')) score += 5; // Classe prezzo principale Zalando
+    if (classes.includes('lystz1')) score += 2;
+    if (classes.includes('govna')) score += 2;
+    
+    // ✅ BONUS PER POSIZIONE PROMINENTE
+    if (this.isElementProminent && this.isElementProminent($element, $)) score += 3;
+    
+    // ✅ BONUS PER TESTO CORTO (prezzi singoli)
+    const wordCount = text.split(/\s+/).length;
+    if (wordCount <= 2) score += 3;
+    if (wordCount <= 4) score += 1;
+    
+    // ✅ BONUS PER TAG APPROPRIATI
+    if (tagName === 'span') score += 1;
+    if (tagName === 'div') score += 0.5;
+    
+    // ✅ MALUS PER ELEMENTI PROBLEMATICI
+    const priceMatches = (text.match(/[\d.,]+\s*[€$£]/g) || []).length;
+    if (priceMatches > 1) score -= 3; // Probabilmente listing
+    
+    if (text.length > 50) score -= 2; // Troppo testo
+    
+    // Noise keywords
+    const noiseKeywords = ['shipping', 'delivery', 'tax', 'total', 'recommend', 'related'];
+    if (noiseKeywords.some(keyword => classes.includes(keyword) || text.toLowerCase().includes(keyword))) {
+        score -= 5;
+    }
+    
+    // ✅ BONUS PER TIPO DI MATCH
+    if (matchedVariation.includes('€') && text.includes('€')) score += 1;
+    if (matchedVariation.includes('$') && text.includes('$')) score += 1;
+    if (matchedVariation.includes('£') && text.includes('£')) score += 1;
+    
+    return Math.max(0, score); // Non può essere negativo
 }
 
 isNoiseElement($element, text, $) {
@@ -775,32 +940,66 @@ isNoiseElement($element, text, $) {
         return prominentKeywords.some(keyword => classes.includes(keyword));
     }
 
-    generateCssSelector($element, $) {
-        const tagName = $element.prop('tagName').toLowerCase();
-        const id = $element.attr('id');
-        const classes = $element.attr('class');
+generateCssSelector(element, $) {
+    try {
+        // ✅ Cache per evitare ricalcoli
+        if (element._cachedSelector) return element._cachedSelector;
         
-        if (id) {
-            return `#${id}`;
+        const tagName = element.prop('tagName')?.toLowerCase();
+        const id = element.attr('id');
+        const classes = element.attr('class');
+        
+        let selector;
+        
+        // Se ha un ID unico, usalo
+        if (id && $(`#${id}`).length === 1) {
+            selector = `${tagName}#${id}`;
+        } else if (classes) {
+            const classList = classes.split(' ').filter(cls => cls.trim() !== '');
+            
+            // ✅ Per Zalando: mantieni le classi importanti
+            if (classList.includes('voFjEy')) {
+                const importantClasses = classList.filter(cls => 
+                    cls === 'voFjEy' || 
+                    cls.startsWith('_') ||  // Classi Zalando tipo _4sa1cA
+                    cls.includes('price') || 
+                    cls.includes('money') ||
+                    cls.includes('cost')
+                ).slice(0, 2); // Max 2 classi per performance
+                
+                if (importantClasses.length > 0) {
+                    selector = `${tagName}.${importantClasses.join('.')}`;
+                } else {
+                    selector = `${tagName}.${classList[0]}`;
+                }
+            } else {
+                // Per altri siti: usa le prime 2 classi più significative
+                const significantClasses = classList.filter(cls => 
+                    cls.includes('price') || 
+                    cls.includes('money') || 
+                    cls.includes('cost') || 
+                    cls.includes('amount')
+                ).slice(0, 2);
+                
+                if (significantClasses.length > 0) {
+                    selector = `${tagName}.${significantClasses.join('.')}`;
+                } else {
+                    selector = `${tagName}.${classList.slice(0, 2).join('.')}`;
+                }
+            }
+        } else {
+            selector = tagName;
         }
         
-        if (classes) {
-            const classArray = classes.split(' ').filter(c => c.trim().length > 0);
-            const relevantClasses = classArray.filter(c => 
-                c.includes('price') || c.includes('money') || c.includes('current') || c.includes('sale')
-            );
-            
-            if (relevantClasses.length > 0) {
-                return `${tagName}.${relevantClasses.slice(0, 2).join('.')}`;
-            }
-            
-            if (classArray.length > 0) {
-                return `${tagName}.${classArray.slice(0, 2).join('.')}`;
-            }
-        }
+        // ✅ Cache il risultato
+        element._cachedSelector = selector;
+        return selector;
         
-        return tagName;
+    } catch (error) {
+        console.error(`❌ Errore generazione CSS selector:`, error);
+        return 'unknown';
     }
+}
 
     getParentClasses($element, $) {
         const parentClasses = [];

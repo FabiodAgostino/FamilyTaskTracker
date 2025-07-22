@@ -206,6 +206,7 @@ class ReminderService {
         }
     }
 
+    
     /**
      * Esegue un promemoria (chiamato dal Cloud Task)
      */
@@ -281,7 +282,8 @@ class ReminderService {
 
             const payload = JSON.stringify({
                 action: 'executeReminderEvent',
-                reminderId: reminderId
+                reminderId: reminderId,
+                domain:"Reminder"
             });
 
            const date = new Date(scheduledTime);

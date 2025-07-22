@@ -1287,8 +1287,345 @@ async updateItemWithChanges(itemId, currentData, changes, analysisData, newScrap
             };
         }
     }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+async debugCssSelectorMismatch(url, itemData) {
+    try {
+        console.log(`\n🔍 DEBUG CSS SELECTOR MISMATCH per: ${itemData.name}`);
+        console.log(`📎 URL: ${url}`);
+        console.log(`💾 Selector salvato: "${itemData.priceSelection.selectedCssSelector}"`);
+        console.log(`💰 Prezzo atteso: ${itemData.estimatedPrice}`);
+        
+        // Step 1: Scraping della pagina
+        const scraper = new WebScraper({
+            useRealHeaders: true,
+            enableDelays: false,
+            maxRetries: 1
+        });
+
+        const scrapingResult = await scraper.scrapeComplete(url, {
+            useNavigation: false,
+            fallbackToAggressive: true
+        });
+
+        if (!scrapingResult.success) {
+            console.log(`❌ Scraping fallito: ${scrapingResult.error}`);
+            return { success: false, error: scrapingResult.error };
+        }
+
+        // ✅ CORRETTO: Usa l'HTML RAW, non il testo estratto
+        const htmlContent = scrapingResult.html || scrapingResult.content.raw || scrapingResult.content?.html;
+        
+        if (!htmlContent) {
+            console.log(`❌ Nessun HTML grezzo disponibile`);
+            return { 
+                success: false, 
+                error: "Nessun HTML grezzo disponibile per il test CSS",
+                availableContent: Object.keys(scrapingResult.content || {})
+            };
+        }
+        
+        console.log(`📄 HTML ricevuto: ${htmlContent.length} caratteri`);
+        console.log(`🔍 HTML contiene tag span: ${htmlContent.includes('<span') ? 'SI' : 'NO'}`);
+        console.log(`🔍 HTML contiene 'current-price': ${htmlContent.includes('current-price') ? 'SI' : 'NO'}`);
+
+        // Step 2: Test diretto del CSS selector
+        const cheerio = require('cheerio');
+        const $ = cheerio.load(htmlContent);
+        
+        const savedSelector = itemData.priceSelection.selectedCssSelector;
+        const expectedPrice = itemData.estimatedPrice;
+        
+        // ✅ TEST DIRETTO del selector
+        console.log(`\n🧪 TEST DIRETTO SELECTOR: "${savedSelector}"`);
+        const selectorElements = $(savedSelector);
+        
+        let directMatch = {
+            found: selectorElements.length > 0,
+            count: selectorElements.length,
+            texts: [],
+            containsPrice: false,
+            foundPrice: null
+        };
+        
+        if (selectorElements.length > 0) {
+            console.log(`✅ Selector trova ${selectorElements.length} elementi!`);
+            
+            selectorElements.each((i, element) => {
+                const text = $(element).text().trim();
+                directMatch.texts.push(text);
+                console.log(`   Elemento ${i + 1}: "${text}"`);
+                
+                // Cerca prezzi nel testo - pattern migliorato
+                const pricePatterns = [
+                    /€\s*(\d+[.,]\d{2})/g,
+                    /(\d+[.,]\d{2})\s*€/g,
+                    /(\d+[.,]\d{2})/g
+                ];
+                
+                pricePatterns.forEach(pattern => {
+                    let match;
+                    while ((match = pattern.exec(text)) !== null) {
+                        const numericValue = parseFloat(match[1].replace(',', '.'));
+                        console.log(`     Prezzo trovato: ${numericValue}`);
+                        
+                        if (Math.abs(numericValue - expectedPrice) < 0.01) {
+                            directMatch.containsPrice = true;
+                            directMatch.foundPrice = numericValue;
+                            console.log(`     🎯 MATCH! Prezzo atteso trovato: ${numericValue}`);
+                        }
+                    }
+                });
+            });
+        } else {
+            console.log(`❌ Selector non trova elementi`);
+        }
+        
+        console.log(`   Elementi trovati: ${directMatch.count}`);
+        console.log(`   Testi: ${JSON.stringify(directMatch.texts)}`);
+        console.log(`   Contiene prezzo atteso: ${directMatch.containsPrice}`);
+        
+        // ✅ TEST ANCHE span.money (il selector che funziona nella pipeline)
+        console.log(`\n🔍 TEST SELECTOR ALTERNATIVO: "span.money"`);
+        const moneyElements = $('span.money');
+        
+        let moneyMatch = {
+            found: moneyElements.length > 0,
+            count: moneyElements.length,
+            containsPrice: false,
+            foundPrice: null
+        };
+        
+        if (moneyElements.length > 0) {
+            console.log(`✅ span.money trova ${moneyElements.length} elementi!`);
+            
+            moneyElements.each((i, element) => {
+                const text = $(element).text().trim();
+                console.log(`   span.money ${i + 1}: "${text}"`);
+                
+                const pricePatterns = [
+                    /€\s*(\d+[.,]\d{2})/g,
+                    /(\d+[.,]\d{2})\s*€/g,
+                    /(\d+[.,]\d{2})/g
+                ];
+                
+                pricePatterns.forEach(pattern => {
+                    let match;
+                    while ((match = pattern.exec(text)) !== null) {
+                        const numericValue = parseFloat(match[1].replace(',', '.'));
+                        console.log(`     Prezzo in span.money: ${numericValue}`);
+                        
+                        if (Math.abs(numericValue - expectedPrice) < 0.01) {
+                            moneyMatch.containsPrice = true;
+                            moneyMatch.foundPrice = numericValue;
+                            console.log(`     🎯 MATCH in span.money! Prezzo atteso: ${numericValue}`);
+                        }
+                    }
+                });
+            });
+        }
+
+        // ✅ TEST GERARCHIA: Il selector salvato contiene span.money?
+        console.log(`\n🔍 TEST GERARCHIA: "${savedSelector}" contiene "span.money"?`);
+        const hierarchyTest = $(savedSelector).find('span.money');
+        
+        let hierarchyMatch = {
+            found: hierarchyTest.length > 0,
+            count: hierarchyTest.length,
+            containsPrice: false
+        };
+        
+        if (hierarchyTest.length > 0) {
+            console.log(`✅ Trovati ${hierarchyTest.length} span.money dentro ${savedSelector}!`);
+            
+            hierarchyTest.each((i, element) => {
+                const text = $(element).text().trim();
+                console.log(`   Hierarchy ${i + 1}: "${text}"`);
+                
+                const numericValue = parseFloat(text.replace(/[€\s,]/g, '').replace(',', '.'));
+                if (!isNaN(numericValue) && Math.abs(numericValue - expectedPrice) < 0.01) {
+                    hierarchyMatch.containsPrice = true;
+                    console.log(`     🎯 MATCH in hierarchy! Prezzo: ${numericValue}`);
+                }
+            });
+        } else {
+            console.log(`❌ Nessun span.money dentro ${savedSelector}`);
+        }
+        
+        // ✅ RISULTATO FINALE
+        const result = {
+            success: true,
+            savedSelector: savedSelector,
+            exactMatch: directMatch.containsPrice,
+            detectedPrices: directMatch.count + moneyMatch.count,
+            htmlLength: htmlContent.length,
+            analysis: {
+                hasExactMatch: directMatch.containsPrice,
+                hasSimilarSelectors: moneyMatch.containsPrice || hierarchyMatch.containsPrice,
+                hasNumericMatch: directMatch.containsPrice || moneyMatch.containsPrice || hierarchyMatch.containsPrice,
+                elementExists: directMatch.found,
+                alternativeMatch: {
+                    spanMoney: moneyMatch,
+                    hierarchy: hierarchyMatch
+                },
+                directSelectorTest: directMatch
+            }
+        };
+        
+        console.log(`\n✅ ANALISI COMPLETATA:`);
+        console.log(`   Exact Match: ${result.exactMatch}`);
+        console.log(`   Element Exists: ${result.analysis.elementExists}`);
+        console.log(`   Alternative Match (span.money): ${moneyMatch.containsPrice}`);
+        console.log(`   Hierarchy Match: ${hierarchyMatch.containsPrice}`);
+        
+        return result;
+        
+    } catch (error) {
+        console.error(`❌ Errore debug CSS selector:`, error);
+        return { 
+            success: false, 
+            error: error.message,
+            exactMatch: false,
+            detectedPrices: 0,
+            analysis: {
+                hasExactMatch: false,
+                hasSimilarSelectors: false,
+                hasNumericMatch: false,
+                elementExists: false
+            }
+        };
+    }
+}
+
+
+
+/**
+ * 🔍 Trova selettori simili (parent/child relationships)
+ */
+findSimilarSelectors(detectedPrices, targetSelector) {
+    if (!detectedPrices || !targetSelector) return [];
+    
+    const similar = [];
+    
+    detectedPrices.forEach(price => {
+        let similarity = 0;
+        
+        // Check se è un parent o child del target
+        if (price.cssSelector.includes(targetSelector) || targetSelector.includes(price.cssSelector)) {
+            similarity += 0.8;
+        }
+        
+        // Check classi condivise
+        const targetClasses = targetSelector.match(/\.[a-zA-Z0-9_-]+/g) || [];
+        const priceClasses = price.cssSelector.match(/\.[a-zA-Z0-9_-]+/g) || [];
+        
+        const sharedClasses = targetClasses.filter(cls => priceClasses.includes(cls));
+        if (sharedClasses.length > 0) {
+            similarity += (sharedClasses.length / Math.max(targetClasses.length, priceClasses.length)) * 0.6;
+        }
+        
+        // Check tag condivisi
+        const targetTag = targetSelector.match(/^[a-zA-Z]+/)?.[0];
+        const priceTag = price.cssSelector.match(/^[a-zA-Z]+/)?.[0];
+        
+        if (targetTag && priceTag && targetTag === priceTag) {
+            similarity += 0.3;
+        }
+        
+        if (similarity > 0.3) { // Soglia minima
+            similar.push({
+                ...price,
+                similarity: Math.round(similarity * 100) / 100
+            });
+        }
+    });
+    
+    return similar.sort((a, b) => b.similarity - a.similarity);
+}
+
+/**
+ * 🧪 Metodo helper per estrarre prezzi da testo (se non esiste già)
+ */
+extractPricesFromText(text) {
+    const prices = [];
+    const patterns = [
+        /€\s*(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})?)/g,
+        /(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})?)\s*€/g,
+        /\$\s*(\d{1,4}(?:[.,]\d{3})*(?:[.,]\d{1,2})?)/g,
+        /(\d{1,4}(?:[.,]\d{3})*(?:[.,]\d{1,2})?)\s*\$/g
+    ];
+    
+    patterns.forEach(pattern => {
+        let match;
+        while ((match = pattern.exec(text)) !== null) {
+            const value = match[1].replace(',', '.');
+            const numericValue = parseFloat(value);
+            
+            if (numericValue > 0 && numericValue < 10000) {
+                prices.push({
+                    value: match[0],
+                    numericValue: numericValue,
+                    source: 'text_extraction'
+                });
+            }
+        }
+    });
+    
+    return prices;
+}
+
+
 }
 
 // Export singleton instance
 const priceMonitorService = new PriceMonitorService();
 module.exports = { priceMonitorService };
+
+
+/**
+ * 🔧 Helper per ottenere il CSS selector di un elemento
+ */
+function getElementSelector(element) {
+    const tagName = element.prop('tagName')?.toLowerCase();
+    const id = element.attr('id');
+    const classes = element.attr('class');
+    
+    if (id) return `${tagName}#${id}`;
+    if (classes) return `${tagName}.${classes.split(' ').join('.')}`;
+    return tagName;
+}
