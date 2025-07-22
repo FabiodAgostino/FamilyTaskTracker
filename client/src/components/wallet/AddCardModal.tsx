@@ -11,7 +11,6 @@ import {
   Plus,
   Palette,
   Zap,
-  ZapOff,
   AlertCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -74,21 +73,38 @@ const useZXingScanner = ({
   const scanCount = useRef(0);
   const lastScanTime = useRef(0);
 
-  // Configurazione ZXing ottimizzata per loyalty cards
+  // Configurazione ZXing ULTRA-FLUIDA con TUTTI i formati barcode
   const getOptimizedHints = useCallback(() => {
     const hints = new Map();
     
-    // Formati specifici per carte fedeltà (Code 39 è il più comune)
+    // 🎯 TUTTI I FORMATI BARCODE SUPPORTATI da ZXing v0.21.3
     hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-      BarcodeFormat.CODE_39,
-      BarcodeFormat.CODE_128,
-      BarcodeFormat.EAN_13,
-      BarcodeFormat.EAN_8
+      // === 1D BARCODES ===
+      BarcodeFormat.CODE_39,       // Carte fedeltà più comune
+      BarcodeFormat.CODE_128,      // Spedizioni, logistica  
+      BarcodeFormat.CODE_93,       // Postale canadese
+      BarcodeFormat.EAN_13,        // Prodotti retail (GTIN-13)
+      BarcodeFormat.EAN_8,         // Prodotti piccoli (GTIN-8)
+      BarcodeFormat.UPC_A,         // Prodotti USA/Canada (GTIN-12)
+      BarcodeFormat.UPC_E,         // UPC compresso
+      BarcodeFormat.ITF,           // Interleaved 2 of 5 (logistica)
+      BarcodeFormat.CODABAR,       // Biblioteche, banche sangue
+      BarcodeFormat.RSS_14,        // GS1 DataBar
+      BarcodeFormat.RSS_EXPANDED,  // GS1 DataBar Expanded
+      
+      // === 2D BARCODES ===
+      BarcodeFormat.QR_CODE,       // QR Code ubiquitario
+      BarcodeFormat.DATA_MATRIX,   // Industria, elettronica
+      BarcodeFormat.PDF_417,       // Documenti, trasporti
+      BarcodeFormat.AZTEC,         // Biglietti trasporti
+      BarcodeFormat.MAXICODE       // UPS, logistica
     ]);
     
-    // Performance ottimizzate per mobile
-    hints.set(DecodeHintType.TRY_HARDER, false); // Disabilitato per performance
-    hints.set(DecodeHintType.PURE_BARCODE, false); // Per immagini reali con rumore
+    // 🚀 CONFIGURAZIONE ULTRA-PERFORMANCE E FLUIDITÀ
+    hints.set(DecodeHintType.TRY_HARDER, true);           // Abilitato per accuratezza massima
+    hints.set(DecodeHintType.PURE_BARCODE, false);        // Per immagini reali
+    hints.set(DecodeHintType.ASSUME_GS1, false);          // Non assumere GS1 per default
+    hints.set(DecodeHintType.RETURN_CODABAR_START_END, true); // Info complete Codabar
     
     return hints;
   }, []);
@@ -102,8 +118,8 @@ const useZXingScanner = ({
     const hints = getOptimizedHints();
     const reader = new BrowserMultiFormatReader(hints);
     
-    // Configurazione timing ottimizzata (equivalente a 1 FPS di Quagga)
-    reader.timeBetweenDecodingAttempts = 1000; // 1 secondo tra i tentativi
+    // Configurazione timing ULTRA-FLUIDA (da 1 FPS a 5 FPS!)
+    reader.timeBetweenDecodingAttempts = 200; // Da 1000ms a 200ms = 5 scansioni/secondo!
     
     readerRef.current = reader;
     setIsInitialized(true);
@@ -137,14 +153,17 @@ const useZXingScanner = ({
       try {
         console.log('🎯 Avvio scanning ZXing...');
         
-        // Configurazione constraints per performance
+        // Configurazione constraints ULTRA-FLUIDA
         const constraints = {
           video: {
             deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined,
             facingMode: selectedDeviceId ? undefined : 'environment',
-            width: { ideal: 640 },    // Risoluzione ottimizzata
-            height: { ideal: 480 },
-            frameRate: { ideal: 15, max: 30 } // Frame rate limitato
+            width: { ideal: 1280, min: 640 },    // Risoluzione più alta per precisione
+            height: { ideal: 720, min: 480 },
+            frameRate: { ideal: 30, min: 15 },   // 30 FPS per fluidità massima
+            focusMode: 'continuous',             // Autofocus continuo
+            exposureMode: 'continuous',          // Esposizione automatica
+            whiteBalanceMode: 'continuous'       // Bilanciamento automatico
           }
         };
 
@@ -157,8 +176,8 @@ const useZXingScanner = ({
             if (result) {
               const now = Date.now();
               
-              // Debounce per evitare scansioni multiple
-              if (now - lastScanTime.current < 2000) {
+              // Debounce ULTRA-RIDOTTO per fluidità (da 2s a 0.5s)
+              if (now - lastScanTime.current < 500) {
                 console.log('🔄 Scansione troppo ravvicinata, ignorata');
                 return;
               }
@@ -340,8 +359,9 @@ const BarcodeScanner = ({
       <div className="w-full space-y-3">
         <div className="w-full bg-gray-200 rounded-lg aspect-video flex items-center justify-center">
           <div className="text-center">
-            <Camera className="w-12 h-12 text-gray-400 mx-auto mb-2 animate-pulse" />
-            <p className="text-sm text-gray-500">Inizializzazione scanner ZXing...</p>
+            <Camera className="w-12 h-12 text-gray-400 mx-auto mb-2 animate-bounce" />
+            <p className="text-sm text-gray-500">🚀 Caricamento Ultra-Scanner ZXing...</p>
+            <p className="text-xs text-gray-400 mt-1">HD • 5fps • Multi-format</p>
           </div>
         </div>
       </div>
@@ -376,43 +396,54 @@ const BarcodeScanner = ({
 
   return (
     <div className="w-full space-y-3">
-      {/* Area scanner compatta */}
-      <div className="relative w-full bg-black rounded-lg overflow-hidden">
+      {/* Area scanner ULTRA-FLUIDA e più ampia */}
+      <div className="relative w-full bg-black rounded-lg overflow-hidden shadow-lg">
         <video 
           ref={videoRef}
-          className="w-full object-cover"
+          className="w-full object-cover transition-all duration-300"
           style={{ 
-            height: '250px',
+            height: '320px',  // Aumentata da 250px a 320px
             maxWidth: '100%'
           }}
           playsInline
           muted
+          autoPlay
         />
         
-        {/* Overlay di scanning */}
+        {/* Overlay di scanning ULTRA-FLUIDO */}
         <div className="absolute inset-0 pointer-events-none">
-          {/* Linea di scanning animata quando attivo */}
+          {/* Linea di scanning animata più fluida */}
           {isScanning && (
-            <div className="absolute inset-x-4 top-1/2 transform -translate-y-1/2 h-0.5 bg-red-500 shadow-lg animate-pulse" />
+            <>
+              <div className="absolute inset-x-4 top-1/2 transform -translate-y-1/2 h-0.5 bg-red-500 shadow-lg animate-pulse" />
+              <div className="absolute inset-x-4 top-1/2 transform -translate-y-1/2 h-px bg-red-300 animate-ping" />
+            </>
           )}
           
-          {/* Cornice di targeting */}
-          <div className="absolute inset-4 border-2 border-white/70 rounded-lg">
-            <div className="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-red-500 rounded-tl-lg" />
-            <div className="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-red-500 rounded-tr-lg" />
-            <div className="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-red-500 rounded-bl-lg" />
-            <div className="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-red-500 rounded-br-lg" />
+          {/* Cornice di targeting migliorata */}
+          <div className="absolute inset-4 border-2 border-white/80 rounded-lg shadow-lg">
+            <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-green-400 rounded-tl-lg animate-pulse" />
+            <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-green-400 rounded-tr-lg animate-pulse" />
+            <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-green-400 rounded-bl-lg animate-pulse" />
+            <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-green-400 rounded-br-lg animate-pulse" />
           </div>
+          
+          {/* Indicatori di scanning attivo */}
+          {isScanning && (
+            <div className="absolute top-2 right-2 w-3 h-3 bg-green-500 rounded-full animate-pulse shadow-lg" />
+          )}
         </div>
         
-        {/* Overlay con stato */}
-        <div className="absolute top-2 left-2 right-2 bg-black/70 text-white text-xs p-2 rounded text-center">
+        {/* Overlay con stato ULTRA-PERFORMANCE */}
+        <div className="absolute top-2 left-2 right-2 bg-black/80 text-white text-xs p-2 rounded text-center backdrop-blur-sm">
           {isScanning ? (
-            <span className="text-green-300">🟢 ZXing Scanner attivo - Inquadra il codice a barre</span>
+            <span className="text-green-300 flex items-center justify-center gap-1">
+              🚀 ULTRA-FLUIDO: 5 scansioni/sec - TUTTI i formati barcode
+            </span>
           ) : isInitialized ? (
-            <span className="text-yellow-300">🟡 Inizializzazione camera...</span>
+            <span className="text-yellow-300">🟡 Inizializzazione camera HD...</span>
           ) : (
-            <span className="text-blue-300">🔵 Caricamento ZXing...</span>
+            <span className="text-blue-300">🔵 Caricamento ZXing Ultra...</span>
           )}
         </div>
       </div>
@@ -431,24 +462,40 @@ const BarcodeScanner = ({
           </Button>
         )}
         <div className="text-xs text-gray-500 flex items-center gap-2">
-          <Zap size={14} className="text-blue-500" />
-          {cameras.length > 0 ? `ZXing: ${cameras[currentCameraIndex]?.label}` : 'Nessuna camera'}
+          <Zap size={14} className="text-green-500" />
+          {cameras.length > 0 ? (
+            <span className="font-medium">
+              Ultra-ZXing: {cameras[currentCameraIndex]?.label} | 5fps | HD
+            </span>
+          ) : (
+            'Nessuna camera'
+          )}
         </div>
       </div>
 
-      {/* Suggerimenti ottimizzazione ZXing */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-        <h4 className="text-sm font-medium text-blue-800 mb-2 flex items-center gap-2">
-          <Zap size={16} className="text-blue-600" />
-          ZXing Performance Mode v0.21.3:
+      {/* Pannello informativo ULTRA-PERFORMANCE */}
+      <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-3">
+        <h4 className="text-sm font-bold text-green-800 mb-2 flex items-center gap-2">
+          <Zap size={16} className="text-green-600" />
+          🚀 ZXing ULTRA-FLUIDO v0.21.3:
         </h4>
-        <ul className="space-y-1 text-xs text-blue-700">
-          <li>• <strong>Multi-format</strong> - Code 39, Code 128, EAN-13/8</li>
-          <li>• <strong>1 scan/sec</strong> - Ottimizzato per mobile</li>
-          <li>• <strong>Risoluzione 640x480</strong> - Performance superiori</li>
-          <li>• <strong>Tieni fermo</strong> il telefono per 2-3 secondi</li>
-          <li>• <strong>Anti-duplicate</strong> - Previene scansioni multiple</li>
-        </ul>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-green-700">
+          <div className="space-y-1">
+            <div>• <strong>5 FPS</strong> - Ultra-reattivo (0.2s intervallo)</div>
+            <div>• <strong>HD 1280x720</strong> - Qualità massima</div>
+            <div>• <strong>30 FPS camera</strong> - Fluidità perfetta</div>
+            <div>• <strong>0.5s debounce</strong> - Risposta immediata</div>
+          </div>
+          <div className="space-y-1">
+            <div>• <strong>16+ formati</strong> - Tutti i barcode supportati</div>
+            <div>• <strong>1D & 2D</strong> - Code39, QR, DataMatrix, PDF417</div>
+            <div>• <strong>TRY_HARDER</strong> - Accuratezza massima</div>
+            <div>• <strong>AutoFocus</strong> - Messa a fuoco continua</div>
+          </div>
+        </div>
+        <div className="mt-2 text-xs text-gray-600 bg-white/50 rounded p-2">
+          💡 <strong>Pro tip:</strong> Funziona con carte fedeltà, prodotti retail, QR code, documenti e qualsiasi barcode!
+        </div>
       </div>
     </div>
   );
