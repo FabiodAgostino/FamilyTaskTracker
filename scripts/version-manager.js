@@ -19,7 +19,9 @@ const colors = {
 };
 
 function log(color, message) {
-  }
+  const prefix = colors[color] || '';
+  console.log(`${prefix}${message}${colors.reset}`);
+}
 
 /**
  * Struttura del file version.json
@@ -35,18 +37,18 @@ const DEFAULT_VERSION = {
   patch: 0,
   build: 0,
   lastUpdated: new Date().toISOString(),
-  environment: 'development'
+  environment: 'development',
+  deploymentId: null
 };
+
 function setSpecificVersion(versionString, environment = 'production') {
   const versionRegex = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/;
   const match = versionString.match(versionRegex);
-  
   if (!match) {
     throw new Error('Formato versione non valido. Usa: major.minor.patch.build (es: 5.1.4.0)');
   }
-  
-  const [, major, minor, patch, build] = match.map(Number);
-  
+  const [, maj, min, pat, bu] = match;
+  const major = Number(maj), minor = Number(min), patch = Number(pat), build = Number(bu);
   return {
     major,
     minor,
@@ -57,107 +59,7 @@ function setSpecificVersion(versionString, environment = 'production') {
     deploymentId: generateDeploymentId()
   };
 }
-/**
- * Genera build number basato su timestamp (più unico)
- */
-function generateBuildNumber() {
-  // Usa gli ultimi 6 digit del timestamp per build number
-  // Questo garantisce che ogni build sia sempre incrementale
-  const timestamp = Date.now();
-  const buildNumber = parseInt(timestamp.toString().slice(-6));
-  return buildNumber;
-}
 
-/**
- * Genera versione basata su data corrente
- */
-function generateTimestampVersion(type = 'build', environment = 'production') {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1; // 0-based
-  const day = now.getDate();
-  
-  // Leggi versione corrente per determinare patch se necessario
-  const currentVersion = readVersion();
-  
-  let newVersion;
-  
-  switch (type) {
-    case 'major':
-      newVersion = {
-        major: year - 2020, // 2025 = v5.x.x
-        minor: 0,
-        patch: 0,
-        build: generateBuildNumber(),
-        lastUpdated: now.toISOString(),
-        environment: environment,
-        deploymentId: generateDeploymentId()
-      };
-      break;
-      
-    case 'minor':
-      newVersion = {
-        major: currentVersion.major,
-        minor: month, // 1-12 
-        patch: 0,
-        build: generateBuildNumber(),
-        lastUpdated: now.toISOString(),
-        environment: environment,
-        deploymentId: generateDeploymentId()
-      };
-      break;
-      
-    case 'patch':
-      newVersion = {
-        major: currentVersion.major,
-        minor: currentVersion.minor,
-        patch: day, // 1-31
-        build: generateBuildNumber(),
-        lastUpdated: now.toISOString(),
-        environment: environment,
-        deploymentId: generateDeploymentId()
-      };
-      break;
-
-    case 'set': {
-      const versionString = process.argv[3];
-      if (!versionString) {
-        log('red', '❌ Specifica la versione (es: 5.1.4.0)');
-        process.exit(1);
-      }
-
-      try {
-        const newVersion = setSpecificVersion(versionString, environment);
-        writeVersion(newVersion);
-        log('green', `🎯 Versione impostata: ${formatVersion(newVersion)}`);
-      } catch (error) {
-        log('red', `❌ ${error.message}`);
-        process.exit(1);
-      }
-      break;
-      }
-      
-    case 'build':
-    default:
-      // Sistema completamente automatico: ogni deploy genera build number unico
-      newVersion = {
-        major: currentVersion.major,
-        minor: currentVersion.minor, 
-        patch: currentVersion.patch,
-        build: generateBuildNumber(), // Sempre nuovo
-        lastUpdated: now.toISOString(),
-        environment: environment,
-        deploymentId: generateDeploymentId()
-      };
-      break;
-  }
-  
-  return newVersion;
-}
-
-/**
- * Legge la versione corrente dal file
- */
 function readVersion() {
   try {
     if (fs.existsSync(VERSION_FILE)) {
@@ -167,14 +69,10 @@ function readVersion() {
   } catch (error) {
     log('yellow', `⚠️ Errore lettura version.json: ${error.message}`);
   }
-  
   log('cyan', '📄 Creazione nuovo file version.json...');
   return DEFAULT_VERSION;
 }
 
-/**
- * Scrive la versione nel file
- */
 function writeVersion(versionData) {
   try {
     fs.writeFileSync(VERSION_FILE, JSON.stringify(versionData, null, 2));
@@ -185,142 +83,97 @@ function writeVersion(versionData) {
   }
 }
 
-/**
- * Incrementa la versione in base al tipo (LEGACY)
- */
 function incrementVersion(current, type = 'build') {
-  const newVersion = { ...current };
-  newVersion.lastUpdated = new Date().toISOString();
-  
+  const newVersion = { ...current, lastUpdated: new Date().toISOString(), deploymentId: generateDeploymentId() };
   switch (type) {
     case 'major':
-      newVersion.major += 1;
-      newVersion.minor = 0;
-      newVersion.patch = 0;
-      newVersion.build = 0;
+      newVersion.major += 1; newVersion.minor = 0; newVersion.patch = 0; newVersion.build = 0;
       break;
     case 'minor':
-      newVersion.minor += 1;
-      newVersion.patch = 0;
-      newVersion.build = 0;
+      newVersion.minor += 1; newVersion.patch = 0; newVersion.build = 0;
       break;
     case 'patch':
-      newVersion.patch += 1;
-      newVersion.build = 0;
+      newVersion.patch += 1; newVersion.build = 0;
       break;
     case 'build':
     default:
       newVersion.build += 1;
       break;
   }
-  
   return newVersion;
 }
 
-/**
- * Formatta la versione come stringa
- */
-function formatVersion(versionData) {
-  return `v${versionData.major}.${versionData.minor}.${versionData.patch}.${versionData.build}`;
+function formatVersion(v) {
+  return `${v.major}.${v.minor}.${v.patch}.${v.build}`;
 }
 
-/**
- * Genera il deployment ID unico
- */
 function generateDeploymentId() {
-  const timestamp = Date.now();
-  const random = Math.random().toString(36).substr(2, 5);
-  return `${timestamp}-${random}`;
+  const ts = Date.now();
+  const rand = Math.random().toString(36).substr(2, 5);
+  return `${ts}-${rand}`;
 }
 
-/**
- * Comando principale
- */
 function main() {
   const command = process.argv[2] || 'increment';
-  const type = process.argv[3] || 'build';
+  const typeOrVersion = process.argv[3];
   const environment = process.argv[4] || 'production';
-  
-  log('cyan', `🔢 Version Manager - Comando: ${command}`);
-  
+
   switch (command) {
+    case 'set': {
+      if (!typeOrVersion) {
+        log('red', '❌ Specifica la versione dopo `set` (es: set 2.0.0.0)');
+        process.exit(1);
+      }
+      log('cyan', `🔢 Imposto versione specifica: ${typeOrVersion}`);
+      let newVer;
+      try {
+        newVer = setSpecificVersion(typeOrVersion, environment);
+        writeVersion(newVer);
+      } catch (err) {
+        log('red', `❌ ${err.message}`);
+        process.exit(1);
+      }
+      // Output per CI/CD
+      console.log(`version=${formatVersion(newVer)}`);
+      console.log(`build_number=${newVer.build}`);
+      console.log(`deployment_id=${newVer.deploymentId}`);
+      process.exit(0);
+    }
+
     case 'increment': {
-      log('cyan', '🔢 Incremento versione per deploy...');
-      
-      const currentVersion = readVersion();
-      log('blue', `📋 Versione corrente: ${formatVersion(currentVersion)}`);
-      
-      // Sistema sequenziale tradizionale
-      const newVersion = incrementVersion(currentVersion, type);
-      newVersion.environment = environment;
-      newVersion.deploymentId = generateDeploymentId();
-      
-      // Scrivi sempre il file aggiornato
-      writeVersion(newVersion);
-      
-      // Output per il CI/CD
-                        
-      log('green', `🎉 Nuova versione: ${formatVersion(newVersion)}`);
-      log('cyan', `🏗️ Build #${newVersion.build} | Environment: ${environment}`);
-      break;
+      const incrementType = typeOrVersion || 'build';
+      log('cyan', `🔢 Incremento versione: ${incrementType}`);
+      const current = readVersion();
+      log('blue', `📋 Versione corrente: v${formatVersion(current)}`);
+      const newVer = incrementVersion(current, incrementType);
+      newVer.environment = environment;
+      writeVersion(newVer);
+      // Output per CI/CD
+      console.log(`version=${formatVersion(newVer)}`);
+      console.log(`build_number=${newVer.build}`);
+      console.log(`deployment_id=${newVer.deploymentId}`);
+      process.exit(0);
     }
-    
-    case 'increment-legacy': {
-      // Sistema legacy per backward compatibility
-      log('cyan', '🔢 Incremento versione legacy per deploy...');
-      
-      const currentVersion = readVersion();
-      log('blue', `📋 Versione corrente: ${formatVersion(currentVersion)}`);
-      
-      const newVersion = incrementVersion(currentVersion, type);
-      newVersion.environment = environment;
-      newVersion.deploymentId = generateDeploymentId();
-      
-      writeVersion(newVersion);
-      
-      // Output per il CI/CD
-                        
-      log('green', `🎉 Nuova versione: ${formatVersion(newVersion)}`);
-      log('cyan', `🏗️ Build #${newVersion.build} | Environment: ${environment}`);
-      break;
-    }
-    
-    case 'current': {
-      const currentVersion = readVersion();
-            break;
-    }
-    
-    case 'info': {
-      const currentVersion = readVersion();
-      log('cyan', '📊 Informazioni Versione:');
-            break;
-    }
-    
+
     case 'reset': {
-      log('yellow', '🔄 Reset versione...');
-      const resetVersion = { 
-        ...DEFAULT_VERSION, 
-        environment: environment 
-      };
-      writeVersion(resetVersion);
-      break;
+      log('yellow', '🔄 Reset versione ai valori di default');
+      const resetVer = { ...DEFAULT_VERSION, environment, deploymentId: generateDeploymentId() };
+      writeVersion(resetVer);
+      process.exit(0);
     }
-    
+
     default:
-      log('red', '❌ Comando non riconosciuto!');
+      log('red', `❌ Comando non riconosciuto: ${command}`);
       log('cyan', 'Comandi disponibili:');
-      log('cyan', '  increment [build|patch|minor|major] [environment] - Incrementa versione (timestamp-based)');
-      log('cyan', '  increment-legacy [build|patch|minor|major] [environment] - Incrementa versione (legacy)');
-      log('cyan', '  current - Mostra versione corrente');
-      log('cyan', '  info - Mostra info dettagliate');
-      log('cyan', '  reset [environment] - Reset versione');
+      log('cyan', '  set <version> [environment]   - Imposta versione specifica');
+      log('cyan', '  increment [build|patch|minor|major] [environment] - Incrementa versione');
+      log('cyan', '  reset [environment]           - Reset versione ai default');
       process.exit(1);
   }
 }
 
-// Esegui se chiamato direttamente
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main();
 }
 
-export { readVersion, writeVersion, incrementVersion, formatVersion,setSpecificVersion  };
+export { readVersion, writeVersion, incrementVersion, formatVersion, setSpecificVersion };
