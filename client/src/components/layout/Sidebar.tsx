@@ -10,6 +10,7 @@ import { ShoppingItem } from '@/lib/models/shopping-item';
 import { FaShoppingBag,FaCalendar  } from "react-icons/fa";
 import { ShoppingFood } from '@/lib/models/food';
 import { FaCartShopping, FaNoteSticky  } from "react-icons/fa6";
+import { CiCreditCard1 } from "react-icons/ci";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -105,7 +106,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     {
       name: 'Digital Wallet',
       path: '/digitalwallet',
-      icon: FaCalendar ,
+      icon: CiCreditCard1  ,
       count: stats.calendar,
       color: 'bg-sunset'
     }

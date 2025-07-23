@@ -39,7 +39,7 @@ export function MobileHeader() {
   const AppIcon = appConfig.icon;
 
   return (
-    <header className="sm:hidden flex items-center justify-between h-12 px-4 bg-background border-b border-border shadow-md z-10">
+    <header className="sm:hidden flex items-center justify-between h-14 px-4 bg-background border-b border-border shadow-md z-10">
       {/* Sezione Sinistra: Logo e Titolo */}
       <div className="flex items-center gap-3">
         <div
