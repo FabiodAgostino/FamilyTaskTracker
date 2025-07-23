@@ -449,7 +449,7 @@ export function ShoppingImageCard({
                     <Button
                       variant="secondary"
                       size="sm"
-                      className="h-8 w-8 p-0 bg-white/90 hover:bg-white shadow-md"
+                      className="h-8 w-8 p-0 bg-white/90 hover:bg-white shadow-md z-20"
                       onClick={(e) => e.stopPropagation()}
                       asChild
                     >
@@ -476,7 +476,7 @@ export function ShoppingImageCard({
                           e.stopPropagation();
                           onEdit(item);
                         }}
-                        className="h-8 w-8 p-0 bg-white/90 hover:bg-white shadow-md"
+                        className="h-8 w-8 p-0 bg-white/90 hover:bg-white shadow-md z-20"
                       >
                        <Edit className="h-4 w-4 text-gray-500 dark:text-black-300" />
                       </Button>
