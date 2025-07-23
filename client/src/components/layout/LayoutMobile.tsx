@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
-import { MobileFooter } from './MobileFooter';
 import { MobileHeader } from './MobileHeader';
+import MobileFooter from './MobileFooter';
 
 interface LayoutProps {
   children: React.ReactNode;
