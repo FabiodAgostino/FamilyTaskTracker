@@ -1,5 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useLocation } from "wouter"; // <-- IMPORTANTE: Integrazione con Wouter
+// *** FIX 2: Passaggio a useHashLocation per compatibilità con l'hash routing ***
+// Questo è il fix più probabile per il problema dell'icona "Shopping" che si attiva in modo errato.
+import { useHashLocation as useLocation } from "wouter/use-hash-location";
+// La riga seguente è stata commentata perché probabilmente non adatta alla configurazione del tuo router.
+// import { useLocation } from "wouter"; 
 import {
   LogOut,
   User,
@@ -141,9 +145,7 @@ const DropdownMenuSeparator: React.FC = () => <div className="border-t dark:bord
 // COMPONENTE MOBILE FOOTER (Logica principale)
 // ============================================================================
 
-// Rimosse le props 'currentPage' e 'setCurrentPage'
 const MobileFooter: React.FC = () => {
-  // Usa l'hook di Wouter per ottenere la posizione e la funzione di navigazione
   const [location, navigate] = useLocation();
 
   const { user, logout } = useAuthContext();
@@ -156,7 +158,6 @@ const MobileFooter: React.FC = () => {
   const isAdmin = user?.role === 'admin';
 
   const navItems: NavItem[] = [
-    // Per il routing hash, i percorsi devono iniziare con '/'
     { name: 'Shopping', path: '/shopping', icon: ShoppingBasket },
     { name: 'Note', path: '/notes', icon: NotebookText },
     { name: 'Calendario', path: '/calendar', icon: CalendarDays },
@@ -166,6 +167,8 @@ const MobileFooter: React.FC = () => {
 
   const mainApps = navItems.slice(0, 2);
   const bubbleApps = navItems.slice(2);
+
+  const isBubblePathActive = bubbleApps.some(item => item.path === location);
 
   const getNotificationStatus = () => {
     if (permission !== 'granted') return { icon: BellOff, text: 'Attiva Notifiche', color: 'text-gray-400' };
@@ -177,7 +180,6 @@ const MobileFooter: React.FC = () => {
   const StatusIcon = getNotificationStatus().icon;
   const UserAvatarIcon = isTopiniTheme ? RatIcon : User;
 
-  // Funzione di navigazione che usa il navigate di Wouter
   const handleNavigation = (path: string) => {
     navigate(path);
     setShowBubble(false);
@@ -195,14 +197,13 @@ const MobileFooter: React.FC = () => {
             <div className="grid grid-cols-3 gap-2">
               {bubbleApps.map((item, index) => {
                 const Icon = item.icon;
-                // Usa 'location' da Wouter per determinare lo stato attivo
                 const isActive = location === item.path;
                 return (
                   <button
                     key={item.path}
                     onClick={() => handleNavigation(item.path)}
                     className={`h-20 w-20 rounded-2xl flex flex-col items-center justify-center transition-all duration-200 hover:scale-105 ${
-                      isActive ? 'text-blue-500 bg-blue-100 dark:bg-blue-900/50' : 'hover:text-blue-500 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      isActive ? 'text-burnt-newStyle' : 'hover:text-burnt-newStyle hover:bg-gray-100 dark:hover:bg-gray-700'
                     }`}
                     style={{ animation: `slideInItem 0.4s ease-out ${index * 80}ms forwards`, opacity: 0 }}
                   >
@@ -225,7 +226,7 @@ const MobileFooter: React.FC = () => {
               key={item.path}
               onClick={() => handleNavigation(item.path)}
               className={`h-full w-20 rounded-lg flex flex-col items-center justify-center space-y-1 transition-colors ${
-                isActive ? 'text-blue-500 bg-blue-50 dark:bg-blue-900/40' : 'text-gray-500 hover:text-blue-500'
+                isActive ? 'text-burnt-newStyle' : 'text-gray-500 hover:text-burnt-newStyle'
               }`}
             >
               <Icon className="h-4 w-4" />
@@ -237,7 +238,7 @@ const MobileFooter: React.FC = () => {
         <button
           onClick={() => setShowBubble(!showBubble)}
           className={`h-14 w-14 rounded-full flex items-center justify-center transition-all duration-300 ${
-            showBubble ? 'text-blue-500 bg-blue-100 dark:bg-blue-900/50' : 'text-gray-500 hover:text-blue-500'
+            (showBubble || isBubblePathActive) ? 'text-burnt-newStyle' : ''
           }`}
           style={{ transform: showBubble ? 'rotate(45deg)' : 'rotate(0deg)' }}
         >
@@ -271,8 +272,8 @@ const MobileFooter: React.FC = () => {
             )}
             
             <DropdownMenuItem onClick={() => handleNavigation('/settings')}>
-                <Settings className="mr-2 h-3 w-3" />
-                <span>Impostazioni</span>
+              <Settings className="mr-2 h-3 w-3" />
+              <span>Impostazioni</span>
             </DropdownMenuItem>
 
             {isAdmin && (
@@ -304,6 +305,5 @@ const MobileFooter: React.FC = () => {
     </footer>
   );
 };
-
 
 export default MobileFooter;
