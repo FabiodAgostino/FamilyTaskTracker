@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  body {
+    @apply text-slate-900 dark:text-white;
+  }
+}
+
 :root {
   /* ✅ PALETTE LIGHT MODERNA - Ispirata a "Warm Neutral" */
   --background: hsl(200, 25%, 97%);        /* Blu-grigio chiarissimo */

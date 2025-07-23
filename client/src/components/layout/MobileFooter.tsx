@@ -18,10 +18,18 @@ import {
   Bell,
   BellOff,
   Plus,
+  ExternalLink,
 } from 'lucide-react';
 
 // ============================================================================
-// TIPI E INTERFACCE
+// IMPORT DEGLI HOOK E CONTESTI REALI (COME NELL'HEADER)
+// ============================================================================
+import { useAuthContext } from '@/contexts/AuthContext'; // Importa il contesto reale
+import { useTheme } from '@/contexts/ThemeContext';     // Importa il contesto reale
+import { useNotifications } from '@/hooks/useNotifications'; // Importa l'hook reale
+
+// ============================================================================
+// TIPI E INTERFACCE (Come da tuo codice originale, non modificato)
 // ============================================================================
 
 type LucideIconType = React.ComponentType<React.SVGProps<SVGSVGElement>>;
@@ -38,7 +46,7 @@ interface NavItem {
 }
 
 // ============================================================================
-// ICONE PERSONALIZZATE E SIMULATE
+// ICONE PERSONALIZZATE E SIMULATE (Come da tuo codice originale, non modificato)
 // ============================================================================
 
 const CreditCardIcon: React.FC<{ className?: string }> = ({ className = '' }) => (
@@ -57,9 +65,10 @@ const RatIcon: React.FC<{ className?: string }> = ({ className = '' }) => (
 );
 
 // ============================================================================
-// HOOK SIMULATI (Questi rimangono per l'autonomia del componente)
+// HOOK SIMULATI (QUESTI SONO STATI RIMOSSI PER USARE GLI HOOK REALI)
 // ============================================================================
-
+// I seguenti hook sono stati rimossi in favore delle importazioni da `@/contexts` e `@/hooks`:
+/*
 const useAuthContext = () => ({
   user: { username: 'Fabio', role: 'admin' } as UserData,
   logout: () => console.log('Logout eseguito'),
@@ -82,9 +91,10 @@ const useNotifications = () => ({
   isManuallyDisabled: false,
   disableNotifications: () => console.log('Notifiche disabilitate'),
 });
+*/
 
 // ============================================================================
-// COMPONENTI UI (Dropdown Menu)
+// COMPONENTI UI (Dropdown Menu - Come da tuo codice originale, non modificato)
 // ============================================================================
 
 const DropdownMenu: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -148,9 +158,12 @@ const DropdownMenuSeparator: React.FC = () => <div className="border-t dark:bord
 const MobileFooter: React.FC = () => {
   const [location, navigate] = useLocation();
 
+  // ORA USIAMO GLI HOOK REALI, COME NELL'HEADER!
   const { user, logout } = useAuthContext();
   const { theme, toggleTheme } = useTheme();
-  const { permission, isSupported, token, isManuallyDisabled, disableNotifications } = useNotifications();
+  // Destrutturiamo tutti i valori necessari per la logica completa delle notifiche
+  const { permission, requestPermission, isSupported, token, isInitializing, disableNotifications, enableNotifications, isManuallyDisabled } = useNotifications();
+
 
   const [showBubble, setShowBubble] = useState<boolean>(false);
 
@@ -163,26 +176,35 @@ const MobileFooter: React.FC = () => {
     { name: 'Calendario', path: '/calendar', icon: CalendarDays },
     { name: 'Spesa', path: '/shoppingfood', icon: Pizza },
     { name: 'Wallet', path: '/digitalwallet', icon: CreditCardIcon },
+    {name: 'TripTaste', path:'https://fabiodagostino.github.io/TripTaste/#/', icon:ExternalLink}
   ];
 
   const mainApps = navItems.slice(0, 2);
   const bubbleApps = navItems.slice(2);
 
-  const isBubblePathActive = bubbleApps.some(item => item.path === location);
+  // Considera se `isBubblePathActive` debba usare `location.startsWith` per link esterni
+  const isBubblePathActive = bubbleApps.some(item => item.path === location || (item.path.includes("https://") && location.startsWith(item.path.split('#')[0])));
 
+
+  // Logica per ottenere lo stato delle notifiche (ORA ALLINEATA CON L'HEADER)
   const getNotificationStatus = () => {
     if (permission !== 'granted') return { icon: BellOff, text: 'Attiva Notifiche', color: 'text-gray-400' };
+    if (isInitializing) return { icon: Bell, text: 'Configurazione token in corso...', color: 'text-blue-500' }; // Come nell'Header
     if (token) return { icon: Bell, text: 'Notifiche Attive', color: 'text-green-500' };
     if (isManuallyDisabled) return { icon: BellOff, text: 'Notifiche Disabilitate', color: 'text-red-500' };
-    return { icon: Bell, text: 'Configura notifiche', color: 'text-blue-500' };
+    return { icon: Bell, text: 'Configura notifiche', color: 'text-blue-500' }; // Testo aggiornato per rispecchiare l'Header
   };
 
   const StatusIcon = getNotificationStatus().icon;
   const UserAvatarIcon = isTopiniTheme ? RatIcon : User;
 
   const handleNavigation = (path: string) => {
-    navigate(path);
+    if(path.includes("https://"))
+      window.open(path, '_blank', 'noopener,noreferrer');
+    else
+      navigate(path);
     setShowBubble(false);
+
   };
 
   return (
@@ -197,7 +219,8 @@ const MobileFooter: React.FC = () => {
             <div className="grid grid-cols-3 gap-2">
               {bubbleApps.map((item, index) => {
                 const Icon = item.icon;
-                const isActive = location === item.path;
+                // Gestione dell'active state per link esterni (allineata con l'Header)
+                const isActive = item.path === location || (item.path.includes("https://") && location.startsWith(item.path.split('#')[0]));
                 return (
                   <button
                     key={item.path}
@@ -220,7 +243,8 @@ const MobileFooter: React.FC = () => {
       <div className="flex justify-around items-center h-16 px-2">
         {mainApps.map(item => {
           const Icon = item.icon;
-          const isActive = location === item.path;
+          // Gestione dell'active state per link esterni (allineata con l'Header)
+          const isActive = item.path === location || (item.path.includes("https://") && location.startsWith(item.path.split('#')[0]));
           return (
             <button
               key={item.path}
@@ -240,7 +264,7 @@ const MobileFooter: React.FC = () => {
           className={`h-14 w-14 rounded-full flex items-center justify-center transition-all duration-300 ${
             (showBubble || isBubblePathActive) ? 'text-burnt-newStyle' : ''
           }`}
-          style={{ transform: showBubble ? 'rotate(45deg)' : 'rotate(0deg)' }}
+          style={{ transform: showBubble || isBubblePathActive ? 'rotate(45deg)' : 'rotate(0deg)' }}
         >
           <Plus className="h-4 w-4" />
         </button>
@@ -265,7 +289,24 @@ const MobileFooter: React.FC = () => {
             </DropdownMenuItem>
 
             {isSupported && (
-              <DropdownMenuItem onClick={disableNotifications}>
+              // LOGICA AVANZATA DELLE NOTIFICHE COME NELL'HEADER
+              <DropdownMenuItem 
+                onClick={async () => {
+                  try {
+                    if (permission === 'granted') {
+                      if (token) {
+                        await disableNotifications();
+                      } else if (isManuallyDisabled) {
+                        await enableNotifications();
+                      }
+                    } else {
+                      await requestPermission();
+                    }
+                  } catch (error) {
+                    console.error('❌ Errore:', error);
+                  }
+                }}
+              >
                 <StatusIcon className={`mr-2 h-3 w-3 ${getNotificationStatus().color}`} />
                 <span className={getNotificationStatus().color}>{getNotificationStatus().text}</span>
               </DropdownMenuItem>

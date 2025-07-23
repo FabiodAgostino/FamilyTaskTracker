@@ -336,7 +336,7 @@ export function ShoppingItemDetail({
           {/* Informazioni di sistema */}
           <Card>
             <CardHeader className="pb-3">
-              <h3 className="font-medium text-gray-900">Informazioni</h3>
+              <h3 className="font-medium">Informazioni</h3>
             </CardHeader>
             <CardContent className="pt-0 space-y-3">
               <div className="flex items-center text-sm text-gray-600">

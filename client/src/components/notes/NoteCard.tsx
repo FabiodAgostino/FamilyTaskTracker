@@ -111,7 +111,6 @@ export function NoteCard({
       className="hover:shadow-md transition-all duration-200 border-l-4 cursor-pointer"
       style={{ 
         borderLeftColor: note.color || '#F3F4F6',
-        backgroundColor: note.color ? `${note.color}15` : '#FFFFFF'
       }}
       onClick={handleCardClick} // ✅ NUOVO: Click handler sulla card
     >
@@ -127,7 +126,6 @@ export function NoteCard({
               
               <h3 
                 className="font-semibold text-lg leading-tight break-words"
-                style={{ color: textColor }}
               >
                 {note.title}
               </h3>
@@ -199,7 +197,6 @@ export function NoteCard({
         <div className="space-y-3">
           <p 
             className="text-sm leading-relaxed"
-            style={{ color: textColor }}
           >
             {truncateContent(note.content)}
           </p>

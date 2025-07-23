@@ -656,7 +656,7 @@ const CardDetailModal = ({
           <div className="flex justify-end">
             <Button 
               variant="destructive" 
-              onClick={() => handleDeleteCard(selectedCard.id)}
+              onClick={() => {handleDeleteCard(selectedCard.id); handleCloseDetail()}}
               className="bg-red-500 hover:bg-red-600 text-white"
             >
               <Trash2 className="w-4 h-4 mr-2" />
