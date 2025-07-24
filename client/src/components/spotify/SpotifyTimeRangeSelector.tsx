@@ -57,7 +57,7 @@ export function SpotifyTimeRangeSelector({ currentTimeRange, onTimeRangeChange }
                 {isMobile ? (
                     // Vista per dispositivi mobili: usa il componente Select
                     <Select onValueChange={(value) => onTimeRangeChange(value as TimeRange)} value={currentTimeRange}>
-                        <SelectTrigger className="w-[180px]"> {/* Puoi aggiustare la larghezza */}
+                        <SelectTrigger className="w-[140px]"> {/* Puoi aggiustare la larghezza */}
                             <SelectValue placeholder="Seleziona un periodo" />
                         </SelectTrigger>
                         <SelectContent>

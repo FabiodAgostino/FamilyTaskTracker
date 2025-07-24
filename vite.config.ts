@@ -3,16 +3,20 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
+
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // https://vitejs.dev/config/
 export default defineConfig(({ command, mode }) => {
+  // 🔍 Determina se siamo in sviluppo
+  const isDevelopment = mode === 'development' || command === 'serve';
+  
   // Determina base URL in base all'ambiente
   const getBaseUrl = () => {
     // Se siamo in development locale, usa path relativo
-    if (mode === 'development' || command === 'serve') {
+    if (isDevelopment) {
       return './';
     }
     
@@ -26,6 +30,37 @@ export default defineConfig(({ command, mode }) => {
   };
 
   const baseUrl = getBaseUrl();
+
+  // 🔐 Configurazione HTTPS condizionale per sviluppo
+  const getServerConfig = () => {
+    const baseConfig = {
+      port: 3000,
+      open: true
+    };
+
+    // ✅ In sviluppo: solo localhost per sicurezza
+    if (isDevelopment) {
+      return {
+        ...baseConfig,
+        host: '127.0.0.1', // Solo localhost in sviluppo
+        
+        // 🔐 HTTPS solo in sviluppo (se i certificati esistono)
+        ...(fs.existsSync(path.resolve(__dirname, 'certs/localhost-key.pem')) && 
+           fs.existsSync(path.resolve(__dirname, 'certs/localhost.pem')) ? {
+          https: {
+            key: fs.readFileSync(path.resolve(__dirname, 'certs/localhost-key.pem')),
+            cert: fs.readFileSync(path.resolve(__dirname, 'certs/localhost.pem')),
+          }
+        } : {})
+      };
+    }
+
+    // ✅ In produzione: accessibile da qualsiasi indirizzo
+    return {
+      ...baseConfig,
+      host: true // Accessibile da ovunque in produzione
+    };
+  };
   
   return {
     plugins: [react()],
@@ -66,25 +101,16 @@ export default defineConfig(({ command, mode }) => {
       // 🚀 Ottimizzazioni iOS
       cssCodeSplit: false,
       minify: 'esbuild',
-      sourcemap: mode === 'development'
+      sourcemap: isDevelopment // Source maps solo in sviluppo
     },
     
-    // 🌐 Server di sviluppo
-    server: {
-      // host: '127.0.0.1',
-      host:true,
-      port: 3000,
-      open: true
-      // https: {
-      //   key : fs.readFileSync(path.resolve(__dirname, 'certs/localhost-key.pem')),
-      //   cert: fs.readFileSync(path.resolve(__dirname, 'certs/localhost.pem')),
-      // }
-    },
+    // 🌐 Server di sviluppo (configurazione condizionale)
+    server: getServerConfig(),
     
     // 📱 Preview server
     preview: {
       port: 4173,
-      host: true,
+      host: !isDevelopment, // Host true in produzione, false in sviluppo
       headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
@@ -98,7 +124,8 @@ export default defineConfig(({ command, mode }) => {
       'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || mode),
       __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '1.0.0'),
       __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
-      __BASE_URL__: JSON.stringify(baseUrl)
+      __BASE_URL__: JSON.stringify(baseUrl),
+      __IS_DEVELOPMENT__: JSON.stringify(isDevelopment) // Flag disponibile nel codice
     },
     
     // 🔧 Ottimizzazioni dependency
@@ -111,7 +138,7 @@ export default defineConfig(({ command, mode }) => {
     
     // 🔧 CSS configuration
     css: {
-      devSourcemap: mode === 'development'
+      devSourcemap: isDevelopment // CSS source maps solo in sviluppo
     }
   }
 })
