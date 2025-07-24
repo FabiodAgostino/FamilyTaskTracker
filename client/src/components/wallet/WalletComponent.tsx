@@ -521,8 +521,11 @@ const FilterPanel = ({
   <Card className="mb-4">
     <CardContent className="p-4">
       {isMobile && (
-        <div className="flex justify-between items-center mb-2">
-          <span className="font-medium">Filtri</span>
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-cambridge-newStyle" />
+            <span className="font-medium text-delft-blue">Filtri di ricerca</span>
+          </div>
           <Button variant="ghost" size="sm" onClick={toggleFilters}>
             {isFiltersExpanded ? <ChevronUp /> : <ChevronDown />}
           </Button>

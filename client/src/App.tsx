@@ -53,14 +53,17 @@ function AppContent() {
       const state = urlParams.get('state');
       const error = urlParams.get('error');
       if(error)
+      {
         localStorage.setItem("spotyerror",error);
+        navigate("/spotystat");
+      }
 
       if (code && state) {
         localStorage.setItem("spotycode",code);
         localStorage.setItem("spotystate",state);
+        navigate("/spotystat");
       }
       
-      navigate("/spotystat");
 
     }, []);
 
