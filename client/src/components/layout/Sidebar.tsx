@@ -11,6 +11,7 @@ import { FaShoppingBag,FaCalendar  } from "react-icons/fa";
 import { ShoppingFood } from '@/lib/models/food';
 import { FaCartShopping, FaNoteSticky  } from "react-icons/fa6";
 import { CiCreditCard1 } from "react-icons/ci";
+import { useMenu } from '@/hooks/use-menu';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -74,44 +75,23 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   }, [shoppingItems, notes, events, user]);
 
   // ✅ MIGLIORATO: Sidebar items con statistiche dinamiche
-  const sidebarItems = [
-    {
-      name: 'Shopping',
-      path: '/shopping',
-      icon: FaShoppingBag,
-      count: stats.shopping,
-      color: 'bg-burnt-newStyle'
-    },
-    {
-      name: 'Note',
-      path: '/notes',
-      icon: FaNoteSticky,
-      count: stats.notes,
-      color: 'bg-cambridge-newStyle'
-    },
-     {
-      name: 'Spesa',
-      path: '/shoppingfood',
-      icon: FaCartShopping ,
-      count: stats.shoppingFood,
-      color: 'bg-sunset'
-    },
-    {
-      name: 'Calendario',
-      path: '/calendar',
-      icon: FaCalendar ,
-      count: stats.calendar,
-      color: 'bg-sunset'
-    },
-    {
-      name: 'Digital Wallet',
-      path: '/digitalwallet',
-      icon: CiCreditCard1  ,
-      count: stats.calendar,
-      color: 'bg-sunset'
-    }
-   
-  ];
+  const sidebarItems = useMenu();
+  sidebarItems.forEach(x=>{
+switch(x.name)
+{
+  case 'Shopping':
+    x.count = stats.shopping;
+    break;
+     case 'Note':
+    x.count = stats.notes;
+    break;
+     case 'Spesa':
+    x.count = stats.shoppingFood;
+    break;
+    case 'Calendario':
+    x.count = stats.calendar;
+    break;
+}});
 
   return (
     <>
@@ -159,7 +139,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     )} />
                     <span className="flex-1">{item.name}</span>
                     {/* ✅ MIGLIORATO: Mostra count solo se > 0 */}
-                    {item.count > 0 && (
+                    {item.count!=undefined && item.count > 0 && (
                       <span className={cn(
                         "text-xs px-2 py-1 rounded-full font-medium transition-colors",
                         isActive

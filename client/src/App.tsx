@@ -13,6 +13,8 @@ import { useCallback, useEffect, useState } from "react";
 
 // 🔴 NUOVO: Import per sistema prezzi multipli
 import { PriceSelectionManager } from "@/components/shopping/PriceSelectionManager";
+import { navigate } from "wouter/use-hash-location";
+import React from "react";
 
 // 🔄 RIPRISTINO: Hook hash routing originale (ma con fix iPhone)
 function useHashLocation(): [string, (path: string) => void] {
@@ -30,7 +32,6 @@ function useHashLocation(): [string, (path: string) => void] {
     window.addEventListener('hashchange', handler);
     return () => window.removeEventListener('hashchange', handler);
   }, []);
-
   const navigate = useCallback((to: string) => {
     try {
       window.location.hash = to;
@@ -42,8 +43,26 @@ function useHashLocation(): [string, (path: string) => void] {
   return [hash, navigate];
 }
 
+
 function AppContent() {
   const { user, isLoading } = useAuthContext();
+
+      React.useEffect(() => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      const state = urlParams.get('state');
+      const error = urlParams.get('error');
+      if(error)
+        localStorage.setItem("spotyerror",error);
+
+      if (code && state) {
+        localStorage.setItem("spotycode",code);
+        localStorage.setItem("spotystate",state);
+      }
+      
+      navigate("/spotystat");
+
+    }, []);
 
   if (isLoading) {
     return (

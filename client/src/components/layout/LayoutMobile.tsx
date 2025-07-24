@@ -1,10 +1,8 @@
 
 // src/components/layout/Layout.tsx
-import { useState } from 'react';
-import { Header } from './Header';
-import { Sidebar } from './Sidebar';
 import { MobileHeader } from './MobileHeader';
 import MobileFooter from './MobileFooter';
+
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -28,4 +26,8 @@ export function LayoutMobile({ children }: { children: React.ReactNode }) {
       <MobileFooter />
     </div>
   );
+}
+
+function useEffect(arg0: () => void, arg1: never[]) {
+  throw new Error('Function not implemented.');
 }

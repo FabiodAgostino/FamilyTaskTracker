@@ -182,6 +182,10 @@
   .bg-burnt-newStyle {
   background: var(--burnt-newStyle);
 }
+
+.border-newStyle {
+  border: var(--burnt-newStyle);
+}
  .text-burnt-newStyle {
     color: var(--burnt-text-newStyle);
   }

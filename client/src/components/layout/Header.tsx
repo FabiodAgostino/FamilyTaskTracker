@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { VersionBadge, MobileVersionBadge } from '@/components/common/VersionBadge';
 import { NotificationCenter } from '../user/NotificationCenter';
 import { usePriceSelectionService } from '@/components/shopping/PriceSelectionManager';
+import { useMenu } from '@/hooks/use-menu';
 
 interface HeaderProps {
   onMenuToggle: () => void;
@@ -41,13 +42,7 @@ const { permission, requestPermission, isSupported, token, debug, isInitializing
   const { theme, toggleTheme } = useTheme();
   const [location] = useLocation();
 
-  const navItems = [
-    { name: 'Shopping', path: '/shopping' },
-    { name: 'Note', path: '/notes' },
-    { name: 'Calendario', path: '/calendar' },
-    { name: 'Spesa', path: '/shoppingfood' },
-
-  ];
+  const navItems = useMenu().filter(x=> x.onlyHeader);
   const getNotificationStatus = () => {
   if (permission !== 'granted') return { icon: BellOff, text: 'Attiva Notifiche', color: 'text-muted-foreground' };
   if (isInitializing) return { icon: Bell, text: 'Configurazione token in corso...', color: 'text-blue-500' };

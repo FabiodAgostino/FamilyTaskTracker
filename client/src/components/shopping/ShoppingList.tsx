@@ -3,7 +3,7 @@
 // Partendo dal codice originale dell'utente + modifiche responsive + dettaglio click
 // ==========================================
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Plus, 
   Search, 
@@ -46,8 +46,11 @@ import { CategorySelectWithAdd } from '../common/CategorySelectWithAdd';
 import { ShoppingItem } from '@/lib/models/shopping-item';
 import { FaShoppingBag } from 'react-icons/fa';
 import { LoadingScreen, useLoadingTransition } from '../ui/loading-screen';
+import { navigate } from 'wouter/use-browser-location';
 
 export function ShoppingList() {
+
+    
   const { user } = useAuthContext();
   const { toast } = useToast();
   const isMobile = useIsMobile();

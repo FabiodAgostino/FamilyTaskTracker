@@ -200,6 +200,11 @@ jobs:
          VITE_APP_DEPLOYMENT_ID=${{ steps.version.outputs.deployment_id }}
          VITE_APP_ENVIRONMENT=production
          VITE_BASE_URL=/FamilyTaskTracker/
+
+         #spotify
+         VITE_SPOTIFY_CLIENT_ID=${{ secrets.SPOTIFY_CLIENT_ID }}
+         VITE_SPOTIFY_REDIRECT_URI=${{ secrets.SPOTIFY_REDIRECT_URI }}
+
          
          # Build Configuration
          NODE_ENV=production
@@ -351,6 +356,8 @@ jobs:
          VITE_GOOGLE_SEARCH_API_KEY: ${{ secrets.GOOGLE_SEARCH_API_KEY }}
          VITE_GOOGLE_SEARCH_ENGINE_ID: ${{ secrets.GOOGLE_SEARCH_ENGINE_ID }}
          VITE_DEEPSEEK_KEY: ${{ secrets.DEEPSEEK_KEY }}
+         VITE_SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+         VITE_SPOTIFY_REDIRECT_URI: ${{ secrets.SPOTIFY_REDIRECT_URI }}
          VITE_PASSWORD_ENCRYPTION_KEY: "SuperTopoliniArrivano1234567890AB"
          VITE_APP_NAME: "Family Task Tracker"
          VITE_APP_VERSION: ${{ steps.version.outputs.version }}

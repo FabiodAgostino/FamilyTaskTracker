@@ -14,6 +14,9 @@ import { NotificationCenter } from '@/components/user/NotificationCenter';
 import DigitalWallet from '@/components/wallet/DigitalWallet';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { TestPage } from '@/TestPage';
+import { SpotifyStats } from '@/components/spotify/SpotifyStats';
+import { useEffect } from 'react';
+import { navigate } from 'wouter/use-browser-location';
 
 export default function Dashboard() {
   const { user } = useAuthContext();
@@ -43,6 +46,12 @@ export default function Dashboard() {
         <Route path="/digitalwallet">
           {() => <DigitalWallet />}
         </Route>
+
+          <Route path="/spotystat">
+          {() => <SpotifyStats />}
+        </Route>
+
+      
 
         {/* Route per gestione utenti - solo per admin */}
         {user?.role === 'admin' && (

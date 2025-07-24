@@ -2,7 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 import { fileURLToPath } from 'url'
-
+import fs from 'fs'
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -71,9 +71,14 @@ export default defineConfig(({ command, mode }) => {
     
     // 🌐 Server di sviluppo
     server: {
+      host:true,
+      // host: '127.0.0.1',
       port: 3000,
-      host: true,
-      open: true
+      open: true,
+      https: {
+        key : fs.readFileSync(path.resolve(__dirname, 'certs/localhost-key.pem')),
+        cert: fs.readFileSync(path.resolve(__dirname, 'certs/localhost.pem')),
+      }
     },
     
     // 📱 Preview server

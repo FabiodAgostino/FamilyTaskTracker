@@ -27,6 +27,7 @@ import {
 import { useAuthContext } from '@/contexts/AuthContext'; // Importa il contesto reale
 import { useTheme } from '@/contexts/ThemeContext';     // Importa il contesto reale
 import { useNotifications } from '@/hooks/useNotifications'; // Importa l'hook reale
+import { useMenu } from '@/hooks/use-menu';
 
 // ============================================================================
 // TIPI E INTERFACCE (Come da tuo codice originale, non modificato)
@@ -64,38 +65,6 @@ const RatIcon: React.FC<{ className?: string }> = ({ className = '' }) => (
   />
 );
 
-// ============================================================================
-// HOOK SIMULATI (QUESTI SONO STATI RIMOSSI PER USARE GLI HOOK REALI)
-// ============================================================================
-// I seguenti hook sono stati rimossi in favore delle importazioni da `@/contexts` e `@/hooks`:
-/*
-const useAuthContext = () => ({
-  user: { username: 'Fabio', role: 'admin' } as UserData,
-  logout: () => console.log('Logout eseguito'),
-});
-
-const useTheme = () => {
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
-  const toggleTheme = () => {
-    setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
-    console.log('Tema cambiato');
-  };
-  return { theme, toggleTheme };
-};
-
-const useNotifications = () => ({
-  permission: 'granted' as NotificationPermission,
-  requestPermission: () => console.log('Richiesta permessi notifiche'),
-  isSupported: true,
-  token: 'mock-token',
-  isManuallyDisabled: false,
-  disableNotifications: () => console.log('Notifiche disabilitate'),
-});
-*/
-
-// ============================================================================
-// COMPONENTI UI (Dropdown Menu - Come da tuo codice originale, non modificato)
-// ============================================================================
 
 const DropdownMenu: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -170,14 +139,7 @@ const MobileFooter: React.FC = () => {
   const isTopiniTheme = user?.username === 'Fabio' || user?.username === 'Ludovica';
   const isAdmin = user?.role === 'admin';
 
-  const navItems: NavItem[] = [
-    { name: 'Shopping', path: '/shopping', icon: ShoppingBasket },
-    { name: 'Note', path: '/notes', icon: NotebookText },
-    { name: 'Calendario', path: '/calendar', icon: CalendarDays },
-    { name: 'Spesa', path: '/shoppingfood', icon: Pizza },
-    { name: 'Wallet', path: '/digitalwallet', icon: CreditCardIcon },
-    {name: 'TripTaste', path:'https://fabiodagostino.github.io/TripTaste/#/', icon:ExternalLink}
-  ];
+  const navItems = useMenu();
 
   const mainApps = navItems.slice(0, 2);
   const bubbleApps = navItems.slice(2);
