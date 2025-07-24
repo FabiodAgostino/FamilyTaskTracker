@@ -74,11 +74,11 @@ export default defineConfig(({ command, mode }) => {
       // host: '127.0.0.1',
       host:true,
       port: 3000,
-      open: true,
-      https: {
-        key : fs.readFileSync(path.resolve(__dirname, 'certs/localhost-key.pem')),
-        cert: fs.readFileSync(path.resolve(__dirname, 'certs/localhost.pem')),
-      }
+      open: true
+      // https: {
+      //   key : fs.readFileSync(path.resolve(__dirname, 'certs/localhost-key.pem')),
+      //   cert: fs.readFileSync(path.resolve(__dirname, 'certs/localhost.pem')),
+      // }
     },
     
     // 📱 Preview server
