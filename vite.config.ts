@@ -71,8 +71,8 @@ export default defineConfig(({ command, mode }) => {
     
     // 🌐 Server di sviluppo
     server: {
-      host:true,
       // host: '127.0.0.1',
+      host:true,
       port: 3000,
       open: true,
       https: {

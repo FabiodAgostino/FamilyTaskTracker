@@ -1,8 +1,8 @@
 import { TimeRange } from "../models/spotify";
 
 export const SPOTIFY_CONFIG = {
-  CLIENT_ID: import.meta.env.VITE_SPOTIFY_CLIENT_ID as string,
-  REDIRECT_URI:import.meta.env.VITE_SPOTIFY_REDIRECT_URI || 'http://localhost:3000/callback',
+  CLIENT_ID:import.meta.env.VITE_SPOTIFY_CLIENT_ID as string,
+  REDIRECT_URI:import.meta.env.VITE_SPOTIFY_REDIRECT_URI,
   SCOPES: [
     'user-read-private',
     'user-read-email', 

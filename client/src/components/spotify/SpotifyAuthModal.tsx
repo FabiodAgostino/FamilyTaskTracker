@@ -1,9 +1,10 @@
 // components/spotify/SpotifyAuthModal.tsx
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Music, X } from 'lucide-react';
 import { FaSpotify } from 'react-icons/fa';
+import { navigate } from 'wouter/use-hash-location';
 
 interface SpotifyAuthModalProps {
   isOpen: boolean;
@@ -13,8 +14,12 @@ interface SpotifyAuthModalProps {
 }
 
 export function SpotifyAuthModal({ isOpen, onClose, onLogin, error }: SpotifyAuthModalProps) {
+
+  const onCloseModal = useCallback(() => {
+    navigate("/shopping");
+  },[])
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={onCloseModal}>
       <DialogContent
         // Sfondo e bordo del modale: chiaro di default, scuro in dark mode
         className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-black dark:text-white"

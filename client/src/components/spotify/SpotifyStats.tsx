@@ -12,6 +12,7 @@ import { SpotifyErrorState } from './SpotifyErrorState';
 import { SpotifyContentTabs } from './SpotifyContentTabs';
 import { SpotifyLoadingState } from './SpotifyLoadingState';
 import { LoadingScreen } from '../ui/loading-screen';
+import { ValidationError } from '@/lib/models/types';
 
 // Tipi di dati per lo stato del componente
 interface SpotifyData {
@@ -145,8 +146,15 @@ export function SpotifyStats() {
           setLoading(false);
         }
       } catch (err) {
+
         console.error("Initialization failed", err);
-        setError("Autenticazione fallita.");
+        if(err instanceof Error)
+        {
+          if(err.message!=="No refresh token available")
+            setError("Autenticazione fallita.");
+        }
+        else
+          setError("Autenticazione fallita.");
         setIsAuthenticated(false);
         setShowLoginModal(true);
         setLoading(false);
