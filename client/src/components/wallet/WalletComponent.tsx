@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { 
   Scan,
@@ -153,27 +154,32 @@ interface CardDetailModalProps {
 // ==== HOOKS
 // ==========================================================
 
-// Hook per rilevare l'orientamento dello schermo
-const useOrientation = (): 'portrait' | 'landscape' => {
-  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>(
-    window.matchMedia("(orientation: portrait)").matches ? 'portrait' : 'landscape'
-  );
+// Hook per rilevare dispositivo mobile e orientamento
+const useDeviceInfo = (): { isMobile: boolean; orientation:string } => {
+  const [deviceInfo, setDeviceInfo] = useState(() => {
+    const isMobile = window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const orientation = window.matchMedia("(orientation: portrait)").matches ? 'portrait' : 'landscape';
+    return { isMobile, orientation };
+  });
 
   useEffect(() => {
-    const portraitMql = window.matchMedia("(orientation: portrait)");
-
-    const handleOrientationChange = (e: MediaQueryListEvent) => {
-      setOrientation(e.matches ? 'portrait' : 'landscape');
+    const handleResize = () => {
+      const isMobile = window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const orientation = window.matchMedia("(orientation: portrait)").matches ? 'portrait' : 'landscape';
+      setDeviceInfo({ isMobile, orientation });
     };
 
-    portraitMql.addEventListener('change', handleOrientationChange);
+    const portraitMql = window.matchMedia("(orientation: portrait)");
+    portraitMql.addEventListener('change', handleResize);
+    window.addEventListener('resize', handleResize);
 
     return () => {
-      portraitMql.removeEventListener('change', handleOrientationChange);
+      portraitMql.removeEventListener('change', handleResize);
+      window.removeEventListener('resize', handleResize);
     };
   }, []);
 
-  return orientation;
+  return deviceInfo;
 };
 
 const useZXingScanner = ({
@@ -580,12 +586,12 @@ const CardDetailModal = ({
   selectedCard, isDetailModalOpen, showCardBack, handleCloseDetail,
   toggleCardView, handleDeleteCard
 }: CardDetailModalProps) => {
-  const orientation = useOrientation();
+  const { isMobile, orientation } = useDeviceInfo();
 
   if (!selectedCard || !isDetailModalOpen) return null;
 
-  // Vista Landscape: solo barcode con linguetta superiore
-  if (orientation === 'landscape') {
+  // Vista Landscape MOBILE: solo barcode con linguetta superiore
+  if (isMobile && orientation === 'landscape') {
     return (
       <div className="fixed inset-0 z-50 flex flex-col bg-white animate-in fade-in-0">
         {/* Linguetta colorata solo in alto */}
@@ -609,64 +615,86 @@ const CardDetailModal = ({
     );
   }
   
-  // Vista Portrait: card con flip
+  // Vista Portrait: solo la carta a schermo intero
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleCloseDetail} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/20 backdrop-blur-sm">
+      {/* Background scuro cliccabile per chiudere */}
+      <div className="absolute inset-0" onClick={handleCloseDetail} />
       
-      <div 
-        className="relative bg-white rounded-xl shadow-xl w-full max-w-md border border-gray-200/80 overflow-hidden"
-      >
-        <div className="p-6">
-          <div className="grid grid-flow-col justify-items-end mb-4">
-            <Button variant="ghost" size="icon" onClick={handleCloseDetail} className="h-8 w-8 text-gray-500 hover:bg-gray-100">
-              <X className="h-5 w-5" />
-            </Button>
+      {/* Carta */}
+      <div className="relative" style={{ perspective: '1200px', width: '85vw', maxWidth: '400px' }}>
+        <div 
+          className="cursor-pointer transition-transform duration-700 w-full"
+          style={{ 
+            transformStyle: 'preserve-3d', 
+            transform: showCardBack ? 'rotateY(180deg)' : 'rotateY(0deg)', 
+            aspectRatio: '1.58' 
+          }}
+          onClick={toggleCardView}
+        >
+          {/* Fronte della carta */}
+          <div 
+            className="absolute w-full h-full p-6 rounded-xl flex flex-col justify-between text-white shadow-2xl"
+            style={{ 
+              backgroundColor: selectedCard.color, 
+              backfaceVisibility: 'hidden'
+            }}
+          >
+            {/* Icona elimina - solo sul fronte */}
+            <div className="flex justify-end">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation(); // Previene il flip della carta
+                  handleDeleteCard(selectedCard.id);
+                  handleCloseDetail();
+                }}
+                className="bg-black/20 hover:bg-black/40 rounded-full p-2 transition-colors"
+              >
+                <Trash2 className="w-5 h-5 text-white"/>
+              </button>
+            </div>
+            
+            {/* Logo centrato */}
+            <div className="flex-1 flex items-center justify-center">
+              <img 
+                src={viewImage(selectedCard.logo)} 
+                alt="Logo" 
+                className="h-20 w-auto object-contain" 
+              />
+            </div>
+            
+            {/* Nome brand in basso */}
+            <div className="text-center">
+              <p className="text-2xl font-mono tracking-widest">{selectedCard.brand}</p>
+            </div>
           </div>
           
-          <div className="space-y-6">
-            <div style={{ perspective: '1200px' }}>
-              <div 
-                className="cursor-pointer transition-transform duration-700 w-full"
-                style={{ transformStyle: 'preserve-3d', transform: showCardBack ? 'rotateY(180deg)' : 'rotateY(0deg)', aspectRatio: '1.58' }}
-                onClick={toggleCardView}
-              >
-                {/* Fronte */}
-                <div className="absolute w-full h-full p-6 rounded-lg flex flex-col justify-between text-white shadow-lg" style={{ backgroundColor: selectedCard.color, backfaceVisibility: 'hidden' }}>
-                  <img src={viewImage(selectedCard.logo)} alt="Logo" className="h-16 w-auto object-contain self-center" />
-                  <p className="text-center text-xl font-mono tracking-widest">{selectedCard.brand}</p>
-                </div>
-                
-                {/* Retro con nuovo stile */}
-                <div className="absolute w-full h-full rounded-lg bg-gray-100" style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
-                  <div 
-                    className="bg-white rounded-md h-full w-full flex items-center justify-center border border-gray-200 shadow-inner overflow-hidden"
-                    style={{ borderTop: `12px solid ${selectedCard.color || '#6B7280'}`, borderRadius:'14px' }}
-                  >
-                    <img src={generateBarcodeDataURL(selectedCard.barcode || '123456789')} alt="Barcode" className="w-full h-auto object-contain px-2" />
-                  </div>
-                </div>
-              </div>
-            </div>
-            <p className="text-center text-sm text-gray-500">
-              {showCardBack ? "Mostra questo codice alla cassa" : "Clicca sulla carta per girarla"}
-            </p>
-          </div>
-        </div>
-        
-        {/* Footer con pulsante Elimina */}
-        <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 mt-6">
-          <div className="flex justify-end">
-            <Button 
-              variant="destructive" 
-              onClick={() => {handleDeleteCard(selectedCard.id); handleCloseDetail()}}
-              className="bg-red-500 hover:bg-red-600 text-white"
+          {/* Retro della carta con barcode */}
+          <div 
+            className="absolute w-full h-full rounded-xl bg-gray-100 shadow-2xl" 
+            style={{ 
+              borderRadius: '12px', 
+              backfaceVisibility: 'hidden', 
+              transform: 'rotateY(180deg)' 
+            }}
+          >
+            <div 
+              className="bg-white rounded-xl h-full w-full flex items-center justify-center border-gray-200 shadow-inner overflow-hidden"
+              style={{ 
+                borderTop: `25px solid ${selectedCard.color || '#6B7280'}`,
+                borderRadius: '12px' 
+              }}
             >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Elimina Carta
-            </Button>
+              <img 
+                src={generateBarcodeDataURL(selectedCard.barcode || '123456789')} 
+                alt="Barcode" 
+                className="w-full h-auto object-contain px-4" 
+                style={{ imageRendering: 'pixelated' }}
+              />
+            </div>
           </div>
         </div>
+      
       </div>
     </div>
   );
@@ -722,7 +750,7 @@ export const AddCardModal = ({ isOpen, onClose, onSave }: { isOpen: boolean; onC
         setScannedData(result.codeResult.code);
     }, []);
 
-    const handleScanError = useCallback((error: unknown) => {
+const handleScanError = useCallback((error: unknown) => {
         console.error('Scan Error:', error);
     }, []);
 
