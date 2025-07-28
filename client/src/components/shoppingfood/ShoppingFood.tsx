@@ -1284,7 +1284,7 @@ export function ShoppingFoodComponent({ className }: ShoppingFoodComponentProps)
         {/* Mobile Detail Dialog */}
         {isMobile && (
           <Dialog open={showMobileDetail} onOpenChange={setShowMobileDetail}>
-            <DialogContent className="sm:max-w-full h-[90vh] p-0 flex flex-col">
+            <DialogContent className="sm:max-w-full h-[90vh] p-0 flex flex-col" hideCloseButton={true}>
               <DialogHeader className="p-4 border-b">
                 <div className="flex items-center justify-between">
                   <DialogTitle>{selectedList?.title}</DialogTitle>
