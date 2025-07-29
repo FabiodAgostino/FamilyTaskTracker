@@ -60,7 +60,15 @@ interface SpeechGrammarList {
   addFromURI(src: string, weight?: number): void;
   addFromString(string: string, weight?: number): void;
 }
+declare var SpeechGrammarList: {
+  prototype: SpeechGrammarList;
+  new(): SpeechGrammarList;
+};
 
+declare var webkitSpeechGrammarList: {
+  prototype: SpeechGrammarList;
+  new(): SpeechGrammarList;
+};
 interface SpeechGrammar {
   src: string;
   weight: number;

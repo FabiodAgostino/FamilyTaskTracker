@@ -338,6 +338,15 @@ const startRecording = useCallback(() => {
 
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   const recognition = new SpeechRecognition();
+  const paroleChiave = ['aggiungi', 'promemoria', 'evento', 'nota', 'domani', 'spesa', "oggi","dopo","calendario"];
+  const grammar = '#JSGF V1.0; grammar parole; public <parola> = ' + paroleChiave.join(' | ') + ' ;'
+
+// 2. Crea la lista di grammatiche
+const speechRecognitionList = new window.webkitSpeechGrammarList() || new window.SpeechGrammarList();
+speechRecognitionList.addFromString(grammar, 1);
+
+// 3. Assegna la grammatica all'istanza di recognition
+recognition.grammars = speechRecognitionList;
   
   recognition.continuous = false;
   recognition.interimResults = false;
