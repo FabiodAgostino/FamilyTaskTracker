@@ -1,11 +1,21 @@
-// src/components/chat/ui/ChatMessage.tsx
-
 import React from 'react';
 import { Mic } from 'lucide-react';
 import { ChatMessageProps } from '@/lib/models/chat.types';
 import { CHAT_COLORS } from '@/lib/const/chat.constants';
 
 export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
+  // 💡 Gestisci i messaggi di sistema separatamente
+  if (message.isSystem) {
+    return (
+      <div className="flex justify-center my-2">
+        <div className="px-4 py-1 text-xs text-gray-500 bg-gray-100 rounded-full">
+          {message.text}
+        </div>
+      </div>
+    );
+  }
+
+  // Renderizza i normali messaggi utente/assistente
   return (
     <div className={`flex ${message.isUser ? 'justify-end' : 'justify-start'}`}>
       <div
@@ -19,7 +29,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
         } : {}}
       >
         <div className="flex items-start space-x-2">
-          {/* Icona microfono per messaggi vocali */}
           {message.isVoice && (
             <Mic 
               size={14} 

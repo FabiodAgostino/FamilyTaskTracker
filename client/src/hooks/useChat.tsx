@@ -65,11 +65,12 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
     {
       id: '1',
       text: config.enableSmartAssistant
-        ? `Ciao ${config.username}! Come posso aiutarti oggi? 😊`
+        ? `Invia un messaggio per cominciare la chat.`
         : CHAT_LABELS.welcomeMessage,
       isUser: true,
       timestamp: new Date(),
-      isVoice: false
+      isVoice: false,
+      isSystem: true
     }
   ]);
   

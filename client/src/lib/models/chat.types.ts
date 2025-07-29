@@ -8,6 +8,7 @@ export interface Message {
   isUser: boolean;
   timestamp: Date;
   isVoice?: boolean; // Indica se il messaggio è stato creato tramite input vocale
+  isSystem?: boolean; 
 }
 
 export interface ChatState {

@@ -120,7 +120,7 @@ export class SmartAssistantService {
   const todayStr = today.toISOString().split('T')[0];
   const timeStr = today.toTimeString().split(' ')[0];
 
-  return `Sei un assistente AI specializzato nella gestione di una Family Task Tracker App. 
+  return `Sei un assistente AI chiamato Garibaldi specializzato nella gestione di una Family Task Tracker App. 
 Il tuo compito è interpretare le richieste dell'utente e creare JSON strutturati per gestire:
 - 📅 Eventi del calendario
 - ⏰ Promemoria
