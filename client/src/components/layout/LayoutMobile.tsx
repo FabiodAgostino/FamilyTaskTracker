@@ -2,6 +2,7 @@
 // src/components/layout/Layout.tsx
 import { MobileHeader } from './MobileHeader';
 import MobileFooter from './MobileFooter';
+import AIChatComponent from '../chat/AIChatComponent';
 
 
 interface LayoutProps {
@@ -21,6 +22,7 @@ export function LayoutMobile({ children }: { children: React.ReactNode }) {
           {children}
         </div>
       </main>
+      <AIChatComponent />
 
       {/* Il footer rimane fisso in fondo alla viewport, come prima. */}
       <MobileFooter />
