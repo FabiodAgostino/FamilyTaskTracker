@@ -14,9 +14,12 @@ import {
   NoteData, 
   ShoppingFoodData 
 } from '../services/smartAssistant.service';
-import { ShoppingFood } from '@/lib/models/food';
+import { ShoppingFood, ShoppingFoodItem } from '@/lib/models/food';
 import { Reminder } from '@/lib/models/reminder';
 import { CalendarEvent, Note } from '@/lib/models/types';
+import { CategoryFood } from '@/lib/models/food';
+import { DeepSeekCategorizationClient } from '@/lib/deepseek-client';
+import { useFirestore } from './useFirestore';
 
 // ==================== INTERFACCE ====================
 
@@ -60,6 +63,10 @@ export interface UseChatReturn {
 // ==================== HOOK PRINCIPALE ====================
 
 export const useChat = (config: UseChatConfig): UseChatReturn => {
+  // ==================== FIRESTORE HOOKS ====================
+  const { data: existingShoppingLists } = useFirestore<ShoppingFood>('shopping_food');
+  const { data: categories, add: addCategory } = useFirestore<CategoryFood>('food_categories');
+
   // ==================== STATE ====================
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -87,6 +94,94 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const chatServiceRef = useRef<IntegratedChatService | null>(null);
+
+  // ==================== HELPER FUNCTIONS ====================
+
+  /**
+   * Converte array di stringhe in ShoppingFoodItem[] con categorizzazione automatica
+   */
+  const convertItemsToShoppingFoodItems = useCallback(async (itemStrings: string[]): Promise<ShoppingFoodItem[]> => {
+    const result: ShoppingFoodItem[] = [];
+    const itemsForAI: { text: string; category?: string }[] = [];
+
+    // Step 1: Cerca categorie esistenti negli shopping già presenti
+    for (const itemText of itemStrings) {
+      let foundCategory: string | undefined;
+
+      // Cerca in tutti gli shopping esistenti
+      for (const shoppingList of existingShoppingLists || []) {
+        const existingItem = shoppingList.items.find(
+          item => item.text.toLowerCase().trim() === itemText.toLowerCase().trim()
+        );
+        
+        if (existingItem?.category) {
+          foundCategory = existingItem.category;
+          break;
+        }
+      }
+
+      if (foundCategory) {
+        // Categoria trovata - crea subito l'item
+        result.push({
+          id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          text: itemText,
+          completed: false,
+          category: foundCategory,
+          assignedAutomatically: true,
+          createdAt: new Date()
+        });
+      } else {
+        // Nessuna categoria trovata - aggiungi alla lista per l'AI
+        itemsForAI.push({ text: itemText });
+      }
+    }
+
+    // Step 2: Se ci sono item senza categoria, usa l'AI per categorizzarli
+    if (itemsForAI.length > 0) {
+      try {
+        const categoriesForAI = categories?.map(cat => ({
+          name: cat.name,
+          description: cat.description || 'Nessuna descrizione disponibile'
+        })) || [];
+
+        const categorizationResults = await DeepSeekCategorizationClient.categorizeProducts(
+          itemsForAI,
+          categoriesForAI
+        );
+
+        // Step 3: Crea gli ShoppingFoodItem con le categorie dall'AI
+        for (let i = 0; i < itemsForAI.length; i++) {
+          const itemText = itemsForAI[i].text;
+          const aiCategory = categorizationResults[i]?.suggestedCategory;
+
+          result.push({
+            id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            text: itemText,
+            completed: false,
+            category: aiCategory,
+            assignedAutomatically: true,
+            createdAt: new Date()
+          });
+        }
+
+      } catch (error) {
+        console.warn('⚠️ Errore nella categorizzazione AI, creo item senza categoria:', error);
+        
+        // Fallback: crea item senza categoria
+        for (const itemForAI of itemsForAI) {
+          result.push({
+            id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            text: itemForAI.text,
+            completed: false,
+            assignedAutomatically: false,
+            createdAt: new Date()
+          });
+        }
+      }
+    }
+
+    return result;
+  }, [existingShoppingLists, categories]);
 
   // ==================== INITIALIZATION ====================
 
@@ -191,56 +286,95 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
     try {
       let success = false;
       let actionName = '';
-      try
-      {
-      switch (pendingAction.type) {
-              case 'calendar_events':
-                actionName = 'evento calendario';
-                if (config.onAddCalendarEvent) {
-                  await config.onAddCalendarEvent(pendingAction.data);
-                } else {
-                  console.log('📅 Creazione evento:', pendingAction.data);
-                  success = true; // Simulazione successo se non c'è callback
-                }
-                break;
-
-              case 'reminders':
-                actionName = 'promemoria';
-                if (config.onAddReminder) {
-                  await config.onAddReminder(pendingAction.data);
-
-                } else {
-                  console.log('⏰ Creazione promemoria:', pendingAction.data);
-                  success = true;
-                }
-                break;
-
-              case 'notes':
-                actionName = 'nota';
-                if (config.onAddNote) {
-                  await config.onAddNote(pendingAction.data);
-                } else {
-                  console.log('📝 Creazione nota:', pendingAction.data);
-                  success = true;
-                }
-                break;
-
-              case 'shopping_food':
-                actionName = 'lista della spesa';
-                if (config.onAddShoppingFood) {
-                  await config.onAddShoppingFood(pendingAction.data);
-                } else {
-                  console.log('🛒 Creazione lista spesa:', pendingAction.data);
-                  success = true;
-                }
-                break;
+      
+      try {
+        switch (pendingAction.type) {
+          case 'calendar_events':
+            actionName = 'evento calendario';
+            if (config.onAddCalendarEvent) {
+              await config.onAddCalendarEvent(pendingAction.data);
+            } else {
+              console.log('📅 Creazione evento:', pendingAction.data);
+              success = true; // Simulazione successo se non c'è callback
             }
-        success= true;
-      }catch(ex)
-      {
+            break;
+
+          case 'reminders':
+            actionName = 'promemoria';
+            if (config.onAddReminder) {
+              await config.onAddReminder(pendingAction.data);
+            } else {
+              console.log('⏰ Creazione promemoria:', pendingAction.data);
+              success = true;
+            }
+            break;
+
+          case 'notes':
+            actionName = 'nota';
+            if (config.onAddNote) {
+              await config.onAddNote(pendingAction.data);
+            } else {
+              console.log('📝 Creazione nota:', pendingAction.data);
+              success = true;
+            }
+            break;
+
+          case 'shopping_food':
+            actionName = 'lista della spesa';
+            
+            if (config.onAddShoppingFood) {
+              // ==================== CONVERSIONE ITEMS ====================
+              
+              console.log('🛒 Inizio conversione shopping food...');
+              console.log('📝 Dati originali AI:', pendingAction.data);
+              
+              // Estrai i dati dall'AI
+              const { title, items: itemStrings, isPublic } = pendingAction.data;
+              
+              // Genera title di default se mancante
+              const todayStr = new Date().toISOString().split('T')[0];
+              const finalTitle = title || `Spesa del ${todayStr.split('-').reverse().join('/')}`;
+              
+              // Converti stringhe in ShoppingFoodItem[]
+              console.log('🔄 Conversione items:', itemStrings);
+              const convertedItems = await convertItemsToShoppingFoodItems(itemStrings);
+              console.log('✅ Items convertiti:', convertedItems);
+              
+              // Crea l'oggetto completo per Firestore
+              const shoppingFoodData = new ShoppingFood(
+                '', // id verrà generato da Firestore
+                finalTitle,
+                convertedItems,
+                config.username,
+                new Date(),
+                undefined, // supermarketId
+                isPublic || false,
+                false, // isCompleted
+                undefined, // completedAt
+                undefined, // notes
+                undefined, // estimatedTotal
+                undefined, // actualTotal
+                [], // sharedWith
+                undefined, // updatedAt
+                false // isDeleted
+              );
+              
+              console.log('📦 Dati finali per Firestore:', shoppingFoodData);
+              
+              // Salva su Firestore
+              await config.onAddShoppingFood(shoppingFoodData);
+              
+            } else {
+              console.log('🛒 Creazione lista spesa (simulazione):', pendingAction.data);
+              success = true;
+            }
+            break;
+        }
+        success = true;
+      } catch (ex) {
+        console.error('❌ Errore nella creazione:', ex);
         success = false;
       }
-      
 
       // Messaggio di conferma
       const confirmMessage: Message = {
@@ -273,7 +407,7 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
     } finally {
       setIsTyping(false);
     }
-  }, [pendingAction, config]);
+  }, [pendingAction, config, convertItemsToShoppingFoodItems]);
 
   const cancelPendingAction = useCallback(() => {
     setPendingAction(null);
@@ -329,105 +463,103 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
 
   // ==================== VOICE RECOGNITION ====================
 
-// src/hooks/useChat.tsx
-
-const startRecording = useCallback(() => {
-  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-    setError('Il tuo browser non supporta la registrazione vocale');
-    return;
-  }
-
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const recognition = new SpeechRecognition();
-  const paroleChiave = ['aggiungi', 'promemoria', 'evento', 'nota', 'domani', 'spesa', "oggi","dopo","calendario"];
-  const grammar = '#JSGF V1.0; grammar parole; public <parola> = ' + paroleChiave.join(' | ') + ' ;'
-
-// 2. Crea la lista di grammatiche
-const speechRecognitionList = new window.webkitSpeechGrammarList() || new window.SpeechGrammarList();
-speechRecognitionList.addFromString(grammar, 1);
-
-// 3. Assegna la grammatica all'istanza di recognition
-recognition.grammars = speechRecognitionList;
-  
-  recognition.continuous = false;
-  recognition.interimResults = false;
-  recognition.lang = 'it-IT';
-
-  // ==================== LOG DI DEBUG ====================
-  
-  // 1. Il processo sta per iniziare
-  console.log('🎤 Tentativo di avvio della registrazione...');
-
-  recognition.onstart = () => {
-    // 2. Il processo è ufficialmente partito
-    console.log('✅ Registrazione avviata.');
-    setIsRecording(true);
-    setError(null);
-  };
-
-  recognition.onsoundstart = () => {
-    // 3. Rilevato un suono (qualsiasi suono)
-    console.log('🔊 Suono rilevato.');
-  };
-
-  recognition.onspeechstart = () => {
-    // 4. Il suono è stato identificato come parlato
-    console.log('🗣️ Rilevato inizio del parlato.');
-  };
-
-  recognition.onspeechend = () => {
-    // 5. Il parlato è terminato
-    console.log('🛑 Rilevata fine del parlato.');
-  };
-
-  recognition.onsoundend = () => {
-    // 6. Anche i suoni sono terminati
-    console.log('🔇 Suono terminato.');
-  };
-
-recognition.onresult = (event) => {
-  console.log('🎯 RISULTATO OTTENUTO!', event.results);
-  setIsRecording(false);
-  setIsTranscribing(true);
-
-  // Prendi il testo trascritto dall'evento
-  const transcript = event.results[0][0].transcript;
-  
-  if (transcript) {
-    sendMessage(transcript, true); 
-  }
-
-  // La trascrizione è finita, quindi puoi nascondere l'indicatore
-  setTimeout(() => setIsTranscribing(false), 300); // Piccolo ritardo per fluidità
-};
-
-  recognition.onerror = (event) => {
-    // 8. ERRORE! Qualcosa è andato storto.
-    console.error('❌ ERRORE DI RICONOSCIMENTO:', event.error, event.message);
-    setIsRecording(false);
-    setIsTranscribing(false);
-    
-    if (event.error === 'not-allowed') {
-      setError('Permesso microfono negato. Abilita il microfono nelle impostazioni del browser.');
-    } else if (event.error === 'no-speech') {
-      setError('Nessun discorso rilevato. Prova a parlare più forte o in un ambiente meno rumoroso.');
-    } else {
-      setError(`Errore durante la registrazione: ${event.error}`);
+  const startRecording = useCallback(() => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      setError('Il tuo browser non supporta la registrazione vocale');
+      return;
     }
-  };
 
-  recognition.onend = () => {
-    // 9. Il processo è terminato (sempre, sia in caso di successo che di errore)
-    console.log('🏁 Registrazione terminata (evento onend).');
-    setIsRecording(false);
-    // Nota: non impostare isTranscribing su false qui, perché onresult potrebbe essere ancora in elaborazione
-  };
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    const paroleChiave = ['aggiungi', 'promemoria', 'evento', 'nota', 'domani', 'spesa', "oggi","dopo","calendario"];
+    const grammar = '#JSGF V1.0; grammar parole; public <parola> = ' + paroleChiave.join(' | ') + ' ;'
 
-  // =======================================================
+    // 2. Crea la lista di grammatiche
+    const speechRecognitionList = new window.webkitSpeechGrammarList() || new window.SpeechGrammarList();
+    speechRecognitionList.addFromString(grammar, 1);
 
-  recognitionRef.current = recognition;
-  recognition.start();
-}, [sendMessage, isTranscribing]); // Assicurati che le dipendenze siano corrette
+    // 3. Assegna la grammatica all'istanza di recognition
+    recognition.grammars = speechRecognitionList;
+    
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'it-IT';
+
+    // ==================== LOG DI DEBUG ====================
+    
+    // 1. Il processo sta per iniziare
+    console.log('🎤 Tentativo di avvio della registrazione...');
+
+    recognition.onstart = () => {
+      // 2. Il processo è ufficialmente partito
+      console.log('✅ Registrazione avviata.');
+      setIsRecording(true);
+      setError(null);
+    };
+
+    recognition.onsoundstart = () => {
+      // 3. Rilevato un suono (qualsiasi suono)
+      console.log('🔊 Suono rilevato.');
+    };
+
+    recognition.onspeechstart = () => {
+      // 4. Il suono è stato identificato come parlato
+      console.log('🗣️ Rilevato inizio del parlato.');
+    };
+
+    recognition.onspeechend = () => {
+      // 5. Il parlato è terminato
+      console.log('🛑 Rilevata fine del parlato.');
+    };
+
+    recognition.onsoundend = () => {
+      // 6. Anche i suoni sono terminati
+      console.log('🔇 Suono terminato.');
+    };
+
+    recognition.onresult = (event) => {
+      console.log('🎯 RISULTATO OTTENUTO!', event.results);
+      setIsRecording(false);
+      setIsTranscribing(true);
+
+      // Prendi il testo trascritto dall'evento
+      const transcript = event.results[0][0].transcript;
+      
+      if (transcript) {
+        sendMessage(transcript, true); 
+      }
+
+      // La trascrizione è finita, quindi puoi nascondere l'indicatore
+      setTimeout(() => setIsTranscribing(false), 300); // Piccolo ritardo per fluidità
+    };
+
+    recognition.onerror = (event) => {
+      // 8. ERRORE! Qualcosa è andato storto.
+      console.error('❌ ERRORE DI RICONOSCIMENTO:', event.error, event.message);
+      setIsRecording(false);
+      setIsTranscribing(false);
+      
+      if (event.error === 'not-allowed') {
+        setError('Permesso microfono negato. Abilita il microfono nelle impostazioni del browser.');
+      } else if (event.error === 'no-speech') {
+        setError('Nessun discorso rilevato. Prova a parlare più forte o in un ambiente meno rumoroso.');
+      } else {
+        setError(`Errore durante la registrazione: ${event.error}`);
+      }
+    };
+
+    recognition.onend = () => {
+      // 9. Il processo è terminato (sempre, sia in caso di successo che di errore)
+      console.log('🏁 Registrazione terminata (evento onend).');
+      setIsRecording(false);
+      // Nota: non impostare isTranscribing su false qui, perché onresult potrebbe essere ancora in elaborazione
+    };
+
+    // =======================================================
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  }, [sendMessage, isTranscribing]); // Assicurati che le dipendenze siano corrette
 
   const stopRecording = useCallback(() => {
     if (recognitionRef.current) {
@@ -493,4 +625,3 @@ recognition.onresult = (event) => {
     toggleSmartAssistant
   };
 };
-

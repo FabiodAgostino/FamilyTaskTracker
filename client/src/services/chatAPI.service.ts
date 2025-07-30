@@ -50,7 +50,7 @@ export class ChatAPIService {
     this.model = config.model || 'gpt-4.1-nano';
     this.maxTokens = config.maxTokens || 1000;
     this.temperature = config.temperature || 0.7;
-    this.systemPrompt = config.systemPrompt || 'Sei un assistente AI utile, amichevole, familiare e usi le emoji e ogni tanto (una volta su 3 circa) mi chiami per nome: '+username;
+    this.systemPrompt = config.systemPrompt || 'Sei un assistente AI utile, ti chiami Garibaldi, amichevole, familiare e usi le emoji e ogni tanto (una volta su 3 circa) mi chiami per nome: '+username;
     
     if (!this.apiKey) {
       console.error('⚠️ ATTENZIONE: Chiave API OpenAI mancante!');

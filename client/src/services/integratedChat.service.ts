@@ -442,7 +442,7 @@ export class IntegratedChatService {
     const validation = this.validateShoppingFoodData(data);
     
     const responseMessage = validation.isValid 
-      ? `Quindi il titolo sarà "${data.title}" e i prodotti saranno: ${data.items.slice(0, 5).map(item => `${item},`).join('\n')}${data.items.length > 5 ? `\n... e altri ${data.items.length - 5} prodotti, corretto?` : ' corretto?'}}`
+      ? `Quindi il titolo sarà "${data.title}" e i prodotti saranno: ${data.items.slice(0, 5).map(item => `${item},`).join('\n')}${data.items.length > 5 ? `\n... e altri ${data.items.length - 5} prodotti, corretto?` : ' corretto?'}`
       : `❌ **Non posso creare la lista.**\n\nMancano alcune informazioni:\n${validation.errors.map(e => `• ${e}`).join('\n')}\n\nPuoi fornire maggiori dettagli?`;
 
     const message: Message = {

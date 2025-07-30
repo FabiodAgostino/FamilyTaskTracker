@@ -1,5 +1,5 @@
 import React from 'react';
-import { MessageCircle, Send, X, Mic, MicOff, Loader2, Check, XCircle } from 'lucide-react'; // Importa Check e XCircle
+import { MessageCircle, Send, X, Mic, MicOff, Loader2, Check, XCircle, Sparkles } from 'lucide-react'; // Importa Check e XCircle
 import { ChatMessage } from './ChatMessage';
 import { useChatScrolling } from '@/hooks/useChatScrolling';
 import { CHAT_COLORS, CHAT_LABELS } from '@/lib/const/chat.constants';
@@ -127,7 +127,7 @@ export const ChatModal: React.FC<ChatModalProps> = ({
       {/* Container Chat - struttura migliorata */}
       <div
         className="relative w-full max-w-sm mx-4 sm:mb-4 bg-white rounded-t-2xl sm:rounded-2xl shadow-xl transition-all duration-300 transform flex flex-col"
-        style={{ height: 'calc(70vh - 2rem)', maxHeight: '500px', marginBottom:"8vh" }}
+        style={{ height: 'calc(70vh - 2rem)', maxHeight: '500px', bottom:"7vh" }}
       >
         {/* Header Chat - rimane fisso */}
         <div
@@ -136,7 +136,7 @@ export const ChatModal: React.FC<ChatModalProps> = ({
         >
           <div className="flex items-center space-x-2">
             <div className="w-6 h-6 rounded-full bg-white bg-opacity-20 flex items-center justify-center">
-              <MessageCircle size={14} />
+              <Sparkles size={14} />
             </div>
             <div>
               <h3 className="font-medium text-sm">{CHAT_LABELS.assistantName}</h3>
