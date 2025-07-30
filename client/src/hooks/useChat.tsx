@@ -20,6 +20,9 @@ import { CalendarEvent, Note } from '@/lib/models/types';
 import { CategoryFood } from '@/lib/models/food';
 import { DeepSeekCategorizationClient } from '@/lib/deepseek-client';
 import { useFirestore } from './useFirestore';
+import { getFirestoreSearchProvider } from '@/services/firestoreSearchProvider';
+import { ShoppingList } from '@/components/shopping/ShoppingList';
+import { capitalizeFirstLetter } from '@/lib/utils';
 
 // ==================== INTERFACCE ====================
 
@@ -64,10 +67,11 @@ export interface UseChatReturn {
 
 export const useChat = (config: UseChatConfig): UseChatReturn => {
   // ==================== FIRESTORE HOOKS ====================
-  const { data: existingShoppingLists } = useFirestore<ShoppingFood>('shopping_food');
+  const { data: existingShoppingLists } = useFirestore<ShoppingFood>('shopping_food', { includeDeleted: true });
   const { data: categories, add: addCategory } = useFirestore<CategoryFood>('food_categories');
+  const searchProvider = getFirestoreSearchProvider();
 
-  // ==================== STATE ====================
+  // ==================== STATE ===== ===============
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -107,7 +111,7 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
     // Step 1: Cerca categorie esistenti negli shopping già presenti
     for (const itemText of itemStrings) {
       let foundCategory: string | undefined;
-
+      console.log(existingShoppingLists)
       // Cerca in tutti gli shopping esistenti
       for (const shoppingList of existingShoppingLists || []) {
         const existingItem = shoppingList.items.find(
@@ -143,7 +147,6 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
           name: cat.name,
           description: cat.description || 'Nessuna descrizione disponibile'
         })) || [];
-
         const categorizationResults = await DeepSeekCategorizationClient.categorizeProducts(
           itemsForAI,
           categoriesForAI
@@ -162,6 +165,7 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
             assignedAutomatically: true,
             createdAt: new Date()
           });
+         
         }
 
       } catch (error) {
@@ -179,19 +183,25 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
         }
       }
     }
-
+    result.forEach(item => {
+                item.text = capitalizeFirstLetter(item.text);
+              })
     return result;
   }, [existingShoppingLists, categories]);
 
   // ==================== INITIALIZATION ====================
 
   useEffect(() => {
-    // Crea il servizio chat integrato
     chatServiceRef.current = createIntegratedChat({
       username: config.username,
       apiKey: config.apiKey,
-      enableSmartAssistant: config.enableSmartAssistant
-    });
+      enableSmartAssistant: config.enableSmartAssistant,
+      // 🔑 CONNESSIONE AL TUO FIRESTORE
+      searchProvider: {
+        executeQuery: searchProvider.executeQuery.bind(searchProvider),
+        deleteItem: searchProvider.deleteItem.bind(searchProvider),
+        updateItem: searchProvider.updateItem.bind(searchProvider)
+      }})
 
     return () => {
       // Cleanup
@@ -286,13 +296,186 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
     try {
       let success = false;
       let actionName = '';
-      
+      let resultMessage = '';
       try {
         switch (pendingAction.type) {
+          case 'delete_query':
+              actionName = 'cancellazione';
+        
+        if (pendingAction.searchResults?.items && pendingAction.searchResults.items.length > 0) {
+          try {
+            let deletedCount = 0;
+            const totalItems = pendingAction.searchResults.items.length;
+            
+            // Cancella tutti gli elementi trovati
+            for (const item of pendingAction.searchResults.items) {
+              console.log(`🗑️ Cancellazione elemento: ${item.id} (${item.title})`);
+              
+              const deleted = await searchProvider.deleteItem(
+                pendingAction.data.entityType, 
+                item.id
+              );
+              
+              if (deleted) {
+                deletedCount++;
+              } else {
+                console.warn(`⚠️ Impossibile cancellare elemento ${item.id}`);
+              }
+            }
+            
+            if (deletedCount === totalItems) {
+              success = true;
+              resultMessage = deletedCount === 1 
+                ? `Elemento cancellato! "${pendingAction.searchResults.items[0].title}" è stato eliminato definitivamente`
+                : `${deletedCount} elementi cancellati! Tutti gli elementi selezionati sono stati eliminati.`;
+            } else if (deletedCount > 0) {
+              success = true;
+              resultMessage = `Cancellazione parziale: ${deletedCount} su ${totalItems} elementi sono stati cancellati. Alcuni potrebbero non essere stati eliminati a causa di errori.`;
+            } else {
+              success = false;
+              resultMessage = `Nessun elemento cancellato! Si è verificato un errore durante la cancellazione.`;
+            }
+            
+          } catch (deleteError) {
+            console.error('Errore durante la cancellazione:', deleteError);
+            success = false;
+            resultMessage = `Errore durante la cancellazione: ${deleteError instanceof Error ? deleteError.message : 'Errore sconosciuto'}`;
+          }
+        } else {
+          success = false;
+          resultMessage = `Nessun elemento da cancellare** trovato.`;
+        }
+        break;
+         case 'update_query':
+        actionName = 'modifica';
+        
+        if (pendingAction.searchResults?.items?.length === 1) {
+          const itemToUpdate = pendingAction.searchResults.items[0];
+          
+          try {
+            console.log(`✏️ Modifica elemento: ${itemToUpdate.id} (${itemToUpdate.title})`);
+            console.log('📝 Updates da applicare:', pendingAction.data.updates);
+            
+            // ========== GESTIONE SPECIALE PER LISTE DELLA SPESA ==========
+            if (pendingAction.data.entityType === 'shopping_food' && 
+                pendingAction.data.updates.items?.action === 'add') {
+              
+              // Aggiunta elementi alla lista della spesa
+              const currentItems = (itemToUpdate as any).items || [];
+              const newItemsText = pendingAction.data.updates.items.items as string[];
+              
+              console.log('🛒 Aggiunta elementi alla lista spesa:', newItemsText);
+              console.log('📋 Items attuali:', currentItems);
+              
+              // Converti stringhe in ShoppingFoodItem format
+              const itemsToAdd = await convertItemsToShoppingFoodItems(newItemsText);
+              
+              console.log('✅ Items convertiti:', itemsToAdd);
+              
+              // Crea l'oggetto aggiornato
+              const updatedShoppingList = {
+                ...itemToUpdate,
+                items: [...currentItems, ...itemsToAdd],
+                updatedAt: new Date()
+              };
+              
+              success = await searchProvider.updateItem(
+                pendingAction.data.entityType,
+                itemToUpdate.id,
+                updatedShoppingList
+              );
+              
+              if (success) {
+                resultMessage = `Lista aggiornata! Ho aggiunto ${newItemsText.length === 1 ? `"${newItemsText[0]}"` : `${newItemsText.length} elementi`} alla lista "${itemToUpdate.title}"`;
+              }
+              
+            } 
+            // ========== RIMOZIONE ELEMENTI DALLA LISTA ==========
+            else if (pendingAction.data.entityType === 'shopping_food' && 
+                     pendingAction.data.updates.items?.action === 'remove') {
+              
+              const currentItems = (itemToUpdate as any).items || [];
+              const itemsToRemove = pendingAction.data.updates.items.items as string[];
+              
+              console.log('🗑️ Rimozione elementi dalla lista:', itemsToRemove);
+              
+              // Rimuovi elementi per testo
+              const updatedItems = currentItems.filter((item: any) => 
+                !itemsToRemove.some(removeText => 
+                  item.text.toLowerCase().includes(removeText.toLowerCase())
+                )
+              );
+              
+              const updatedShoppingList = {
+                ...itemToUpdate,
+                items: updatedItems,
+                updatedAt: new Date()
+              };
+              
+              success = await searchProvider.updateItem(
+                pendingAction.data.entityType,
+                itemToUpdate.id,
+                updatedShoppingList
+              );
+              
+              if (success) {
+                const removedCount = currentItems.length - updatedItems.length;
+                resultMessage = `🗑️ **Elementi rimossi!** Ho rimosso ${removedCount} elemento${removedCount !== 1 ? 'i' : ''} dalla lista "${itemToUpdate.title}"`;
+              }
+            }
+            // ========== ALTRI TIPI DI AGGIORNAMENTO ==========
+            else {
+              // Aggiornamenti standard (titolo, orario, contenuto, etc.)
+              const updates = { ...pendingAction.data.updates };
+              
+              // Rimuovi il campo items se non è un'operazione su lista spesa
+              if (updates.items && pendingAction.data.entityType !== 'shopping_food') {
+                delete updates.items;
+              }
+              
+              success = await searchProvider.updateItem(
+                pendingAction.data.entityType,
+                itemToUpdate.id,
+                updates
+              );
+              
+              if (success) {
+                // Genera messaggio basato su cosa è stato modificato
+                const changeDescriptions = [];
+                if (updates.title) changeDescriptions.push(`titolo in "${updates.title}"`);
+                if (updates.scheduledTime) changeDescriptions.push(`orario a ${formatDateTime(updates.scheduledTime)}`);
+                if (updates.message) changeDescriptions.push(`messaggio in "${updates.message}"`);
+                if (updates.content) changeDescriptions.push(`contenuto`);
+                if (updates.startDate && updates.endDate) changeDescriptions.push(`data/orario`);
+                
+                const entityName = getEntityDisplayName(pendingAction.data.entityType, true); // singolare
+                resultMessage = `✅ **${entityName} modificat${entityName.endsWith('a') ? 'a' : 'o'}!** Ho cambiato ${changeDescriptions.join(', ')} per "${itemToUpdate.title}"`;
+              }
+            }
+            
+            if (!success) {
+              resultMessage = `Errore nella modifica dell'elemento "${itemToUpdate.title}". Riprova.`;
+            }
+            
+          } catch (updateError) {
+            console.error('Errore durante l\'aggiornamento:', updateError);
+            success = false;
+            resultMessage = `Errore durante la modifica: ${updateError instanceof Error ? updateError.message : 'Errore sconosciuto'}`;
+          }
+          
+        } else if (pendingAction.searchResults?.items?.length === 0) {
+          success = false;
+          resultMessage = `Nessun elemento da modificare trovato.`;
+        } else if (pendingAction.searchResults?.items && pendingAction.searchResults.items.length > 1) {
+          success = false;
+          resultMessage = `Trovati ${pendingAction.searchResults.items.length} elementi. Puoi essere più specifico per identificare quello da modificare?`;
+        }
+        break;
           case 'calendar_events':
             actionName = 'evento calendario';
             if (config.onAddCalendarEvent) {
               await config.onAddCalendarEvent(pendingAction.data);
+              resultMessage="Ho creato il nuovo evento a calendario!";
             } else {
               console.log('📅 Creazione evento:', pendingAction.data);
               success = true; // Simulazione successo se non c'è callback
@@ -303,6 +486,7 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
             actionName = 'promemoria';
             if (config.onAddReminder) {
               await config.onAddReminder(pendingAction.data);
+              resultMessage="Ho creato il nuovo promemoria!";
             } else {
               console.log('⏰ Creazione promemoria:', pendingAction.data);
               success = true;
@@ -313,6 +497,7 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
             actionName = 'nota';
             if (config.onAddNote) {
               await config.onAddNote(pendingAction.data);
+              resultMessage="Ho creato la nuova nota!";
             } else {
               console.log('📝 Creazione nota:', pendingAction.data);
               success = true;
@@ -321,11 +506,11 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
 
           case 'shopping_food':
             actionName = 'lista della spesa';
-            
+            resultMessage="Ho creato la nuova lista della spesa!";
+
             if (config.onAddShoppingFood) {
               // ==================== CONVERSIONE ITEMS ====================
               
-              console.log('🛒 Inizio conversione shopping food...');
               console.log('📝 Dati originali AI:', pendingAction.data);
               
               // Estrai i dati dall'AI
@@ -336,9 +521,7 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
               const finalTitle = title || `Spesa del ${todayStr.split('-').reverse().join('/')}`;
               
               // Converti stringhe in ShoppingFoodItem[]
-              console.log('🔄 Conversione items:', itemStrings);
               const convertedItems = await convertItemsToShoppingFoodItems(itemStrings);
-              console.log('✅ Items convertiti:', convertedItems);
               
               // Crea l'oggetto completo per Firestore
               const shoppingFoodData = new ShoppingFood(
@@ -359,7 +542,6 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
                 false // isDeleted
               );
               
-              console.log('📦 Dati finali per Firestore:', shoppingFoodData);
               
               // Salva su Firestore
               await config.onAddShoppingFood(shoppingFoodData);
@@ -380,8 +562,8 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
       const confirmMessage: Message = {
         id: Date.now().toString(),
         text: success 
-          ? `Perfetto! Ho creato il tuo ${actionName}!` 
-          : `❌ **Errore!** Non sono riuscito a creare il ${actionName}. Riprova o contatta il supporto.`,
+          ? `Perfetto! ${resultMessage}!` 
+          : `Errore! Riprova o contatta il supporto.`,
         isUser: false,
         timestamp: new Date(),
         isVoice: false
@@ -408,6 +590,29 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
       setIsTyping(false);
     }
   }, [pendingAction, config, convertItemsToShoppingFoodItems]);
+ const formatDateTime = useCallback((date: Date): string => {
+  return date.toLocaleString('it-IT', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}, []);
+  const getEntityDisplayName = useCallback((entityType: string, singular: boolean = false): string => {
+  const names: Record<string, { singular: string; plural: string }> = {
+    shopping_food: { singular: 'lista della spesa', plural: 'liste della spesa' },
+    reminders: { singular: 'promemoria', plural: 'promemoria' },
+    notes: { singular: 'nota', plural: 'note' },
+    calendar_events: { singular: 'evento', plural: 'eventi' }
+  };
+  
+  const name = names[entityType];
+  if (!name) return singular ? 'elemento' : 'elementi';
+  
+  return singular ? name.singular : name.plural;
+}, []);
 
   const cancelPendingAction = useCallback(() => {
     setPendingAction(null);

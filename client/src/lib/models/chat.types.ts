@@ -63,4 +63,91 @@ export interface VoiceRecorderProps {
   onStop: () => void;
 }
 
+
+export interface SearchCriteria {
+  entityType: "shopping_food" | "reminders" | "notes" | "calendar_events";
+  searchText?: string;
+  dateRange?: {
+    from?: Date;
+    to?: Date;
+  };
+  filters?: {
+    title?: string;
+    createdBy?: string;
+    isCompleted?: boolean;
+    isActive?: boolean;
+    category?: string;
+    reminderType?: string;
+    eventType?: string;
+    isPublic?: boolean;
+    isPinned?: boolean;
+    isAllDay?: boolean;
+  };
+  limit?: number;
+}
+
+
+
+export interface DeleteOperation {
+  entityType: "shopping_food" | "reminders" | "notes" | "calendar_events";
+  searchCriteria: SearchCriteria;
+  confirmationRequired: boolean;
+  deleteType: "single" | "multiple" | "all_matching";
+}
+
+export interface SearchResult {
+  id: string;
+  title?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+  createdBy?: string;
+  [key: string]: any; // per altri campi specifici del tipo
+}
+
+export interface SearchConfig {
+  collection: string;
+  titleField: string;
+  searchableFields: string[];
+  dateField: string;
+  filterMappings: Record<string, string>;
+}
+
+export interface UpdateOperation {
+  entityType: "shopping_food" | "reminders" | "notes" | "calendar_events";
+  searchCriteria: SearchCriteria;
+  updates: {
+    // Campi comuni
+    title?: string;
+    isPublic?: boolean;
+    
+    // Per Shopping Food
+    items?: {
+      action: "add" | "remove" | "update";
+      items: string[] | { id: string; text: string }[];
+    };
+    
+    // Per Reminders
+    scheduledTime?: Date;
+    message?: string;
+    reminderType?: string;
+    isActive?: boolean;
+    priority?: "low" | "medium" | "high";
+    
+    // Per Notes
+    content?: string;
+    isPinned?: boolean;
+    color?: string;
+    
+    // Per Calendar Events
+    startDate?: Date;
+    endDate?: Date;
+    eventType?: string;
+    isAllDay?: boolean;
+    reminderMinutes?: number;
+    description?: string;
+    location?: string;
+  };
+  confirmationRequired: boolean;
+}
+
 export interface AIChatContextType extends ChatState, ChatActions {}

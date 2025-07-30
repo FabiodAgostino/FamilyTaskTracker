@@ -183,6 +183,8 @@ jobs:
          VITE_FIREBASE_MEASUREMENT_ID=${{ secrets.FIREBASE_MEASUREMENT_ID }}
          VITE_FIREBASE_VAPID_KEY=${{ secrets.FIREBASE_VAPID_KEY }}
          VITE_DEEPSEEK_KEY=${{ secrets.DEEPSEEK_KEY }}
+         VITE_OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+
          
          # Google Services
          VITE_GOOGLE_SEARCH_API_KEY=${{ secrets.GOOGLE_SEARCH_API_KEY }}
@@ -358,6 +360,7 @@ jobs:
          VITE_DEEPSEEK_KEY: ${{ secrets.DEEPSEEK_KEY }}
          VITE_SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
          VITE_SPOTIFY_REDIRECT_URI: ${{ secrets.SPOTIFY_REDIRECT_URI }}
+         VITE_OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
          VITE_PASSWORD_ENCRYPTION_KEY: "SuperTopoliniArrivano1234567890AB"
          VITE_APP_NAME: "Family Task Tracker"
          VITE_APP_VERSION: ${{ steps.version.outputs.version }}

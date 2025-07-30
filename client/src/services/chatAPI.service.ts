@@ -74,6 +74,7 @@ export class ChatAPIService {
       console.log(this.openAIHistory)
       // Chiamata all'API OpenAI
       const response = await this.callOpenAI();
+      console.log(response)
       const aiResponseText = this.extractResponseText(response);
       
       // Crea il messaggio di risposta dell'AI

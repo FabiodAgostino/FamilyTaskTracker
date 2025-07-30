@@ -1,4 +1,5 @@
 import { clsx, type ClassValue } from "clsx"
+import { useCallback } from "react";
 import { twMerge } from "tailwind-merge"
 
 export function cn(...inputs: ClassValue[]) {
@@ -50,6 +51,18 @@ export function viewImage(path:string) : string {
   } else {
     return baseUrl + path;
   }
+}
+
+
+export function capitalizeText(str: string): string {
+  return str.toLowerCase().replace(/(^|\s|['-])[a-z]/g, (match) => {
+    return match.toUpperCase();
+  });
+}
+
+export function capitalizeFirstLetter(str: string): string {
+  if (!str) return str;
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 }
 
 /**
