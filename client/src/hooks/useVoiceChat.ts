@@ -121,7 +121,7 @@ export const useVoiceChat = (config: VoiceChatConfig) => {
       
       processingTimeoutRef.current = window.setTimeout(() => {
         setIsProcessing(false);
-        if (isVoiceChatActive) {
+        if (isVoiceChatActiveRef.current) {
           startListening(); // Riprova se non arriva risposta
         }
       }, 10000); // 10 secondi di timeout
@@ -133,10 +133,10 @@ export const useVoiceChat = (config: VoiceChatConfig) => {
       
       if (event.error === 'no-speech') {
         // Nessun parlato rilevato - riprova automaticamente
-        if (isVoiceChatActive) {
+        if (isVoiceChatActiveRef.current) {
           setTimeout(() => {
             startListening();
-          }, 1000);
+          }, 100);
         }
       } else {
         config.onError?.(`Errore riconoscimento: ${event.error}`);
