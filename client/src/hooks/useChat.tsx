@@ -334,11 +334,8 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
       // Aggiungi il messaggio AI
       setMessages(prev => [...prev, response.message]);
 
-      if (voiceChat.isVoiceChatActive) {
-        await voiceChat.respondWithVoice("Mi dispiace, ho avuto un problema. Puoi ripetere?");
-      }
       // 🎯 SE È CHAT VOCALE, FAI PARLARE L'AI
-      if (voiceChat.isVoiceChatActive) {
+      if (voiceChat.isVoiceChatActiveRef) {
         await voiceChat.respondWithVoice(response.message.text);
     }
       
@@ -346,7 +343,7 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
      if (response.actionRequired) {
     if (response.actionRequired.isValid) {
         // 🗣️ Se la chat vocale è attiva, gestiamo la conferma a voce
-        if (voiceChat.isVoiceChatActive) {
+        if (voiceChat.isVoiceChatActiveRef) {
             setVocalConfirmationAction(response.actionRequired);
             await voiceChat.respondWithVoice(response.message.text + ". Confermi?");
 
@@ -363,7 +360,7 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
       const errorMessage = err instanceof Error ? err.message : 'Errore sconosciuto';
       setError(errorMessage);
       
-      if (voiceChat.isVoiceChatActive) {
+      if (voiceChat.isVoiceChatActiveRef) {
         await voiceChat.respondWithVoice("Mi dispiace, ho avuto un problema. Puoi ripetere?");
       } else {
         // Fallback testuale come prima
@@ -696,7 +693,7 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
       setMessages(prev => [...prev, confirmMessage]);
       setPendingAction(null);
 
-      if (voiceChat.isVoiceChatActive) {
+      if (voiceChat.isVoiceChatActiveRef) {
         await voiceChat.respondWithVoice(confirmMessage.text);
       }
 
@@ -706,7 +703,7 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
       
       const errorMessage: Message = {
         id: Date.now().toString(),
-        text: `❌ **Errore nella creazione:** ${errorMsg}`,
+        text: `Errore nella creazione: ${errorMsg}`,
         isUser: false,
         timestamp: new Date(),
         isVoice: false
@@ -718,6 +715,7 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
       setIsTyping(false);
     }
   }, [pendingAction, config, convertItemsToShoppingFoodItems]);
+
  const formatDateTime = useCallback((date: Date): string => {
   return date.toLocaleString('it-IT', {
     weekday: 'long',
@@ -915,7 +913,7 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
       stopRecording();
     }
     
-    if (voiceChat.isVoiceChatActive) {
+    if (voiceChat.isVoiceChatActiveRef) {
       voiceChat.stopVoiceChat();
     }
     

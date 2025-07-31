@@ -587,7 +587,7 @@ export class IntegratedChatService {
     
     const message: Message = {
       id: this.generateId(),
-      text: `❌ **${context}**\n\n${errorMsg}\n\n🔄 Puoi riprovare o essere più specifico nella richiesta.`,
+      text: `${context} ${errorMsg}. Puoi riprovare o essere più specifico nella richiesta.`,
       isUser: false,
       timestamp: new Date(),
       isVoice: false
@@ -692,7 +692,7 @@ export class IntegratedChatService {
     const validation = this.validateCalendarEventData(data);
     const responseMessage = validation.isValid 
       ? `Dunque il titolo è "${data.title}" e l'ho fissato per il ${this.formatDateRange(data.startDate, data.endDate, data.isAllDay)}.\nIl promemoria ti avvertirà ${data.reminderMinutes} minuti prima.`
-      : `❌ **Non posso creare l'evento.**\n\nMancano alcune informazioni:\n${validation.errors.map(e => `• ${e}`).join('\n')}\n\nPuoi fornire maggiori dettagli?`;
+      : `Mi scuso ma non posso creare l'evento. Mancano alcune informazioni: ${validation.errors.map(e => `• ${e}`).join('\n')}. Puoi fornire maggiori dettagli?`;
 
     const message: Message = {
       id: this.generateId(),
@@ -720,8 +720,8 @@ export class IntegratedChatService {
   private handleReminderCreation(data: ReminderData, originalMessage: string, isVoice: boolean): IntegratedChatResponse {
     const validation = this.validateReminderData(data);
     const responseMessage = validation.isValid 
-      ? `Ok! vediamo un po'... \nIl titolo è: "${data.title}", schedulata per il ${this.formatDateTime(data.scheduledTime)} con il messaggio: "${data.message}".`
-      : `❌ **Non posso creare il promemoria.**\n\nMancano alcune informazioni:\n${validation.errors.map(e => `• ${e}`).join('\n')}\n\nPuoi fornire maggiori dettagli?`;
+      ? `Ok! vediamo un po'... Il titolo è: "${data.title}", schedulata per il ${this.formatDateTime(data.scheduledTime)} con il messaggio: "${data.message}".`
+      : `Mi mancano alcune informazioni: ${validation.errors.map(e => `• ${e}`).join('\n')}. Puoi fornirmi maggiori dettagli?`;
 
     const message: Message = {
       id: this.generateId(),
@@ -750,7 +750,7 @@ export class IntegratedChatService {
     const validation = this.validateNoteData(data);
     const responseMessage = validation.isValid 
       ? `Quindi la nota avrà questo titolo: "${data.title}" e il contenuto: ${data.content}?.\n`
-      : `❌ **Non posso creare la nota.**\n\nMancano alcune informazioni:\n${validation.errors.map(e => `• ${e}`).join('\n')}\n\nPuoi fornire maggiori dettagli?`;
+      : `Mi scuso ma non posso creare la nota. Mancano alcune informazioni:\n${validation.errors.map(e => `• ${e}`).join('\n')}. Puoi fornire maggiori dettagli?`;
 
     const message: Message = {
       id: this.generateId(),
