@@ -335,7 +335,7 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
       setMessages(prev => [...prev, response.message]);
 
       // 🎯 SE È CHAT VOCALE, FAI PARLARE L'AI
-      if (voiceChat.isVoiceChatActiveRef) {
+      if (voiceChat.isVoiceChatActiveRef.current) {
         await voiceChat.respondWithVoice(response.message.text);
     }
       
@@ -343,7 +343,7 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
      if (response.actionRequired) {
     if (response.actionRequired.isValid) {
         // 🗣️ Se la chat vocale è attiva, gestiamo la conferma a voce
-        if (voiceChat.isVoiceChatActiveRef) {
+        if (voiceChat.isVoiceChatActiveRef.current) {
             setVocalConfirmationAction(response.actionRequired);
             await voiceChat.respondWithVoice(response.message.text + ". Confermi?");
 
@@ -360,7 +360,7 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
       const errorMessage = err instanceof Error ? err.message : 'Errore sconosciuto';
       setError(errorMessage);
       
-      if (voiceChat.isVoiceChatActiveRef) {
+      if (voiceChat.isVoiceChatActiveRef.current) {
         await voiceChat.respondWithVoice("Mi dispiace, ho avuto un problema. Puoi ripetere?");
       } else {
         // Fallback testuale come prima
@@ -692,8 +692,7 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
 
       setMessages(prev => [...prev, confirmMessage]);
       setPendingAction(null);
-
-      if (voiceChat.isVoiceChatActiveRef) {
+      if (voiceChat.isVoiceChatActiveRef.current) {
         await voiceChat.respondWithVoice(confirmMessage.text);
       }
 
@@ -913,7 +912,7 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
       stopRecording();
     }
     
-    if (voiceChat.isVoiceChatActiveRef) {
+    if (voiceChat.isVoiceChatActiveRef.current) {
       voiceChat.stopVoiceChat();
     }
     
