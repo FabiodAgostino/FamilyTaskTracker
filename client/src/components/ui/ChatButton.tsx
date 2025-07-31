@@ -10,7 +10,7 @@ export const ChatButton: React.FC<ChatButtonProps> = ({ onClick, isVisible, hide
     
     <div 
       className={`fixed bottom-28 right-4 z-50 transition-all duration-300 ${
-        isVisible ? 'opacity-100 translate-y-0' : 'opacity-30 translate-y-2'
+        isVisible ? 'opacity-100 translate-y-0' : 'opacity-30 translate-y-10 translate-x-3'
       }`}
     >
       <button

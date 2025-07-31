@@ -777,15 +777,20 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
-    const paroleChiave = ['aggiungi', 'promemoria', 'evento', 'nota', 'domani', 'spesa', "oggi","dopo","calendario"];
-    const grammar = '#JSGF V1.0; grammar parole; public <parola> = ' + paroleChiave.join(' | ') + ' ;'
-
-    // 2. Crea la lista di grammatiche
-    const speechRecognitionList = new window.webkitSpeechGrammarList() || new window.SpeechGrammarList();
-    speechRecognitionList.addFromString(grammar, 1);
-
-    // 3. Assegna la grammatica all'istanza di recognition
-    recognition.grammars = speechRecognitionList;
+    const SpeechGrammarList = window.SpeechGrammarList || window.webkitSpeechGrammarList;
+  if (SpeechGrammarList) {
+      const paroleChiave = ['aggiungi', 'promemoria', 'evento', 'nota', 'domani', 'spesa', "oggi", "dopo", "calendario"];
+      const grammar = '#JSGF V1.0; grammar parole; public <parola> = ' + paroleChiave.join(' | ') + ' ;'
+      
+      // 2. Crea e assegna la grammatica SOLO se supportata
+      const speechRecognitionList = new SpeechGrammarList();
+      speechRecognitionList.addFromString(grammar, 1);
+      recognition.grammars = speechRecognitionList;
+      console.log('✅ Grammatica del discorso applicata.');
+    } else {
+      // Messaggio opzionale per il debug
+      console.warn('⚠️ Questo browser non supporta SpeechGrammarList. Il riconoscimento funzionerà senza la grammatica specifica.');
+    }
     
     recognition.continuous = false;
     recognition.interimResults = false;
