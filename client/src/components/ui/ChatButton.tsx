@@ -5,8 +5,9 @@ import { MessageCircle } from 'lucide-react';
 import { ChatButtonProps } from '@/lib/models/chat.types';
 import { CHAT_COLORS, CHAT_LABELS } from '@/lib/const/chat.constants';
 
-export const ChatButton: React.FC<ChatButtonProps> = ({ onClick, isVisible }) => {
-  return (
+export const ChatButton: React.FC<ChatButtonProps> = ({ onClick, isVisible, hide }) => {
+  return !hide &&(
+    
     <div 
       className={`fixed bottom-28 right-4 z-50 transition-all duration-300 ${
         isVisible ? 'opacity-100 translate-y-0' : 'opacity-30 translate-y-2'

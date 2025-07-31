@@ -23,6 +23,7 @@ import { useFirestore } from './useFirestore';
 import { getFirestoreSearchProvider } from '@/services/firestoreSearchProvider';
 import { ShoppingList } from '@/components/shopping/ShoppingList';
 import { capitalizeFirstLetter } from '@/lib/utils';
+import { useVoiceChat } from './useVoiceChat';
 
 // ==================== INTERFACCE ====================
 
@@ -37,7 +38,7 @@ export interface UseChatConfig {
 }
 
 export interface UseChatReturn {
-  // State
+  // State esistenti
   messages: Message[];
   isOpen: boolean;
   isTyping: boolean;
@@ -47,7 +48,13 @@ export interface UseChatReturn {
   error: string | null;
   pendingAction: IntegratedChatResponse['actionRequired'] | null;
   
-  // Actions
+  // 🆕 NUOVI STATI CHAT VOCALE
+  isVoiceChatActive: boolean;
+  isListening: boolean;
+  isSpeaking: boolean;
+  isProcessing: boolean;
+  
+  // Actions esistenti
   sendMessage: (text: string, isVoice?: boolean) => Promise<void>;
   openChat: () => void;
   closeChat: () => void;
@@ -56,7 +63,12 @@ export interface UseChatReturn {
   startRecording: () => void;
   stopRecording: () => void;
   
-  // Smart Assistant Actions
+  // 🆕 NUOVE AZIONI CHAT VOCALE
+  startVoiceChat: () => void;
+  stopVoiceChat: () => void;
+  toggleVoiceChat: () => void;
+  
+  // Smart Assistant Actions esistenti
   confirmPendingAction: () => Promise<void>;
   cancelPendingAction: () => void;
   clearConversation: () => void;
@@ -99,6 +111,24 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const chatServiceRef = useRef<IntegratedChatService | null>(null);
 
+ const voiceChat = useVoiceChat({
+    ttsEndpoint: 'https://europe-west1-familytasktracker-c2dfe.cloudfunctions.net/textToSpeech',
+    onTranscript: (transcript) => {
+      console.log('🎤 Transcript ricevuto:', transcript);
+      // Invia automaticamente il messaggio trascritto
+      sendMessage(transcript, true);
+    },
+    onTTSStart: () => {
+      console.log('🔊 TTS iniziato');
+    },
+    onTTSEnd: () => {
+      console.log('✅ TTS completato');
+    },
+    onError: (error) => {
+      console.error('❌ Voice Chat Error:', error);
+      setError(error);
+    }
+  });
   // ==================== HELPER FUNCTIONS ====================
 
   /**
@@ -213,6 +243,60 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
 
   // ==================== CHAT LOGIC ====================
 
+   const stopRecording = useCallback(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsRecording(false);
+    }
+  }, []);
+
+  const startVoiceChat = useCallback(() => {
+    // Chiudi registrazione normale se attiva
+    if (isRecording) {
+      stopRecording();
+    }
+    
+    voiceChat.startVoiceChat();
+    
+    // Messaggio di avvio
+    const startMessage: Message = {
+      id: Date.now().toString(),
+      text: "🎤 **Chat vocale attivata!** Ora puoi parlare liberamente con me. Dì qualcosa per iniziare!",
+      isUser: false,
+      timestamp: new Date(),
+      isVoice: false,
+      isSystem: true
+    };
+    
+    setMessages(prev => [...prev, startMessage]);
+  }, [isRecording, stopRecording, voiceChat]);
+
+  const stopVoiceChat = useCallback(() => {
+    voiceChat.stopVoiceChat();
+    
+    const stopMessage: Message = {
+      id: Date.now().toString(),
+      text: "⏹️ **Chat vocale disattivata.** Ora puoi tornare a scrivere normalmente.",
+      isUser: false,
+      timestamp: new Date(),
+      isVoice: false,
+      isSystem: true
+    };
+    
+    setMessages(prev => [...prev, stopMessage]);
+  }, [voiceChat]);
+
+  const toggleVoiceChat = useCallback(() => {
+    if (voiceChat.isVoiceChatActive) {
+      stopVoiceChat();
+    } else {
+      startVoiceChat();
+    }
+  }, [voiceChat.isVoiceChatActive, startVoiceChat, stopVoiceChat]);
+
+  
+
+
   const processAIResponse = useCallback(async (userMessage: string, isVoice: boolean = false) => {
     if (!chatServiceRef.current) {
       console.error('❌ Chat service non inizializzato');
@@ -228,12 +312,21 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
       // Aggiungi il messaggio AI
       setMessages(prev => [...prev, response.message]);
       
+      // 🎯 SE È CHAT VOCALE, FAI PARLARE L'AI
+      if (voiceChat.isVoiceChatActive && response.message.text) {
+        await voiceChat.respondWithVoice(response.message.text);
+      }
+      
       // Gestisci azioni richieste
       if (response.actionRequired) {
         if (response.actionRequired.isValid) {
           setPendingAction(response.actionRequired);
+          
+          // 🎯 PAUSA CHAT VOCALE SE C'È UN'AZIONE PENDENTE
+          if (voiceChat.isVoiceChatActive) {
+            voiceChat.stopVoiceChat();
+          }
         } else {
-          // Errori di validazione - l'AI chiederà chiarimenti
           setPendingAction(null);
         }
       }
@@ -242,14 +335,18 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
       const errorMessage = err instanceof Error ? err.message : 'Errore sconosciuto';
       setError(errorMessage);
       
-      // Fallback su risposta simulata in caso di errore
-      console.warn('⚠️ Fallback su risposta simulata:', errorMessage);
-      await simulateAIResponseFallback(userMessage);
+      // 🎯 IN CASO DI ERRORE, FAI PARLARE L'AI SE È CHAT VOCALE
+      if (voiceChat.isVoiceChatActive) {
+        await voiceChat.respondWithVoice("Mi dispiace, ho avuto un problema. Puoi ripetere?");
+      } else {
+        // Fallback testuale come prima
+        await simulateAIResponseFallback(userMessage);
+      }
       
     } finally {
       setIsTyping(false);
     }
-  }, []);
+  }, [voiceChat]);
 
   // Fallback per errori API (mantiene la vecchia logica)
   const simulateAIResponseFallback = useCallback(async (userMessage: string) => {
@@ -572,6 +669,10 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
       setMessages(prev => [...prev, confirmMessage]);
       setPendingAction(null);
 
+      if (voiceChat.isVoiceChatActive) {
+        await voiceChat.respondWithVoice(confirmMessage.text);
+      }
+
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Errore sconosciuto';
       setError(`Errore nella creazione: ${errorMsg}`);
@@ -766,12 +867,7 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
     recognition.start();
   }, [sendMessage, isTranscribing]); // Assicurati che le dipendenze siano corrette
 
-  const stopRecording = useCallback(() => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-      setIsRecording(false);
-    }
-  }, []);
+ 
 
   // ==================== UI ACTIONS ====================
 
@@ -779,15 +875,20 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
     setIsOpen(true);
   }, []);
 
-  const closeChat = useCallback(() => {
+ const closeChat = useCallback(() => {
     setIsOpen(false);
-    // Interrompi registrazione se attiva
+    
+    // Ferma tutto
     if (isRecording) {
       stopRecording();
     }
-    // Cancella azioni pendenti
+    
+    if (voiceChat.isVoiceChatActive) {
+      voiceChat.stopVoiceChat();
+    }
+    
     setPendingAction(null);
-  }, [isRecording, stopRecording]);
+  }, [isRecording, stopRecording, voiceChat]);
 
   const handleInputChange = useCallback((text: string) => {
     setInputText(text);
@@ -804,7 +905,7 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
   // ==================== RETURN ====================
 
   return {
-    // State
+    // State esistenti
     messages,
     isOpen,
     isTyping,
@@ -814,7 +915,13 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
     error,
     pendingAction,
     
-    // Actions
+    // 🆕 NUOVI STATI CHAT VOCALE
+    isVoiceChatActive: voiceChat.isVoiceChatActive,
+    isListening: voiceChat.isListening,
+    isSpeaking: voiceChat.isSpeaking,
+    isProcessing: voiceChat.isProcessing,
+    
+    // Actions esistenti
     sendMessage,
     openChat,
     closeChat,
@@ -823,7 +930,12 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
     startRecording,
     stopRecording,
     
-    // Smart Assistant Actions
+    // 🆕 NUOVE AZIONI CHAT VOCALE
+    startVoiceChat,
+    stopVoiceChat,
+    toggleVoiceChat,
+    
+    // Smart Assistant Actions esistenti
     confirmPendingAction,
     cancelPendingAction,
     clearConversation,

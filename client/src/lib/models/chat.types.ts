@@ -32,6 +32,7 @@ export interface ChatActions {
 export interface ChatButtonProps {
   onClick: () => void;
   isVisible: boolean;
+  hide:boolean;
 }
 
 export interface ChatModalProps {
@@ -54,6 +55,7 @@ export interface ChatModalProps {
 
 export interface ChatMessageProps {
   message: Message;
+  isTyping?: boolean;
 }
 
 export interface VoiceRecorderProps {

@@ -28,7 +28,11 @@ const AIChatComponent: React.FC = () => {
     inputText,
     isRecording,
     isTranscribing,
-    
+    isVoiceChatActive,
+    isListening,
+    isSpeaking,
+    isProcessing,
+    toggleVoiceChat,
     // 🆕 Nuovi stati Smart Assistant
     error,
     pendingAction,
@@ -62,6 +66,7 @@ const AIChatComponent: React.FC = () => {
       <ChatButton 
         onClick={openChat}
         isVisible={isButtonVisible}
+        hide={isOpen}
       />
 
       {/* ==================== MODAL CHAT ==================== */}
@@ -79,7 +84,12 @@ const AIChatComponent: React.FC = () => {
         onStartRecording={startRecording}
         onStopRecording={stopRecording}
         onConfirmPendingAction={confirmPendingAction}
-        onCancelPendingAction={cancelPendingAction} pendingAction={pendingAction} error={null}      />
+        onCancelPendingAction={cancelPendingAction} pendingAction={pendingAction} error={null}  
+        isVoiceChatActive={isVoiceChatActive}
+        isListening={isListening}
+        isSpeaking={isSpeaking}
+        isProcessing={isProcessing}
+        onToggleVoiceChat={toggleVoiceChat}     />
     </>
   );
 };

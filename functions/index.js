@@ -16,6 +16,7 @@ if (!admin.apps.length) {
 // Import dei servizi modulari
 const { scraperService } = require('./services/scraping-service');
 const { priceMonitorService } = require('./services/price-monitor-service');
+const {getTtsCharacterCount, USAGE_THRESHOLD} = require('./services/big-query');
 const {
     onDocumentChange,
     testRealtimeNotifications,
@@ -129,8 +130,11 @@ exports.onShoppingItemCreated = functions
     
     // ✅ CORS CONFIGURABILE PER AMBIENTE
     const allowedOrigins = [
-      'http://localhost:3000',
-      'https://fabiodagostino.github.io',                         
+      'http://localhost:3000',      // ✅ HTTP per sviluppo locale
+      'https://localhost:3000',     // ✅ HTTPS per sviluppo locale
+      'http://127.0.0.1:3000',      // ✅ HTTP con IP
+      'https://127.0.0.1:3000',     // ✅ HTTPS con IP
+      'https://fabiodagostino.github.io'  // ✅ Produzione
     ];
 
     const origin = req.get('Origin');
@@ -221,7 +225,169 @@ exports.onShoppingItemCreated = functions
 
 
 
+exports.textToSpeech = functions
+  .region('europe-west1')
+  .runWith({
+    memory: '256MB',
+    timeoutSeconds: 60
+  })
+  .https.onRequest(async (req, res) => {
+    
+    // ✅ CORS CONFIGURABILE PER AMBIENTE
+    const allowedOrigins = [
+      'http://localhost:3000',      // ✅ HTTP per sviluppo locale
+      'https://localhost:3000',     // ✅ HTTPS per sviluppo locale
+      'http://127.0.0.1:3000',      // ✅ HTTP con IP
+      'https://127.0.0.1:3000',     // ✅ HTTPS con IP
+      'https://fabiodagostino.github.io'  // ✅ Produzione
+    ];
 
+    const origin = req.get('Origin');
+    const isAllowedOrigin = allowedOrigins.includes(origin) || !origin; // Nessun origin per richieste server-to-server
+
+    // Imposta CORS headers
+    if (isAllowedOrigin && origin) {
+      res.set('Access-Control-Allow-Origin', origin);
+    } else if (!origin) {
+      res.set('Access-Control-Allow-Origin', '*'); // Per richieste dirette senza browser
+    }
+    
+    res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.set('Access-Control-Max-Age', '3600');
+    res.set('Access-Control-Allow-Credentials', 'true');
+
+    // Gestione preflight
+    if (req.method === 'OPTIONS') {
+      console.log(`🌐 CORS preflight from origin: ${origin}`);
+      res.status(204).send('');
+      return;
+    }
+
+    // Blocca origini non autorizzate in produzione
+    if (origin && !isAllowedOrigin && process.env.NODE_ENV === 'production') {
+      console.log(`🚫 Blocked request from unauthorized origin: ${origin}`);
+      return res.status(403).json({ 
+        error: 'Origin not allowed',
+        success: false 
+      });
+    }
+
+    // Verifica metodo
+    if (req.method !== 'POST') {
+      console.log(`❌ Method not allowed: ${req.method}`);
+      return res.status(405).json({ 
+        error: 'Method not allowed. Use POST.',
+        success: false 
+      });
+    }
+    const { text } = req.body;
+    
+    // Validazione input
+    if (!text || typeof text !== 'string' || text.trim().length === 0) {
+      console.log(`❌ TTS: Invalid text provided`);
+      return res.status(400).json({ 
+        error: 'È richiesto un testo valido nel campo "text".',
+        success: false 
+      });
+    }
+
+    if (text.length > 5000) {
+      console.log(`❌ TTS: Text too long: ${text.length} characters`);
+      return res.status(400).json({ 
+        error: 'Il testo non può superare i 5000 caratteri.',
+        success: false 
+      });
+    }
+
+    try {
+      console.log(`🔊 TTS: Richiesta sintesi vocale da ${origin}: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
+       const currentUsage = await getTtsCharacterCount();
+        console.log(`📈 Utilizzo attuale TTS: ${currentUsage} / ${FREE_TIER_LIMIT} caratteri.`);
+
+        if (currentUsage >= FREE_TIER_LIMIT * USAGE_THRESHOLD) {
+          console.log(`🚫 Quota Free Tier quasi esaurita. Utilizzo: ${currentUsage}. Blocco la richiesta.`);
+          // Invece di un errore, puoi tornare 'false' come richiesto
+          return res.status(200).json({ 
+            success: false,
+            error: 'Free tier monthly limit reached.',
+            reason: 'QUOTA_EXCEEDED'
+          });
+        }
+      // Lazy import per ottimizzare cold start
+      const { TextToSpeechClient } = require('@google-cloud/text-to-speech');
+      const ttsClient = new TextToSpeechClient();
+
+      const request = {
+        input: { text: text.trim() },
+        voice: {
+          languageCode: 'it-IT',
+          name: 'it-IT-Chirp3-HD-Orus',  
+          ssmlGender: 'MALE'
+        },
+        audioConfig: {
+          audioEncoding: 'MP3',
+          speakingRate: 1.0,
+          pitch: 0.0,
+          volumeGainDb: 0.0
+        }
+      };
+
+      console.log(`🎙️ TTS: Avvio sintesi con voce ${request.voice.name}`);
+      
+      // Esegui la sintesi
+      const [response] = await ttsClient.synthesizeSpeech(request);
+
+      if (!response.audioContent) {
+        throw new Error('Nessun contenuto audio ricevuto dall\'API');
+      }
+
+      console.log(`✅ TTS: Sintesi completata con successo`);
+      
+      return res
+        .status(200)
+        .set('Content-Type', 'application/json; charset=utf-8')
+        .json({
+          success: true,
+          audioContent: response.audioContent.toString('base64'),
+          metadata: {
+            voice: 'it-IT-Standard-C (Maschile)',
+            languageCode: 'it-IT',
+            audioEncoding: 'MP3',
+            textLength: text.length,
+            estimatedCost: 'Free Tier'
+          },
+          timestamp: new Date().toISOString()
+        });
+        
+    } catch (error) {
+      console.error(`❌ TTS: Errore nella sintesi vocale:`, error);
+      
+      // Gestione errori specifici dell'API Google
+      let errorMessage = 'Errore interno nella sintesi vocale';
+      let statusCode = 500;
+      
+      if (error.code === 3) {
+        errorMessage = 'Testo non valido o troppo lungo';
+        statusCode = 400;
+      } else if (error.code === 7) {
+        errorMessage = 'API Key non valida o quota esaurita';
+        statusCode = 401;
+      } else if (error.code === 8) {
+        errorMessage = 'Limite di utilizzo superato';
+        statusCode = 429;
+      }
+      
+      return res
+        .status(statusCode)
+        .json({ 
+          error: errorMessage,
+          details: error.message,
+          success: false,
+          timestamp: new Date().toISOString()
+        });
+    }
+  });
 
 
 
