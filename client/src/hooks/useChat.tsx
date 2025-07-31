@@ -104,7 +104,8 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<IntegratedChatResponse['actionRequired'] | null>(null);
-  
+  const [vocalConfirmationAction, setVocalConfirmationAction] = useState<IntegratedChatResponse['actionRequired'] | null>(null);
+
   // ==================== REFS ====================
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -113,10 +114,33 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
 
  const voiceChat = useVoiceChat({
     ttsEndpoint: 'https://europe-west1-familytasktracker-c2dfe.cloudfunctions.net/textToSpeech',
-    onTranscript: (transcript) => {
-      console.log('🎤 Transcript ricevuto:', transcript);
-      // Invia automaticamente il messaggio trascritto
-      sendMessage(transcript, true);
+     onTranscript: async (transcript) => {
+        console.log('🎤 Transcript ricevuto:', transcript);
+
+        // Controlla se siamo in attesa di una conferma vocale
+        if (vocalConfirmationAction) {
+            const confirmationText = transcript.toLowerCase().trim();
+
+            if (['conferma', 'sì', 'confermo', 'ok', 'procedi'].includes(confirmationText)) {
+                setPendingAction(vocalConfirmationAction);
+                setTimeout(() => confirmPendingAction(), 50);
+
+            } else if (['annulla', 'no', 'cancella', 'ferma'].includes(confirmationText)) {
+                // L'utente ha annullato.
+                cancelPendingAction();
+            } else {
+                // Risposta non chiara, annulliamo per sicurezza
+                await voiceChat.respondWithVoice("Non ho capito. Per sicurezza, ho annullato l'operazione.");
+                cancelPendingAction();
+            }
+            
+            // Puliamo lo stato di attesa vocale
+            setVocalConfirmationAction(null);
+
+        } else {
+            // Comportamento normale: invia il messaggio trascritto
+            sendMessage(transcript, true);
+        }
     },
     onTTSStart: () => {
       console.log('🔊 TTS iniziato');
@@ -257,7 +281,6 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
     }
     
     voiceChat.startVoiceChat();
-    
     // Messaggio di avvio
     const startMessage: Message = {
       id: Date.now().toString(),
@@ -302,7 +325,6 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
       console.error('❌ Chat service non inizializzato');
       return;
     }
-
     setIsTyping(true);
     setError(null);
 
@@ -311,31 +333,36 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
       
       // Aggiungi il messaggio AI
       setMessages(prev => [...prev, response.message]);
-      
-      // 🎯 SE È CHAT VOCALE, FAI PARLARE L'AI
-      if (voiceChat.isVoiceChatActive && response.message.text) {
-        await voiceChat.respondWithVoice(response.message.text);
+
+      if (voiceChat.isVoiceChatActive) {
+        await voiceChat.respondWithVoice("Mi dispiace, ho avuto un problema. Puoi ripetere?");
       }
+      // 🎯 SE È CHAT VOCALE, FAI PARLARE L'AI
+      if (voiceChat.isVoiceChatActive) {
+        await voiceChat.respondWithVoice(response.message.text);
+    }
       
       // Gestisci azioni richieste
-      if (response.actionRequired) {
-        if (response.actionRequired.isValid) {
-          setPendingAction(response.actionRequired);
-          
-          // 🎯 PAUSA CHAT VOCALE SE C'È UN'AZIONE PENDENTE
-          if (voiceChat.isVoiceChatActive) {
-            voiceChat.stopVoiceChat();
-          }
+     if (response.actionRequired) {
+    if (response.actionRequired.isValid) {
+        // 🗣️ Se la chat vocale è attiva, gestiamo la conferma a voce
+        if (voiceChat.isVoiceChatActive) {
+            setVocalConfirmationAction(response.actionRequired);
+            await voiceChat.respondWithVoice(response.message.text + ". Confermi?");
+
         } else {
-          setPendingAction(null);
+            // Comportamento standard: mostra i pulsanti di conferma nella UI
+            setPendingAction(response.actionRequired);
         }
-      }
+    } else {
+        setPendingAction(null); // L'azione non è valida
+    }
+}
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Errore sconosciuto';
       setError(errorMessage);
       
-      // 🎯 IN CASO DI ERRORE, FAI PARLARE L'AI SE È CHAT VOCALE
       if (voiceChat.isVoiceChatActive) {
         await voiceChat.respondWithVoice("Mi dispiace, ho avuto un problema. Puoi ripetere?");
       } else {
@@ -346,7 +373,7 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
     } finally {
       setIsTyping(false);
     }
-  }, [voiceChat]);
+  }, [voiceChat.isVoiceChatActive]);
 
   // Fallback per errori API (mantiene la vecchia logica)
   const simulateAIResponseFallback = useCallback(async (userMessage: string) => {

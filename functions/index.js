@@ -16,7 +16,7 @@ if (!admin.apps.length) {
 // Import dei servizi modulari
 const { scraperService } = require('./services/scraping-service');
 const { priceMonitorService } = require('./services/price-monitor-service');
-const {getTtsCharacterCount, USAGE_THRESHOLD} = require('./services/big-query');
+const { isDailyQuotaExceeded, getQuotaCacheStatus } = require('./services/quota-checker');
 const {
     onDocumentChange,
     testRealtimeNotifications,
@@ -243,13 +243,13 @@ exports.textToSpeech = functions
     ];
 
     const origin = req.get('Origin');
-    const isAllowedOrigin = allowedOrigins.includes(origin) || !origin; // Nessun origin per richieste server-to-server
+    const isAllowedOrigin = allowedOrigins.includes(origin) || !origin;
 
     // Imposta CORS headers
     if (isAllowedOrigin && origin) {
       res.set('Access-Control-Allow-Origin', origin);
     } else if (!origin) {
-      res.set('Access-Control-Allow-Origin', '*'); // Per richieste dirette senza browser
+      res.set('Access-Control-Allow-Origin', '*');
     }
     
     res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -273,6 +273,16 @@ exports.textToSpeech = functions
       });
     }
 
+    // ✅ ENDPOINT DI STATUS (per debug)
+    if (req.method === 'GET' && req.query.status === 'true') {
+      const cacheStatus = getQuotaCacheStatus();
+      return res.status(200).json({
+        success: true,
+        quotaStatus: cacheStatus,
+        timestamp: new Date().toISOString()
+      });
+    }
+
     // Verifica metodo
     if (req.method !== 'POST') {
       console.log(`❌ Method not allowed: ${req.method}`);
@@ -281,6 +291,7 @@ exports.textToSpeech = functions
         success: false 
       });
     }
+
     const { text } = req.body;
     
     // Validazione input
@@ -302,18 +313,39 @@ exports.textToSpeech = functions
 
     try {
       console.log(`🔊 TTS: Richiesta sintesi vocale da ${origin}: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
-       const currentUsage = await getTtsCharacterCount();
-        console.log(`📈 Utilizzo attuale TTS: ${currentUsage} / ${FREE_TIER_LIMIT} caratteri.`);
-
-        if (currentUsage >= FREE_TIER_LIMIT * USAGE_THRESHOLD) {
-          console.log(`🚫 Quota Free Tier quasi esaurita. Utilizzo: ${currentUsage}. Blocco la richiesta.`);
-          // Invece di un errore, puoi tornare 'false' come richiesto
-          return res.status(200).json({ 
-            success: false,
-            error: 'Free tier monthly limit reached.',
-            reason: 'QUOTA_EXCEEDED'
-          });
-        }
+      
+      // ✅ CONTROLLO QUOTA GIORNALIERO (BigQuery solo 1 volta al giorno)
+      const quotaCheck = await isDailyQuotaExceeded();
+      
+      console.log(`📊 Controllo quota completato:`);
+      console.log(`   🎯 Quota superata: ${quotaCheck.quotaExceeded ? 'SÌ' : 'NO'}`);
+      console.log(`   📊 Caratteri utilizzati: ${quotaCheck.charactersUsed.toLocaleString()}`);
+      console.log(`   💾 Da cache: ${quotaCheck.fromCache ? 'SÌ' : 'NO (prima volta oggi)'}`);
+      if (quotaCheck.lastChecked) {
+        console.log(`   📅 Ultimo check: ${quotaCheck.lastChecked}`);
+      }
+      
+      // ✅ BLOCCA SE QUOTA SUPERATA
+      if (quotaCheck.quotaExceeded) {
+        console.log(`🚫 Quota Free Tier superata. Blocco la richiesta fino a fine mese.`);
+        return res.status(200).json({ 
+          success: false,
+          error: 'Free tier monthly limit reached. Service will be restored next month.',
+          reason: 'QUOTA_EXCEEDED',
+          quotaInfo: {
+            charactersUsed: quotaCheck.charactersUsed,
+            limit: 1000000,
+            threshold: 0.85,
+            fromCache: quotaCheck.fromCache,
+            lastChecked: quotaCheck.lastChecked
+          },
+          timestamp: new Date().toISOString()
+        });
+      }
+      
+      // ✅ PROCEDI CON LA SINTESI TTS
+      console.log(`✅ Quota OK. Procedo con la sintesi TTS...`);
+      
       // Lazy import per ottimizzare cold start
       const { TextToSpeechClient } = require('@google-cloud/text-to-speech');
       const ttsClient = new TextToSpeechClient();
@@ -327,7 +359,7 @@ exports.textToSpeech = functions
         },
         audioConfig: {
           audioEncoding: 'MP3',
-          speakingRate: 1.0,
+          speakingRate: 1.19,
           pitch: 0.0,
           volumeGainDb: 0.0
         }
@@ -351,11 +383,18 @@ exports.textToSpeech = functions
           success: true,
           audioContent: response.audioContent.toString('base64'),
           metadata: {
-            voice: 'it-IT-Standard-C (Maschile)',
+            voice: 'it-IT-Chirp3-HD-Orus (Maschile)',
             languageCode: 'it-IT',
             audioEncoding: 'MP3',
             textLength: text.length,
             estimatedCost: 'Free Tier'
+          },
+          quotaInfo: {
+            charactersUsed: quotaCheck.charactersUsed,
+            limit: 1000000,
+            threshold: 0.85,
+            fromCache: quotaCheck.fromCache,
+            remainingBeforeLimit: Math.max(0, Math.floor(1000000 * 0.85) - quotaCheck.charactersUsed)
           },
           timestamp: new Date().toISOString()
         });
