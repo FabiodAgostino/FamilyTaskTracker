@@ -61,7 +61,7 @@ export const useVoiceChat = (config: VoiceChatConfig) => {
           config.onTTSEnd?.();
           
           // 🎯 RIATTIVA AUTOMATICAMENTE L'ASCOLTO
-          if (isVoiceChatActive) {
+          if (isVoiceChatActiveRef.current) {
             setTimeout(() => {
               startListening();
             }, 500);
@@ -216,7 +216,7 @@ export const useVoiceChat = (config: VoiceChatConfig) => {
             config.onTTSEnd?.();
             
             // 🎯 RIATTIVA AUTOMATICAMENTE L'ASCOLTO
-            if (isVoiceChatActive) {
+            if (isVoiceChatActiveRef.current) {
               setTimeout(() => {
                 startListening();
               }, 500);

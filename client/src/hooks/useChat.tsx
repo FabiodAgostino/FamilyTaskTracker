@@ -335,26 +335,26 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
       setMessages(prev => [...prev, response.message]);
 
       // 🎯 SE È CHAT VOCALE, FAI PARLARE L'AI
-      if (voiceChat.isVoiceChatActiveRef.current) {
+      if (voiceChat.isVoiceChatActiveRef.current && (!response.actionRequired || !response.actionRequired.isValid)) {
         await voiceChat.respondWithVoice(response.message.text);
     }
       
       // Gestisci azioni richieste
      if (response.actionRequired) {
-    if (response.actionRequired.isValid) {
-        // 🗣️ Se la chat vocale è attiva, gestiamo la conferma a voce
-        if (voiceChat.isVoiceChatActiveRef.current) {
-            setVocalConfirmationAction(response.actionRequired);
-            await voiceChat.respondWithVoice(response.message.text + ". Confermi?");
+      if (response.actionRequired.isValid) {
+          // 🗣️ Se la chat vocale è attiva, gestiamo la conferma a voce
+          if (voiceChat.isVoiceChatActiveRef.current) {
+              setVocalConfirmationAction(response.actionRequired);
+              await voiceChat.respondWithVoice(response.message.text + ". Confermi?");
 
-        } else {
-            // Comportamento standard: mostra i pulsanti di conferma nella UI
-            setPendingAction(response.actionRequired);
-        }
-    } else {
-        setPendingAction(null); // L'azione non è valida
+          } else {
+              // Comportamento standard: mostra i pulsanti di conferma nella UI
+              setPendingAction(response.actionRequired);
+          }
+      } else {
+          setPendingAction(null); // L'azione non è valida
+      }
     }
-}
       
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Errore sconosciuto';
