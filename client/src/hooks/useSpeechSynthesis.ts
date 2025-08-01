@@ -42,9 +42,7 @@ export const useSpeechSynthesis = () => {
     if (italianVoices.length > 0) {
       // Preferisci voci Google/Microsoft se disponibili
       const premiumVoice = italianVoices.find(voice => 
-        voice.name.toLowerCase().includes('google') ||
-        voice.name.toLowerCase().includes('microsoft') ||
-        voice.name.toLowerCase().includes('natural')
+        voice.name.toLowerCase().includes('google')
       );
       
       if (premiumVoice) return premiumVoice;
@@ -98,7 +96,7 @@ export const useSpeechSynthesis = () => {
       }
 
       // ✅ CONFIGURA PARAMETRI
-      utterance.rate = options.rate || 1.0;
+      utterance.rate = options.rate || 1.3;
       utterance.pitch = options.pitch || 1.0;
       utterance.volume = options.volume || 1.0;
 

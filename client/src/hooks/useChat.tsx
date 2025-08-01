@@ -1,6 +1,6 @@
 // src/components/chat/hooks/useChat.tsx
 
-import { CHAT_LABELS, AI_RESPONSES } from '@/lib/const/chat.constants';
+import { CHAT_LABELS } from '@/lib/const/chat.constants';
 import { Message } from '@/lib/models/chat.types';
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { 
@@ -8,12 +8,6 @@ import {
   IntegratedChatResponse, 
   createIntegratedChat 
 } from '../services/integratedChat.service';
-import { 
-  CalendarEventData, 
-  ReminderData, 
-  NoteData, 
-  ShoppingFoodData 
-} from '../services/smartAssistant.service';
 import { ShoppingFood, ShoppingFoodItem } from '@/lib/models/food';
 import { Reminder } from '@/lib/models/reminder';
 import { CalendarEvent, Note } from '@/lib/models/types';
@@ -21,7 +15,6 @@ import { CategoryFood } from '@/lib/models/food';
 import { DeepSeekCategorizationClient } from '@/lib/deepseek-client';
 import { useFirestore } from './useFirestore';
 import { getFirestoreSearchProvider } from '@/services/firestoreSearchProvider';
-import { ShoppingList } from '@/components/shopping/ShoppingList';
 import { capitalizeFirstLetter } from '@/lib/utils';
 import { useVoiceChat } from './useVoiceChat';
 
@@ -103,8 +96,18 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pendingAction, setPendingAction] = useState<IntegratedChatResponse['actionRequired'] | null>(null);
-  const [vocalConfirmationAction, setVocalConfirmationAction] = useState<IntegratedChatResponse['actionRequired'] | null>(null);
+  var [pendingAction, setPendingAction] = useState<IntegratedChatResponse['actionRequired'] | null>(null);
+  const vocalConfirmationActionRef = useRef<IntegratedChatResponse['actionRequired'] | null>(null);
+
+
+  const setVocalConfirmationAction = useCallback((action: IntegratedChatResponse['actionRequired'] | null) => {
+  vocalConfirmationActionRef.current = action;
+  console.log('🔄 CAMBIO vocalConfirmationActionRef:', action);
+}, []);
+
+const getVocalConfirmationAction = useCallback(() => {
+  return vocalConfirmationActionRef.current;
+}, []);
 
   // ==================== REFS ====================
   
@@ -115,32 +118,9 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
  const voiceChat = useVoiceChat({
     ttsEndpoint: 'https://europe-west1-familytasktracker-c2dfe.cloudfunctions.net/textToSpeech',
      onTranscript: async (transcript) => {
-        console.log('🎤 Transcript ricevuto:', transcript);
+   
+            sendMessage(transcript.toLowerCase(), true);
 
-        // Controlla se siamo in attesa di una conferma vocale
-        if (vocalConfirmationAction) {
-            const confirmationText = transcript.toLowerCase().trim();
-
-            if (['conferma', 'sì', 'confermo', 'ok', 'procedi'].includes(confirmationText)) {
-                setPendingAction(vocalConfirmationAction);
-                setTimeout(() => confirmPendingAction(), 50);
-
-            } else if (['annulla', 'no', 'cancella', 'ferma'].includes(confirmationText)) {
-                // L'utente ha annullato.
-                cancelPendingAction();
-            } else {
-                // Risposta non chiara, annulliamo per sicurezza
-                await voiceChat.respondWithVoice("Non ho capito. Per sicurezza, ho annullato l'operazione.");
-                cancelPendingAction();
-            }
-            
-            // Puliamo lo stato di attesa vocale
-            setVocalConfirmationAction(null);
-
-        } else {
-            // Comportamento normale: invia il messaggio trascritto
-            sendMessage(transcript, true);
-        }
     },
     onTTSStart: () => {
       console.log('🔊 TTS iniziato');
@@ -317,103 +297,14 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
     }
   }, [voiceChat.isVoiceChatActive, startVoiceChat, stopVoiceChat]);
 
-  
-
-
-  const processAIResponse = useCallback(async (userMessage: string, isVoice: boolean = false) => {
-    if (!chatServiceRef.current) {
-      console.error('❌ Chat service non inizializzato');
-      return;
+    const confirmPendingAction = useCallback(async (pending: any = null) => {
+    if(pending || pending.isValid)
+    {
+      pendingAction = pending;
     }
+    if ((!pendingAction || !pendingAction.isValid)) return;
+      
     setIsTyping(true);
-    setError(null);
-
-    try {
-      const response = await chatServiceRef.current.processMessage(userMessage, isVoice);
-      
-      // Aggiungi il messaggio AI
-      setMessages(prev => [...prev, response.message]);
-
-      // 🎯 SE È CHAT VOCALE, FAI PARLARE L'AI
-      if (voiceChat.isVoiceChatActiveRef.current && (!response.actionRequired || !response.actionRequired.isValid)) {
-        await voiceChat.respondWithVoice(response.message.text);
-    }
-      
-      // Gestisci azioni richieste
-     if (response.actionRequired) {
-      if (response.actionRequired.isValid) {
-          // 🗣️ Se la chat vocale è attiva, gestiamo la conferma a voce
-          if (voiceChat.isVoiceChatActiveRef.current) {
-              setVocalConfirmationAction(response.actionRequired);
-              await voiceChat.respondWithVoice(response.message.text + ". Confermi?");
-
-          } else {
-              // Comportamento standard: mostra i pulsanti di conferma nella UI
-              setPendingAction(response.actionRequired);
-          }
-      } else {
-          setPendingAction(null); // L'azione non è valida
-      }
-    }
-      
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Errore sconosciuto';
-      setError(errorMessage);
-      
-      if (voiceChat.isVoiceChatActiveRef.current) {
-        await voiceChat.respondWithVoice("Mi dispiace, ho avuto un problema. Puoi ripetere?");
-      } else {
-        // Fallback testuale come prima
-        await simulateAIResponseFallback(userMessage);
-      }
-      
-    } finally {
-      setIsTyping(false);
-    }
-  }, [voiceChat.isVoiceChatActive]);
-
-  // Fallback per errori API (mantiene la vecchia logica)
-  const simulateAIResponseFallback = useCallback(async (userMessage: string) => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const fallbackResponse = `Mi dispiace, ho avuto un problema con la connessione. Per ora posso solo rispondere in modo limitato.\n\n💡 **Messaggio ricevuto:** "${userMessage}"\n\n🔧 **Suggerimento:** Verifica la configurazione della chiave API.`;
-    
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      text: fallbackResponse,
-      isUser: false,
-      timestamp: new Date(),
-      isVoice: false
-    };
-    
-    setMessages(prev => [...prev, newMessage]);
-  }, []);
-
-  const sendMessage = useCallback(async (text: string, isVoice: boolean = false) => {
-    if (!text.trim()) return;
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      text: text.trim(),
-      isUser: true,
-      timestamp: new Date(),
-      isVoice
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInputText('');
-
-    // Processa con AI reale
-    await processAIResponse(text.trim(), isVoice);
-  }, [processAIResponse]);
-
-  // ==================== SMART ASSISTANT ACTIONS ====================
-
-  const confirmPendingAction = useCallback(async () => {
-    if (!pendingAction || !pendingAction.isValid) return;
-
-    setIsTyping(true);
-    
     try {
       let success = false;
       let actionName = '';
@@ -715,6 +606,155 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
     }
   }, [pendingAction, config, convertItemsToShoppingFoodItems]);
 
+  const cancelPendingAction = useCallback(() => {
+    setPendingAction(null);
+    
+    const cancelMessage: Message = {
+      id: Date.now().toString(),
+      text: "Come non detto... Posso aiutarti con qualcos'altro?",
+      isUser: false,
+      timestamp: new Date(),
+      isVoice: false
+    };
+
+    setMessages(prev => [...prev, cancelMessage]);
+  }, []);
+  const simulateAIResponseFallback = useCallback(async (userMessage: string) => {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    const fallbackResponse = `Mi dispiace, ho avuto un problema con la connessione. Per ora posso solo rispondere in modo limitato.\n\n💡 **Messaggio ricevuto:** "${userMessage}"\n\n🔧 **Suggerimento:** Verifica la configurazione della chiave API.`;
+    
+    const newMessage: Message = {
+      id: Date.now().toString(),
+      text: fallbackResponse,
+      isUser: false,
+      timestamp: new Date(),
+      isVoice: false
+    };
+    
+    setMessages(prev => [...prev, newMessage]);
+  }, []);
+
+const processAIResponse = useCallback(async (userMessage: string, isVoice: boolean = false) => {
+  const currentVocalAction = getVocalConfirmationAction(); // ← USA LA FUNZIONE HELPER
+  
+  // 🚨 CONTROLLO CONFERMA VOCALE COME PRIMA COSA ASSOLUTA
+  if (currentVocalAction) {
+    console.log('🎤 Gestendo conferma vocale per:', currentVocalAction);
+    const confirmationText = userMessage.toLowerCase().trim();
+
+    if (['conferma', 'sì', 'confermo', 'ok', 'procedi'].includes(confirmationText)) {
+      setPendingAction(currentVocalAction);
+      setVocalConfirmationAction(null);
+      setTimeout(() => confirmPendingAction(currentVocalAction), 50);
+      return;
+    } else if (['annulla', 'no', 'cancella', 'ferma'].includes(confirmationText)) {
+      setVocalConfirmationAction(null);
+      cancelPendingAction();
+      await voiceChat.respondWithVoice("Va bene, hai altro da chiedermi?");
+      return;
+    } else {
+      setVocalConfirmationAction(null);
+      await voiceChat.respondWithVoice("Non ho capito. Per sicurezza, ho annullato l'operazione.");
+      cancelPendingAction();
+      return;
+    }
+  } else {
+    console.log('❌ vocalConfirmationAction è falsy, procedo con AI');
+  }
+  if (!chatServiceRef.current) {
+      console.error('❌ Chat service non inizializzato');
+      return;
+    }
+    
+    setIsTyping(true);
+    setError(null);
+ try {
+    const response = await chatServiceRef.current.processMessage(userMessage, isVoice);
+    
+    // Aggiungi il messaggio AI
+    setMessages(prev => [...prev, response.message]);
+
+    // 🎯 SE È CHAT VOCALE, FAI PARLARE L'AI
+    if (voiceChat.isVoiceChatActiveRef.current && (!response.actionRequired || !response.actionRequired.isValid)) {
+      await voiceChat.respondWithVoice(response.message.text);
+    }
+    
+    // Gestisci azioni richieste
+    if (response.actionRequired) {
+      if (response.actionRequired.isValid) {
+        // 🗣️ Se la chat vocale è attiva, gestiamo la conferma a voce
+        if (voiceChat.isVoiceChatActiveRef.current) {
+          setVocalConfirmationAction(response.actionRequired);
+          await voiceChat.respondWithVoice(response.message.text + ". Confermi?");
+        } else {
+          // Comportamento standard: mostra i pulsanti di conferma nella UI
+          setPendingAction(response.actionRequired);
+        }
+      } else {
+        setPendingAction(null); // L'azione non è valida
+      }
+    }
+    
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Errore sconosciuto';
+    setError(errorMessage);
+    
+    if (voiceChat.isVoiceChatActiveRef.current) {
+      await voiceChat.respondWithVoice("Mi dispiace, ho avuto un problema. Puoi ripetere?");
+    } else {
+      await simulateAIResponseFallback(userMessage);
+    }
+    
+  } finally {
+    setIsTyping(false);
+  }
+
+}, [
+  // 🚨 DIPENDENZE MOLTO PIÙ SEMPLICI
+  getVocalConfirmationAction,
+  setVocalConfirmationAction,
+  confirmPendingAction,
+  cancelPendingAction,
+  voiceChat,
+  chatServiceRef
+]); // ← RIMUOVI chatServiceRef, setters, ecc.
+
+  // Fallback per errori API (mantiene la vecchia logica)
+
+
+  const sendMessage = useCallback(async (text: string, isVoice: boolean = false) => {
+    if (!text.trim()) return;
+    if(isVoice && !getVocalConfirmationAction())
+    {
+      if (['annulla', 'no', 'cancella', 'ferma','nulla'].includes(text)) {
+            setVocalConfirmationAction(null);
+            cancelPendingAction();
+            closeChat();
+            return;
+          } 
+    }
+    
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      text: text.trim(),
+      isUser: true,
+      timestamp: new Date(),
+      isVoice
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setInputText('');
+
+    // Processa con AI reale
+    await processAIResponse(text.trim(), isVoice);
+  }, [processAIResponse]);
+
+  // ==================== SMART ASSISTANT ACTIONS ====================
+
+
+
  const formatDateTime = useCallback((date: Date): string => {
   return date.toLocaleString('it-IT', {
     weekday: 'long',
@@ -739,19 +779,7 @@ export const useChat = (config: UseChatConfig): UseChatReturn => {
   return singular ? name.singular : name.plural;
 }, []);
 
-  const cancelPendingAction = useCallback(() => {
-    setPendingAction(null);
-    
-    const cancelMessage: Message = {
-      id: Date.now().toString(),
-      text: "Come non detto... Posso aiutarti con qualcos'altro?",
-      isUser: false,
-      timestamp: new Date(),
-      isVoice: false
-    };
 
-    setMessages(prev => [...prev, cancelMessage]);
-  }, []);
 
   const clearConversation = useCallback(() => {
     setMessages([

@@ -1,3 +1,5 @@
+// src/hooks/useVoiceChat.ts (VERSIONE MIGLIORATA - COMPATIBILE CON WAKE WORD)
+
 import { useState, useCallback, useRef } from 'react';
 import { useSpeechSynthesis } from '../hooks/useSpeechSynthesis';
 
@@ -7,7 +9,7 @@ interface VoiceChatConfig {
   onTTSStart?: () => void;
   onTTSEnd?: () => void;
   onError?: (error: string) => void;
-  onInfo?: (message: string) => void; // ✅ Aggiunto per notifiche fallback
+  onInfo?: (message: string) => void;
 }
 
 export const useVoiceChat = (config: VoiceChatConfig) => {
@@ -21,6 +23,7 @@ export const useVoiceChat = (config: VoiceChatConfig) => {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const processingTimeoutRef = useRef<number | null>(null);
+  const instanceIdRef = useRef(Math.random().toString(36).substr(2, 9)); // 🆕 ID PER DEBUG
 
   // ✅ USA L'HOOK SPEECH SYNTHESIS ALL'INIZIO
   const { 
@@ -33,14 +36,16 @@ export const useVoiceChat = (config: VoiceChatConfig) => {
 
   // ✅ FUNZIONE HELPER PER FALLBACK CON SPEECH SYNTHESIS NATIVO
   const speakWithNativeSynthesis = useCallback(async (text: string, reason: string): Promise<void> => {
+    const instanceId = instanceIdRef.current;
+    
     if (!speechSupported) {
-      console.error('❌ Speech Synthesis non supportato in questo browser');
+      console.error(`❌ Voice Chat [${instanceId}]: Speech Synthesis non supportato`);
       config.onError?.('Sintesi vocale non supportata dal browser');
       setIsSpeaking(false);
       return;
     }
 
-    console.log(`🔄 Fallback a Speech Synthesis nativo (${reason}):`, text.substring(0, 50));
+    console.log(`🔄 Voice Chat [${instanceId}]: Fallback Speech Synthesis (${reason}):`, text.substring(0, 50));
     
     try {
       setIsSpeaking(true);
@@ -53,14 +58,14 @@ export const useVoiceChat = (config: VoiceChatConfig) => {
         volume: 1.0,
         voice: getItalianVoice(),
         onStart: () => {
-          console.log('🗣️ Speech Synthesis: Avviato');
+          console.log(`🗣️ Voice Chat [${instanceId}]: Speech Synthesis avviato`);
         },
         onEnd: () => {
-          console.log('✅ Speech Synthesis: Completato');
+          console.log(`✅ Voice Chat [${instanceId}]: Speech Synthesis completato`);
           setIsSpeaking(false);
           config.onTTSEnd?.();
           
-          // 🎯 RIATTIVA AUTOMATICAMENTE L'ASCOLTO
+          // 🎯 RIATTIVA AUTOMATICAMENTE L'ASCOLTO SOLO SE VOICE CHAT È ATTIVA
           if (isVoiceChatActiveRef.current) {
             setTimeout(() => {
               startListening();
@@ -68,22 +73,31 @@ export const useVoiceChat = (config: VoiceChatConfig) => {
           }
         },
         onError: (error) => {
-          console.error('❌ Speech Synthesis Error:', error);
+          console.error(`❌ Voice Chat [${instanceId}]: Speech Synthesis Error:`, error);
           setIsSpeaking(false);
           config.onError?.('Errore sintesi vocale nativa');
         }
       });
       
     } catch (error) {
-      console.error('❌ Fallback Speech Synthesis failed:', error);
+      console.error(`❌ Voice Chat [${instanceId}]: Fallback Speech Synthesis failed:`, error);
       setIsSpeaking(false);
       config.onError?.('Errore fallback sintesi vocale');
     }
-  }, [speechSynthesize, speechSupported, getItalianVoice, config, isVoiceChatActive]);
+  }, [speechSynthesize, speechSupported, getItalianVoice, config]);
 
-  // Funzione per iniziare l'ascolto
+  // 🆕 FUNZIONE PER INIZIARE L'ASCOLTO (CON PROTEZIONI)
   const startListening = useCallback(() => {
+    const instanceId = instanceIdRef.current;
+
+    // 🚫 NON AVVIARE SE VOICE CHAT NON È ATTIVA
+    if (!isVoiceChatActiveRef.current) {
+      console.log(`⏸️ Voice Chat [${instanceId}]: Voice chat non attiva, ignoro startListening`);
+      return;
+    }
+
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      console.error(`❌ Voice Chat [${instanceId}]: Speech Recognition non supportato`);
       config.onError?.('Speech Recognition non supportato');
       return;
     }
@@ -91,7 +105,10 @@ export const useVoiceChat = (config: VoiceChatConfig) => {
     // Ferma riconoscimento precedente
     if (recognitionRef.current) {
       recognitionRef.current.stop();
+      recognitionRef.current = null;
     }
+
+    console.log(`🎤 Voice Chat [${instanceId}]: Avvio ascolto per chat vocale`);
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
@@ -101,13 +118,20 @@ export const useVoiceChat = (config: VoiceChatConfig) => {
     recognition.lang = 'it-IT';
 
     recognition.onstart = () => {
-      console.log('🎤 Ascolto iniziato');
+      if (!isVoiceChatActiveRef.current) {
+        console.log(`⏸️ Voice Chat [${instanceId}]: Voice chat non più attiva, ferma ascolto`);
+        recognition.stop();
+        return;
+      }
+      console.log(`✅ Voice Chat [${instanceId}]: Ascolto ATTIVO per chat vocale`);
       setIsListening(true);
     };
 
     recognition.onresult = (event) => {
+      if (!isVoiceChatActiveRef.current) return;
+      
       const transcript = event.results[0][0].transcript;
-      console.log('📝 Trascritto:', transcript);
+      console.log(`📝 Voice Chat [${instanceId}]: Trascritto:`, transcript);
       
       setIsListening(false);
       setIsProcessing(true);
@@ -120,37 +144,44 @@ export const useVoiceChat = (config: VoiceChatConfig) => {
       }
       
       processingTimeoutRef.current = window.setTimeout(() => {
-        setIsProcessing(false);
         if (isVoiceChatActiveRef.current) {
+          console.log(`⏰ Voice Chat [${instanceId}]: Timeout processing, riprovo ascolto`);
+          setIsProcessing(false);
           startListening(); // Riprova se non arriva risposta
         }
       }, 10000); // 10 secondi di timeout
     };
 
     recognition.onerror = (event) => {
-      console.error('❌ Speech Recognition Error:', event.error);
+      console.error(`❌ Voice Chat [${instanceId}]: Speech Recognition Error:`, event.error);
       setIsListening(false);
       
       if (event.error === 'no-speech') {
-        // Nessun parlato rilevato - riprova automaticamente
+        // Nessun parlato rilevato - riprova automaticamente SOLO se voice chat è attiva
         if (isVoiceChatActiveRef.current) {
+          console.log(`🔄 Voice Chat [${instanceId}]: No-speech, riprovo in 500ms`);
           setTimeout(() => {
-            startListening();
-          }, 100);
+            if (isVoiceChatActiveRef.current) {
+              startListening();
+            }
+          }, 500); // 500ms delay per evitare spam
         }
+      } else if (event.error === 'aborted') {
+        console.log(`⚪ Voice Chat [${instanceId}]: Riconoscimento interrotto (normale)`);
       } else {
+        console.warn(`⚠️ Voice Chat [${instanceId}]: Errore riconoscimento ${event.error}`);
         config.onError?.(`Errore riconoscimento: ${event.error}`);
       }
     };
 
     recognition.onend = () => {
-      console.log('🏁 Speech Recognition terminato');
+      console.log(`🏁 Voice Chat [${instanceId}]: Riconoscimento terminato`);
       setIsListening(false);
     };
 
     recognitionRef.current = recognition;
     recognition.start();
-  }, [isVoiceChatActive, config]);
+  }, [config]);
 
   // Converte base64 in blob audio
   const base64ToBlob = useCallback((base64: string, mimeType: string): Blob => {
@@ -167,24 +198,33 @@ export const useVoiceChat = (config: VoiceChatConfig) => {
 
   // ✅ FUNZIONE speakText CORRETTA CON FALLBACK
   const speakText = useCallback(async (text: string): Promise<void> => {
+    const instanceId = instanceIdRef.current;
+    
     if (!text.trim()) return;
+    
+    // 🚫 NON PARLARE SE VOICE CHAT NON È ATTIVA
+    if (!isVoiceChatActiveRef.current) {
+      console.log(`⏸️ Voice Chat [${instanceId}]: Voice chat non attiva, ignoro speakText`);
+      return;
+    }
 
     setIsSpeaking(true);
     config.onTTSStart?.();
 
     try {
-      console.log('🔊 TTS: Tentativo con endpoint cloud:', text.substring(0, 50));
+      console.log(`🔊 Voice Chat [${instanceId}]: TTS Cloud tentativo:`, text.substring(0, 50));
+      
+      var response:Response = new Response(); 
+      // = await fetch(config.ttsEndpoint, {
+      //   method: 'POST',
+      //   headers: {
+      //     'Content-Type': 'application/json',
+      //   },
+      //   body: JSON.stringify({ text: text.trim() })
+      // });
 
-      const response = await fetch(config.ttsEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text: text.trim() })
-      });
-      // ✅ CONTROLLA SE LA RISPOSTA È OK
       if (!response.ok) {
-        console.log(`⚠️ HTTP Error ${response.status}, using native Speech Synthesis`);
+        console.log(`⚠️ Voice Chat [${instanceId}]: HTTP Error ${response.status}, uso fallback`);
         config.onInfo?.(`Servizio cloud non disponibile (${response.status}), uso sintesi nativa`);
         await speakWithNativeSynthesis(text, `HTTP ${response.status}`);
         return;
@@ -192,9 +232,8 @@ export const useVoiceChat = (config: VoiceChatConfig) => {
 
       const data = await response.json();
       
-      // ✅ CONTROLLA SUCCESS E GESTISCI QUOTA EXCEEDED
       if (data.success && data.audioContent) {
-        console.log('✅ TTS Cloud: Sintesi riuscita');
+        console.log(`✅ Voice Chat [${instanceId}]: TTS Cloud riuscito`);
         
         // Ferma audio precedente se presente
         if (currentAudioRef.current) {
@@ -215,7 +254,7 @@ export const useVoiceChat = (config: VoiceChatConfig) => {
             URL.revokeObjectURL(audioUrl);
             config.onTTSEnd?.();
             
-            // 🎯 RIATTIVA AUTOMATICAMENTE L'ASCOLTO
+            // 🎯 RIATTIVA AUTOMATICAMENTE L'ASCOLTO SOLO SE VOICE CHAT È ATTIVA
             if (isVoiceChatActiveRef.current) {
               setTimeout(() => {
                 startListening();
@@ -226,34 +265,32 @@ export const useVoiceChat = (config: VoiceChatConfig) => {
           };
           
           audio.onerror = (err) => {
-            console.log('❌ Audio playback failed, using native Speech Synthesis');
+            console.log(`❌ Voice Chat [${instanceId}]: Audio playback failed, uso fallback`);
             URL.revokeObjectURL(audioUrl);
-            // Fallback se anche la riproduzione audio fallisce
             speakWithNativeSynthesis(text, 'audio playback error');
             resolve(); // Non reject, usiamo fallback
           };
           
           audio.play().catch((playError) => {
-            console.log('❌ Audio play failed, using native Speech Synthesis:', playError);
+            console.log(`❌ Voice Chat [${instanceId}]: Audio play failed, uso fallback:`, playError);
             URL.revokeObjectURL(audioUrl);
-            // Fallback se play() fallisce
             speakWithNativeSynthesis(text, 'audio play error');
             resolve(); // Non reject, usiamo fallback
           });
         });
         
       } else {
-        // ✅ SERVIZIO RISPONDE MA CON ERRORE (quota, etc.)
+        // Servizio risponde ma con errore
         const errorReason = data.reason || 'service_error';
         const errorMessage = data.error || 'Errore TTS';
         
-        console.log(`⚠️ TTS Cloud fallito: ${errorMessage}`);
+        console.log(`⚠️ Voice Chat [${instanceId}]: TTS Cloud fallito: ${errorMessage}`);
         
         if (errorReason === 'QUOTA_EXCEEDED') {
-          console.log('📊 Quota mensile raggiunta, uso Speech Synthesis nativo');
+          console.log(`📊 Voice Chat [${instanceId}]: Quota raggiunta, uso fallback`);
           config.onInfo?.('Quota cloud raggiunta, uso sintesi nativa del browser');
         } else {
-          console.log('🔄 Servizio TTS non disponibile, uso Speech Synthesis nativo');
+          console.log(`🔄 Voice Chat [${instanceId}]: Servizio non disponibile, uso fallback`);
           config.onInfo?.('Servizio cloud non disponibile, uso sintesi nativa');
         }
         
@@ -261,24 +298,34 @@ export const useVoiceChat = (config: VoiceChatConfig) => {
       }
       
     } catch (error) {
-      // ✅ ERRORE RETE/CONNESSIONE - USA FALLBACK
-      console.log('🌐 Errore connessione TTS Cloud, uso Speech Synthesis nativo:', error);
+      console.log(`🌐 Voice Chat [${instanceId}]: Errore rete, uso fallback:`, error);
       config.onInfo?.('Connessione non disponibile, uso sintesi nativa del browser');
       await speakWithNativeSynthesis(text, 'network error');
     }
-  }, [config, isVoiceChatActive, base64ToBlob, startListening, speakWithNativeSynthesis]);
+  }, [config, base64ToBlob, startListening, speakWithNativeSynthesis]);
 
-  // Inizia chat vocale
+  // 🆕 AVVIA CHAT VOCALE (MIGLIORATO)
   const startVoiceChat = useCallback(() => {
-    console.log('🚀 Avvio chat vocale');
+    const instanceId = instanceIdRef.current;
+    console.log(`🚀 Voice Chat [${instanceId}]: Avvio chat vocale`);
+    
     setIsVoiceChatActive(true);
     isVoiceChatActiveRef.current = true;
-    startListening();
+    
+    // Piccolo delay per assicurarsi che il wake word si sia disattivato
+    setTimeout(() => {
+      if (isVoiceChatActiveRef.current) {
+        startListening();
+      }
+    }, 200);
   }, [startListening]);
 
-  // ✅ FERMA CHAT VOCALE MIGLIORATA
+  // ✅ FERMA CHAT VOCALE (MIGLIORATO)
   const stopVoiceChat = useCallback(() => {
-    console.log('⏹️ Stop chat vocale');
+    const instanceId = instanceIdRef.current;
+    console.log(`⏹️ Voice Chat [${instanceId}]: Stop chat vocale`);
+    
+    // Prima ferma tutto
     isVoiceChatActiveRef.current = false;
     setIsVoiceChatActive(false);
     setIsListening(false);
@@ -298,7 +345,7 @@ export const useVoiceChat = (config: VoiceChatConfig) => {
       currentAudioRef.current = null;
     }
 
-    // ✅ FERMA ANCHE SPEECH SYNTHESIS NATIVO
+    // Ferma speech synthesis nativo
     speechCancel();
 
     // Cancella timeout
@@ -306,10 +353,14 @@ export const useVoiceChat = (config: VoiceChatConfig) => {
       clearTimeout(processingTimeoutRef.current);
       processingTimeoutRef.current = null;
     }
+
+    console.log(`✅ Voice Chat [${instanceId}]: Chat vocale completamente fermata`);
   }, [speechCancel]);
 
   // Funzione per rispondere all'utente
   const respondWithVoice = useCallback(async (responseText: string) => {
+    const instanceId = instanceIdRef.current;
+    
     if (processingTimeoutRef.current) {
       clearTimeout(processingTimeoutRef.current);
       processingTimeoutRef.current = null;
@@ -320,6 +371,7 @@ export const useVoiceChat = (config: VoiceChatConfig) => {
       .replace(/[\u{FE00}-\u{FE0F}]/gu, '')
       .trim();
     
+    console.log(`🎙️ Voice Chat [${instanceId}]: Risposta vocale:`, cleanText.substring(0, 50));
     setIsProcessing(false);
     await speakText(cleanText);
   }, [speakText]);
@@ -331,7 +383,7 @@ export const useVoiceChat = (config: VoiceChatConfig) => {
     // Stati
     isVoiceChatActive,
     isListening,
-    isSpeaking: isCurrentlySpeaking, // ✅ Include anche Speech Synthesis nativo
+    isSpeaking: isCurrentlySpeaking,
     isProcessing,
     isVoiceChatActiveRef,
     // Azioni
@@ -339,7 +391,7 @@ export const useVoiceChat = (config: VoiceChatConfig) => {
     stopVoiceChat,
     respondWithVoice,
     speakText,
-    // ✅ Nuove info utili
+    // Info utili
     speechSupported,
     hasCloudTTS: true,
     hasNativeTTS: speechSupported
