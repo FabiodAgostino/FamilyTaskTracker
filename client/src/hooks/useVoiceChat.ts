@@ -214,14 +214,14 @@ export const useVoiceChat = (config: VoiceChatConfig) => {
     try {
       console.log(`🔊 Voice Chat [${instanceId}]: TTS Cloud tentativo:`, text.substring(0, 50));
       
-      var response:Response = new Response(); 
-      // = await fetch(config.ttsEndpoint, {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //   },
-      //   body: JSON.stringify({ text: text.trim() })
-      // });
+      var response:Response 
+      = await fetch(config.ttsEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text: text.trim() })
+      });
 
       if (!response.ok) {
         console.log(`⚠️ Voice Chat [${instanceId}]: HTTP Error ${response.status}, uso fallback`);
