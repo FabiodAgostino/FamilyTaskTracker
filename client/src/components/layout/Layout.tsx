@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
+import AIChatComponent from '../chat/AIChatComponent';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -27,6 +28,9 @@ export function Layout({ children }: LayoutProps) {
           {children}
         </main>
       </div>
+      
+      {/* AI Chat Component */}
+      <AIChatComponent />
     </div>
   );
 }

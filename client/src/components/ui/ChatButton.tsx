@@ -4,12 +4,21 @@ import React from 'react';
 import { MessageCircle } from 'lucide-react';
 import { ChatButtonProps } from '@/lib/models/chat.types';
 import { CHAT_COLORS, CHAT_LABELS } from '@/lib/const/chat.constants';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export const ChatButton: React.FC<ChatButtonProps> = ({ onClick, isVisible, hide }) => {
+  const isMobile = useIsMobile();
+  
+  // Posizionamento originale mobile: bottom-28 right-4
+  // Posizionamento desktop: bottom-4 right-4
+  const positionClasses = isMobile 
+    ? 'fixed bottom-28 right-4 z-50' 
+    : 'fixed bottom-4 right-4 z-50';
+
   return !hide &&(
     
     <div 
-      className={`fixed bottom-28 right-4 z-50 transition-all duration-300 ${
+      className={`${positionClasses} transition-all duration-300 ${
         isVisible ? 'opacity-100 translate-y-0' : 'opacity-30 translate-y-10 translate-x-3'
       }`}
     >

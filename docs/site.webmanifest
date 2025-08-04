@@ -1,0 +1,94 @@
+{
+  "name": "Family Task Tracker",
+  "short_name": "Tasks",
+  "description": "Gestione attività e shopping list per la famiglia",
+  "start_url": "/FamilyTaskTracker/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "orientation": "portrait-primary",
+  "scope": "/FamilyTaskTracker/",
+   "splash_pages": [
+    {
+      "src": "/FamilyTaskTracker/splash.png",
+      "sizes": "1024x1536",
+      "type": "image/png"
+    }
+  ],
+  "icons": [
+    {
+      "src": "/FamilyTaskTracker/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/FamilyTaskTracker/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/FamilyTaskTracker/icons/icon-512x512.png", 
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/FamilyTaskTracker/icons/icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/FamilyTaskTracker/icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  
+  "categories": ["productivity", "lifestyle", "utilities"],
+  "lang": "it-IT",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  
+  "shortcuts": [
+    {
+      "name": "Shopping List",
+      "short_name": "Shopping",
+      "description": "Apri Shopping",
+      "url": "/FamilyTaskTracker/#/shopping",
+      "icons": [
+        {
+          "src": "/FamilyTaskTracker/icons/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Note",
+      "short_name": "Note",
+      "description": "Apri le note",
+      "url": "/FamilyTaskTracker/#/notes", 
+      "icons": [
+        {
+          "src": "/FamilyTaskTracker/icons/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Calendario",
+      "short_name": "Calendario",
+      "description": "Apri il calendario",
+      "url": "/FamilyTaskTracker/#/calendar",
+      "icons": [
+        {
+          "src": "/FamilyTaskTracker/icons/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ]
+}

@@ -8,6 +8,7 @@ import { PiWaveformBold } from 'react-icons/pi';
 import { ChatMessage } from './ChatMessage';
 import { useChatScrolling } from '@/hooks/useChatScrolling';
 import { CHAT_COLORS, CHAT_LABELS } from '@/lib/const/chat.constants';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 // =================================================================================
 // SEZIONE 1: DEFINIZIONE DELLA UI VOCALE DA INTEGRARE
@@ -124,6 +125,7 @@ export const ChatModal: React.FC<ChatModalProps> = ({
   isOpen, onClose, messages, isTyping, inputText, isRecording, isTranscribing, onInputChange, onSendMessage, onStartRecording, onStopRecording, pendingAction, onConfirmPendingAction, onCancelPendingAction, error, isVoiceChatActive, isListening, isSpeaking, isProcessing, onToggleVoiceChat
 }) => {
   const { messagesEndRef } = useChatScrolling(messages);
+  const isMobile = useIsMobile();
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onSendMessage(); }
@@ -135,10 +137,24 @@ export const ChatModal: React.FC<ChatModalProps> = ({
   const showSingleRecording = !isVoiceChatActive && (isRecording || isTranscribing);
   const showNormalChat = !isVoiceChatActive && !showSingleRecording;
 
+  // Posizionamento originale mobile: items-end justify-center sm:items-center
+  // Posizionamento desktop: items-end justify-end
+  const containerClasses = isMobile 
+    ? 'fixed inset-0 z-40 flex items-end justify-center sm:items-center'
+    : 'fixed inset-0 z-40 flex items-end justify-end sm:items-end sm:justify-end';
+    
+  const modalClasses = isMobile
+    ? 'relative w-full max-w-sm mx-4 sm:mb-4 bg-white rounded-t-2xl sm:rounded-2xl shadow-xl transition-all duration-300 transform flex flex-col'
+    : 'relative w-full max-w-sm sm:mr-1 bg-white rounded-t-2xl sm:rounded-2xl shadow-xl transition-all duration-300 transform flex flex-col';
+    
+  const modalStyle = isMobile 
+    ? { height: 'calc(70vh - 2rem)', maxHeight: '500px', bottom: "7vh" }
+    : { height: 'calc(70vh - 2rem)', maxHeight: '500px' };
+
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center sm:items-center">
+    <div className={containerClasses}>
       <div className="absolute inset-0 bg-black bg-opacity-30 transition-opacity duration-300" onClick={onClose} />
-      <div className="relative w-full max-w-sm mx-4 sm:mb-4 bg-white rounded-t-2xl sm:rounded-2xl shadow-xl transition-all duration-300 transform flex flex-col" style={{ height: 'calc(70vh - 2rem)', maxHeight: '500px', bottom: "7vh" }}>
+      <div className={modalClasses} style={modalStyle}>
         <div className="flex items-center justify-between p-3 rounded-t-2xl text-white flex-shrink-0" style={{ background: CHAT_COLORS.primary }}>
           <div className="flex items-center space-x-2"><div className="w-6 h-6 rounded-full bg-white bg-opacity-20 flex items-center justify-center"><Sparkles size={14} /></div><div><h3 className="font-medium text-sm">{CHAT_LABELS.assistantName}</h3><p className="text-xs opacity-80">{isVoiceChatActive ? 'Conversazione vocale' : isTyping ? 'Sta scrivendo...' : CHAT_LABELS.statusOnline}</p></div></div>
           <button onClick={onClose} className="p-1.5 rounded-full hover:bg-white hover:bg-opacity-20 transition-colors duration-200" aria-label={CHAT_LABELS.closeAriaLabel}><X size={16} /></button>
