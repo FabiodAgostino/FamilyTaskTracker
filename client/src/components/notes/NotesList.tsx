@@ -364,6 +364,7 @@ export function NotesList() {
         <NoteDetail
           note={selectedNote}
           isOpen={isDetailModalOpen}
+          onUpdateContent={ async (note, content) => {note.content=content; await updateNote(note.id, note)}}
           onClose={handleCloseDetail}
           onEdit={(note) => {
             handleCloseDetail(); // Chiudi il dettaglio

@@ -1,5 +1,4 @@
-// src/components/notes/NoteCard.tsx (UPDATED)
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Edit, Trash2, Globe, Lock, User, Clock, Pin, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -7,28 +6,154 @@ import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { formatDistanceToNow } from 'date-fns';
-import { it } from 'date-fns/locale';
 import { Note } from '@/lib/models/types';
 
 interface NoteCardProps {
   note: Note;
   onEdit: (note: Note) => void;
   onDelete: (id: string) => void;
-  onClick?: (note: Note) => void; // ✅ NUOVO: Prop per il click sulla card
+  onClick?: (note: Note) => void;
 }
+
+// Componente per l'anteprima formattata del contenuto nella card
+const FormattedContentPreview = ({ text }: { text: string }) => {
+  const [checkboxStates, setCheckboxStates] = useState<Record<number, boolean>>({});
+
+  const toggleCheckbox = (index: number) => {
+    setCheckboxStates(prev => ({
+      ...prev,
+      [index]: !prev[index]
+    }));
+  };
+
+  const parseInlineFormatting = (text: string) => {
+    if (!text) return null;
+
+    const parts: (string | JSX.Element)[] = [];
+    let lastIndex = 0;
+    const boldRegex = /\*\*([^*]+)\*\*/g;
+    let match;
+
+    while ((match = boldRegex.exec(text)) !== null) {
+      // Aggiungi il testo prima del grassetto
+      if (match.index > lastIndex) {
+        parts.push(text.substring(lastIndex, match.index));
+      }
+      
+      // Aggiungi SOLO il contenuto in grassetto (senza gli asterischi)
+      parts.push(
+        <strong 
+          key={`bold-${match.index}`} 
+          className="font-bold text-blue-900"
+        >
+          {match[1]}
+        </strong>
+      );
+      
+      lastIndex = match.index + match[0].length;
+    }
+
+    // Aggiungi il testo rimanente
+    if (lastIndex < text.length) {
+      parts.push(text.substring(lastIndex));
+    }
+
+    return parts.length > 0 ? parts : text;
+  };
+
+  const parseText = (text: string) => {
+    if (!text) return [];
+
+    const lines = text.split('\n');
+    return lines.map((line, index) => {
+      // Pattern checkbox: "- testo" o "- testo£" 
+      const checkboxMatch = line.match(/^- (.+)$/);
+      if (checkboxMatch) {
+        const content = checkboxMatch[1]; // Prende solo il contenuto DOPO "- "
+        const isChecked = content.endsWith('£');
+        const displayContent = isChecked ? content.slice(0, -1) : content; // Rimuove £ per visualizzazione
+        
+        return (
+          <div key={index} className="flex items-center gap-2 my-1">
+            <input
+              type="checkbox"
+              checked={isChecked}
+              onChange={() => toggleCheckbox(index)}
+              className="h-3 w-3 text-blue-600 rounded border-gray-300 focus:ring-blue-500 flex-shrink-0 cursor-pointer"
+              disabled // Disabilitato nella card preview
+            />
+            <span className={`${isChecked ? 'line-through text-gray-500' : ''} text-sm leading-relaxed`}>
+              {parseInlineFormatting(displayContent)} {/* Mostra SOLO il contenuto, non "- contenuto" */}
+            </span>
+          </div>
+        );
+      }
+
+      // Pattern elenco puntato: ". testo"
+      const bulletMatch = line.match(/^\. (.+)$/);
+      if (bulletMatch) {
+        const bulletContent = bulletMatch[1]; // Prende solo il contenuto DOPO ". "
+        
+        return (
+          <div key={index} className="flex items-start gap-2 my-1">
+            <span className="text-blue-600 font-bold mt-0.5 select-none flex-shrink-0 text-sm">•</span>
+            <span className="text-sm leading-relaxed">
+              {parseInlineFormatting(bulletContent)} {/* Mostra SOLO il contenuto, non ". contenuto" */}
+            </span>
+          </div>
+        );
+      }
+
+      // Riga normale - applica parsing per **grassetto**
+      return (
+        <div key={index} className="my-1 text-sm leading-relaxed">
+          {parseInlineFormatting(line) || '\u00A0'}
+        </div>
+      );
+    });
+  };
+
+  return (
+    <div className="text-sm leading-relaxed">
+      {parseText(text)}
+    </div>
+  );
+};
 
 export function NoteCard({ 
   note, 
   onEdit, 
   onDelete, 
-  onClick // ✅ NUOVO: Callback per click sulla card
+  onClick
 }: NoteCardProps) {
   const { user } = useAuthContext();
   const { toast } = useToast();
   const [isDeleting, setIsDeleting] = useState(false);
 
   const canEdit = user?.username === note.createdBy || user?.role === 'admin' || note.isPublic;
+
+  // Formato data semplice senza date-fns
+  const formatRelativeTime = (date: Date | string): string => {
+    const now = new Date();
+    const targetDate = new Date(date);
+    
+    if (isNaN(targetDate.getTime())) {
+      return 'Data non valida';
+    }
+    
+    const diffMs = now.getTime() - targetDate.getTime();
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffMinutes < 1) return 'appena ora';
+    if (diffMinutes < 60) return `${diffMinutes} minuti fa`;
+    if (diffHours < 24) return `${diffHours} ore fa`;
+    if (diffDays < 7) return `${diffDays} giorni fa`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} settimane fa`;
+    if (diffDays < 365) return `${Math.floor(diffDays / 30)} mesi fa`;
+    return `${Math.floor(diffDays / 365)} anni fa`;
+  };
 
   const handleDelete = async () => {
     setIsDeleting(true);
@@ -49,7 +174,7 @@ export function NoteCard({
     }
   };
 
-  // ✅ NUOVO: Handler per il click sulla card
+  // Handler per il click sulla card
   const handleCardClick = (e: React.MouseEvent) => {
     // Evita il click se si sta cliccando sui pulsanti di azione
     if (
@@ -112,7 +237,7 @@ export function NoteCard({
       style={{ 
         borderLeftColor: note.color || '#F3F4F6',
       }}
-      onClick={handleCardClick} // ✅ NUOVO: Click handler sulla card
+      onClick={handleCardClick}
     >
       <CardContent className="p-4">
         {/* Header con titolo e azioni */}
@@ -139,7 +264,7 @@ export function NoteCard({
                 variant="ghost"
                 size="sm"
                 onClick={(e) => {
-                  e.stopPropagation(); // ✅ NUOVO: Evita il click sulla card
+                  e.stopPropagation();
                   onEdit(note);
                 }}
                 className="text-gray-400 hover:text-cambridge-newStyle h-8 w-8 p-0"
@@ -152,7 +277,7 @@ export function NoteCard({
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={(e) => e.stopPropagation()} // ✅ NUOVO: Evita il click sulla card
+                    onClick={(e) => e.stopPropagation()}
                     className="text-gray-400 hover:text-red-500 h-8 w-8 p-0"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -193,13 +318,11 @@ export function NoteCard({
           )}
         </div>
 
-        {/* Contenuto della nota */}
+        {/* Contenuto della nota con formattazione avanzata */}
         <div className="space-y-3">
-          <p 
-            className="text-sm leading-relaxed"
-          >
-            {truncateContent(note.content)}
-          </p>
+          <div className="text-sm leading-relaxed">
+            <FormattedContentPreview text={truncateContent(note.content)} />
+          </div>
 
           {/* Tags */}
           {note.tags && note.tags.length > 0 && (
@@ -229,10 +352,7 @@ export function NoteCard({
             </div>
             <div className="flex items-center">
               <Clock className="mr-2 h-3 w-3" />
-              {formatDistanceToNow(new Date(note.updatedAt), { 
-                addSuffix: true, 
-                locale: it 
-              })}
+              {formatRelativeTime(note.updatedAt)}
             </div>
           </div>
         </div>

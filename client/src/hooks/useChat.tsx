@@ -298,7 +298,7 @@ const getVocalConfirmationAction = useCallback(() => {
   }, [voiceChat.isVoiceChatActive, startVoiceChat, stopVoiceChat]);
 
     const confirmPendingAction = useCallback(async (pending: any = null) => {
-    if(pending || pending.isValid)
+    if(pending && pending.isValid)
     {
       pendingAction = pending;
     }
@@ -580,7 +580,7 @@ const getVocalConfirmationAction = useCallback(() => {
         timestamp: new Date(),
         isVoice: false
       };
-
+      
       setMessages(prev => [...prev, confirmMessage]);
       setPendingAction(null);
       if (voiceChat.isVoiceChatActiveRef.current) {
@@ -671,7 +671,7 @@ const processAIResponse = useCallback(async (userMessage: string, isVoice: boole
     setError(null);
  try {
     const response = await chatServiceRef.current.processMessage(userMessage, isVoice);
-    
+    console.log(response)
     // Aggiungi il messaggio AI
     setMessages(prev => [...prev, response.message]);
 
@@ -688,6 +688,7 @@ const processAIResponse = useCallback(async (userMessage: string, isVoice: boole
           setVocalConfirmationAction(response.actionRequired);
           await voiceChat.respondWithVoice(response.message.text + ". Confermi?");
         } else {
+          console.log(response.actionRequired);
           // Comportamento standard: mostra i pulsanti di conferma nella UI
           setPendingAction(response.actionRequired);
         }

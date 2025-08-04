@@ -159,7 +159,7 @@ export const ChatModal: React.FC<ChatModalProps> = ({
             {error && (<div className="mb-2 p-2 text-xs text-red-700 bg-red-100 rounded-md flex items-center gap-2"><XCircle size={14} /><span>{error}</span></div>)}
             {pendingAction ? (
               <div className="p-2 border border-blue-200 rounded-lg bg-blue-50">
-                <p className="text-sm text-blue-800 mb-2">{`Vuoi eseguire l'azione: ${pendingAction.name}?`}</p>
+                <p className="text-sm text-blue-800 mb-2">{`Sei sicuro di voler eseguire l'azione?`}</p>
                 <div className="flex justify-end space-x-2"><button onClick={onCancelPendingAction} className="px-3 py-1 text-xs font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">Annulla</button><button onClick={onConfirmPendingAction} className="px-3 py-1 text-xs font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700">Conferma</button></div>
               </div>
             ) : (
