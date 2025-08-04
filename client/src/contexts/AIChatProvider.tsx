@@ -11,7 +11,7 @@ interface AIChatProviderProps {
 }
 
 export const AIChatProvider: React.FC<AIChatProviderProps> = ({ children }) => {
-  const chatState = useChat();
+  const chatState = useChat({ username: 'default' });
 
   return (
     <AIChatContext.Provider value={chatState}>

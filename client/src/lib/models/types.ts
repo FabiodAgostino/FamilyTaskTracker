@@ -1,7 +1,7 @@
 // ===== USER MODELS =====
 
 import { removeUndefinedFields } from "../utils";
-import { PriceHistoryEntry } from "./price";
+// import { PriceHistoryEntry } from "./price"; // unused import
 import { ShoppingItem } from "./shopping-item";
 
 export interface FirestoreSerializable {

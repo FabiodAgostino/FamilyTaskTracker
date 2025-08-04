@@ -2,7 +2,7 @@
 
 import { DeleteOperation, Message, UpdateOperation } from "@/lib/models/chat.types";
 import { ChatAPIService } from "./chatAPI.service";
-import { useAuthContext } from "@/contexts/AuthContext";
+// removed unused useAuthContext import
 
 // ==================== INTERFACCE RISPOSTA ====================
 

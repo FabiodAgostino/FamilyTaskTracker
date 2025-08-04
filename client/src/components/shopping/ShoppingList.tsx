@@ -17,7 +17,6 @@ import {
   ChevronDown,
   ChevronUp,
   Filter,
-  Info,
   Check, // Import aggiunto per l'icona
   User,  // Import aggiunto per l'icona
   Save,  // Import aggiunto per l'icona
@@ -57,7 +56,6 @@ import { CategorySelectWithAdd } from '../common/CategorySelectWithAdd';
 import { ShoppingItem } from '@/lib/models/shopping-item';
 import { FaShoppingBag } from 'react-icons/fa';
 import { LoadingScreen, useLoadingTransition } from '../ui/loading-screen';
-import { navigate } from 'wouter/use-browser-location';
 import { LuChartColumnBig } from "react-icons/lu";
 export function ShoppingList() {
   const { user } = useAuthContext();

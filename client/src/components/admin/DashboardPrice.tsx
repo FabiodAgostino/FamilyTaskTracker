@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
-import { Calendar, Clock, CheckCircle, XCircle, TrendingUp, Mail, AlertTriangle, Activity, Filter, RefreshCw, Download, Eye, Search, Settings, X, Users, Package, Database, Zap } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } from 'recharts';
+import { Clock, CheckCircle, XCircle, TrendingUp, Mail, AlertTriangle, Activity, Filter, RefreshCw, Download, Eye, X, Users, Package, Database } from 'lucide-react';
 import { 
   collection, 
   getDocs, 
@@ -872,7 +872,7 @@ export default function PriceMonitoringDashboard() {
                       dataKey="value"
                       label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                     >
-                      {chartData.errorData.map((entry, index) => (
+                      {chartData.errorData.map((_, index) => (
                         <Cell 
                           key={`cell-${index}`} 
                           fill={['#ef4444', '#f59e0b', '#8b5cf6', '#06b6d4', '#6b7280'][index % 5]} 

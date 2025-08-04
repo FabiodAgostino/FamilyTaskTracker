@@ -1,6 +1,6 @@
 // src/services/googleSearchService.ts - VERSIONE DEBUG
 import { GoogleImageSearchResult, ProcessedImageResult } from '@/lib/models/types';
-import { getPathAfterDomain } from '@/lib/utils';
+// removed unused getPathAfterDomain import
 
 export class GoogleSearchService {
   private readonly apiKey: string;
@@ -20,7 +20,7 @@ export class GoogleSearchService {
   }
 
   async searchProductImages(
-    url: string,
+    _url: string,
     name: string,
     brand: string,
     maxResults: number = 10

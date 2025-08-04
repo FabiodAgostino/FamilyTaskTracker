@@ -15,8 +15,7 @@ import DigitalWallet from '@/components/wallet/DigitalWallet';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { TestPage } from '@/TestPage';
 import { SpotifyStats } from '@/components/spotify/SpotifyStats';
-import { useEffect } from 'react';
-import { navigate } from 'wouter/use-browser-location';
+// Removed unused imports
 
 export default function Dashboard() {
   const { user } = useAuthContext();

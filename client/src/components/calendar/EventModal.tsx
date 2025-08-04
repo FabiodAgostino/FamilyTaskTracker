@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Loader2, Globe, Lock, Calendar as CalendarIcon, MapPin, Clock, Users, Plus, X, Trash2, Bell } from 'lucide-react';
+import { Loader2, Globe, Lock, Calendar as CalendarIcon, MapPin, Clock, Plus, Trash2, Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,13 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
-import { it } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
 import { CalendarEvent, ModelFactory, ValidationError, EventType } from '@/lib/models/types';
 
 interface EventFormData {
@@ -309,7 +306,7 @@ export function EventModal({ isOpen, onClose, onSave, onDelete, editEvent, selec
     }
   };
 
-  const addAttendee = () => {
+  const _addAttendee = () => {
     const trimmedAttendee = attendeeInput.trim();
     if (trimmedAttendee) {
       const currentAttendees = form.getValues('attendees');
@@ -320,20 +317,11 @@ export function EventModal({ isOpen, onClose, onSave, onDelete, editEvent, selec
     }
   };
 
-  const removeAttendee = (attendeeToRemove: string) => {
+  const _removeAttendee = (attendeeToRemove: string) => {
     const currentAttendees = form.getValues('attendees');
     form.setValue('attendees', currentAttendees.filter(a => a !== attendeeToRemove));
   };
 
-  const handleAttendeeInputKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      addAttendee();
-    } else if (e.key === 'Backspace' && attendeeInput === '' && form.getValues('attendees').length > 0) {
-      const attendees = form.getValues('attendees');
-      removeAttendee(attendees[attendees.length - 1]);
-    }
-  };
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -489,7 +477,7 @@ export function EventModal({ isOpen, onClose, onSave, onDelete, editEvent, selec
                           selected={field.value}
                           isAllDay={watchedIsAllDay}
                           minTime={new Date()}
-                          onSelect={(date) => {
+                          onSelect={(date: Date | undefined) => {
                             if (date) {
                               if (!watchedIsAllDay) {
                                 const newDate = new Date(date);
@@ -524,7 +512,7 @@ export function EventModal({ isOpen, onClose, onSave, onDelete, editEvent, selec
                           selected={field.value}
                           isAllDay={watchedIsAllDay}
                           minTime={new Date()}
-                          onSelect={(date) => {
+                          onSelect={(date: Date | undefined) => {
                             if (date) {
                               if (!watchedIsAllDay) {
                                 const newDate = new Date(date);

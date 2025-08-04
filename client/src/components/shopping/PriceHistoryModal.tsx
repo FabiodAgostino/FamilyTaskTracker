@@ -1,14 +1,14 @@
 // src/components/shopping/PriceHistoryModal.tsx
-import React from 'react';
+// Removed unused React import
 import { 
   TrendingUp, 
   TrendingDown, 
   Calendar,
-  Euro,
+  // Removed unused Euro import
   BarChart3,
-  X,
+  // Removed unused X import
   AlertCircle,
-  Activity
+  // Removed unused Activity import
 } from 'lucide-react';
 import { 
   Dialog, 
@@ -19,10 +19,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
-  LineChart, 
-  Line, 
   XAxis, 
   YAxis, 
   CartesianGrid, 
@@ -31,10 +28,9 @@ import {
   Area,
   AreaChart
 } from 'recharts';
-import { formatDistanceToNow, format } from 'date-fns';
+import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { ShoppingItem } from '@/lib/models/shopping-item';
-import { PriceHistoryEntry } from '@/lib/models/price';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface PriceHistoryModalProps {
@@ -96,7 +92,7 @@ export function PriceHistoryModal({ isOpen, onClose, item }: PriceHistoryModalPr
     }
 
     // Aggiungi tutti gli entry dello storico
-    sortedHistory.forEach((entry, index) => {
+    sortedHistory.forEach((entry, _index) => {
       chartData.push({
         date: entry.date,
         price: entry.price,
@@ -128,7 +124,7 @@ export function PriceHistoryModal({ isOpen, onClose, item }: PriceHistoryModalPr
   // Calcola statistiche (includendo il prezzo originario se presente)
   const currentPrice = item.estimatedPrice || 0;
   const allPrices = chartData.map(entry => entry.price);
-  const historyPrices = priceHistory.map(entry => entry.price);
+  // const _historyPrices = priceHistory.map(entry => entry.price); // unused
   
   // Se c'è un prezzo originario, includilo nelle statistiche
   const firstEntry = priceHistory.length > 0 ? priceHistory.find(entry => entry.oldPrice !== undefined && entry.oldPrice !== null) : null;
@@ -149,7 +145,7 @@ export function PriceHistoryModal({ isOpen, onClose, item }: PriceHistoryModalPr
   );
 
   // Custom tooltip per il grafico
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (

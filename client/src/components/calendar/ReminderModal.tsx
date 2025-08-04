@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Loader2, Globe, Lock, Calendar as CalendarIcon, Bell, Clock, Plus, X, Trash2, Repeat, AlertTriangle } from 'lucide-react';
+import { Loader2, Globe, Lock, Bell, Plus, X, Trash2, Repeat, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -9,14 +9,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { Badge } from '@/components/ui/badge';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { format, addDays, addHours, addMinutes } from 'date-fns';
+import { addHours, addMinutes } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
 
 // ✅ IMPORTA SOLO DAL MODELLO REALE - NESSUNA INTERFACCIA INTERNA
 import { Reminder, ReminderType, RecurrencePattern, RecurrenceType } from '@/lib/models/reminder';
@@ -445,7 +444,7 @@ export function ReminderModal({ isOpen, onClose, onSave, onDelete, editReminder 
                         weekStartsOn={1}
                         selected={field.value}
                         minTime={new Date()}
-                        onSelect={(date) => {
+                        onSelect={(date: Date | undefined) => {
                           if (date) {
                             const newDate = new Date(date);
                             newDate.setHours(date.getHours());

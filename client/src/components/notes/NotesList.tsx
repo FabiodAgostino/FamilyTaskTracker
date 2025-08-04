@@ -1,12 +1,12 @@
 // client/src/components/notes/NotesList.tsx - VERSIONE CORRETTA e AGGIORNATA
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Plus,
   Search,
   ChevronDown,
   ChevronUp,
   Filter,
-  Info, // ✅ NUOVO: Icona per il bottone del popup badge
+  // Removed unused Info import
   Globe, // Import aggiunto per l'icona
   Lock,  // Import aggiunto per l'icona
   User,  // Import aggiunto per l'icona
@@ -37,7 +37,7 @@ import { Note } from '@/lib/models/types';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { NoteDetail } from './NoteDetail';
-import { FaIdBadge, FaNoteSticky } from 'react-icons/fa6';
+import { FaNoteSticky } from 'react-icons/fa6';
 import { LoadingScreen, useLoadingTransition } from '../ui/loading-screen';
 import { LuChartColumnBig } from "react-icons/lu";
 

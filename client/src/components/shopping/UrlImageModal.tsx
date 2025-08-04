@@ -4,9 +4,7 @@ import {
   Link, 
   AlertCircle, 
   Check,
-  Image as ImageIcon,
   Loader2,
-  X
 } from 'lucide-react';
 import { 
   Dialog, 

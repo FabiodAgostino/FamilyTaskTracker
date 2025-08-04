@@ -76,7 +76,7 @@ export function AddItemForm({ isOpen, onClose, onAdd, editItem }: AddItemFormPro
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   
   // ✅ Hooks Firebase
-  const { data: categories, add: addCategory, loading: categoriesLoading } = useFirestore<Category>('categories');
+  const { data: categories, add: addCategory } = useFirestore<Category>('categories');
   const { data: existingItems } = useFirestore<ShoppingItem>('shopping_items');
 
   // URL dell'endpoint di scraping

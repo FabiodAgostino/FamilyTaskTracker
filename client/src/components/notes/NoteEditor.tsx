@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { X, Loader2, Globe, Lock, Plus, Palette, Pin, Tag, Bold, List, CheckSquare, Type } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,16 +11,6 @@ import { Badge } from '@/components/ui/badge';
 import { Note, ModelFactory, ValidationError } from '@/lib/models/types';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-
-interface NoteFormData {
-  title: string;
-  content: string;
-  isPublic: boolean;
-  createdBy: string;
-  tags: string[];
-  isPinned: boolean;
-  color: string;
-}
 
 interface NoteFormData {
   title: string;

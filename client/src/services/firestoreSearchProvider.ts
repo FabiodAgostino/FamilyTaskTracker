@@ -75,13 +75,7 @@ function deserializeDocument<T>(collectionName: string, docData: any): T {
   }
 }
 
-function serializeForFirestore(item: any): Record<string, any> {
-  if (typeof item.toFirestore === 'function') {
-    return item.toFirestore();
-  }
-  const { id, ...itemData } = item;
-  return itemData;
-}
+// Removed unused serializeForFirestore function
 
 // ==================== PROVIDER FIRESTORE ====================
 

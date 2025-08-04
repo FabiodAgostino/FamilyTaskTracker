@@ -1,6 +1,7 @@
 // Mock Firestore implementation for demo purposes when Firebase credentials are not available
 
-import { ShoppingItem, Note, CalendarEvent, Category } from "./models/types";
+import { Note, CalendarEvent, Category } from "./models/types";
+import { ShoppingItem } from "./models/shopping-item";
 
 
 interface MockData {
@@ -187,12 +188,12 @@ class MockFirestore {
 export const mockFirestore = new MockFirestore();
 
 // Mock collection function
-export function mockCollection(db: any, name: string) {
+export function mockCollection(_db: any, name: string) {
   return { name };
 }
 
 // Mock doc function
-export function mockDoc(db: any, collectionName: string, id: string) {
+export function mockDoc(_db: any, collectionName: string, id: string) {
   return mockFirestore.doc(collectionName, id);
 }
 

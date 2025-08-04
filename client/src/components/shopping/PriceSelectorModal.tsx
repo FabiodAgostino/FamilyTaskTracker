@@ -1,6 +1,6 @@
 // ===== FIXED FILE: src/components/shopping/PriceSelectorModal.tsx =====
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { 
   Dialog, 
   DialogContent, 
@@ -78,7 +78,7 @@ export function PriceSelectionModal({
 
   const detectedPrices = item.priceSelection.detectedPrices;
   // 🔧 DEBUG: Verifica confidence per ogni prezzo
-  detectedPrices.forEach((price, index) => {
+  detectedPrices.forEach((_price, _index) => {
       });
 
   const handleConfirm = async () => {

@@ -73,7 +73,7 @@ export interface UseChatReturn {
 export const useChat = (config: UseChatConfig): UseChatReturn => {
   // ==================== FIRESTORE HOOKS ====================
   const { data: existingShoppingLists } = useFirestore<ShoppingFood>('shopping_food', { includeDeleted: true });
-  const { data: categories, add: addCategory } = useFirestore<CategoryFood>('food_categories');
+  const { data: categories } = useFirestore<CategoryFood>('food_categories');
   const searchProvider = getFirestoreSearchProvider();
 
   // ==================== STATE ===== ===============
@@ -111,7 +111,7 @@ const getVocalConfirmationAction = useCallback(() => {
 
   // ==================== REFS ====================
   
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  // Removed unused mediaRecorderRef
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const chatServiceRef = useRef<IntegratedChatService | null>(null);
 
@@ -307,12 +307,12 @@ const getVocalConfirmationAction = useCallback(() => {
     setIsTyping(true);
     try {
       let success = false;
-      let actionName = '';
+      // let actionName = '';  // unused
       let resultMessage = '';
       try {
         switch (pendingAction.type) {
           case 'delete_query':
-              actionName = 'cancellazione';
+              // actionName = 'cancellazione'; // unused
         
         if (pendingAction.searchResults?.items && pendingAction.searchResults.items.length > 0) {
           try {
@@ -359,7 +359,7 @@ const getVocalConfirmationAction = useCallback(() => {
         }
         break;
          case 'update_query':
-        actionName = 'modifica';
+        // actionName = 'modifica'; // unused
         
         if (pendingAction.searchResults?.items?.length === 1) {
           const itemToUpdate = pendingAction.searchResults.items[0];
@@ -484,7 +484,7 @@ const getVocalConfirmationAction = useCallback(() => {
         }
         break;
           case 'calendar_events':
-            actionName = 'evento calendario';
+            // actionName = 'evento calendario'; // unused
             if (config.onAddCalendarEvent) {
               await config.onAddCalendarEvent(pendingAction.data);
               resultMessage="Ho creato il nuovo evento a calendario!";
@@ -495,7 +495,7 @@ const getVocalConfirmationAction = useCallback(() => {
             break;
 
           case 'reminders':
-            actionName = 'promemoria';
+            // actionName = 'promemoria'; // unused
             if (config.onAddReminder) {
               await config.onAddReminder(pendingAction.data);
               resultMessage="Ho creato il nuovo promemoria!";
@@ -506,7 +506,7 @@ const getVocalConfirmationAction = useCallback(() => {
             break;
 
           case 'notes':
-            actionName = 'nota';
+            // actionName = 'nota'; // unused
             if (config.onAddNote) {
               await config.onAddNote(pendingAction.data);
               resultMessage="Ho creato la nuova nota!";
@@ -517,7 +517,7 @@ const getVocalConfirmationAction = useCallback(() => {
             break;
 
           case 'shopping_food':
-            actionName = 'lista della spesa';
+            // actionName = 'lista della spesa'; // unused
             resultMessage="Ho creato la nuova lista della spesa!";
 
             if (config.onAddShoppingFood) {

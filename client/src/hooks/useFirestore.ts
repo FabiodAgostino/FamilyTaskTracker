@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { 
   collection, 
   doc, 
-  getDocs, 
+  // getDocs unused 
   addDoc, 
   updateDoc, 
   deleteDoc, 
@@ -21,7 +21,8 @@ import { FCMToken } from '@/lib/models/fcmtoken';
 import { Reminder } from '@/lib/models/reminder';
 import { FidelityCard } from '@/lib/models/FidelityCard';
 
-// Type mapping per la deserializzazione
+// Type mapping per la deserializzazione (unused)
+/*
 type CollectionTypeMap = {
   'shopping_items': ShoppingItem;
   'categories': Category;
@@ -35,6 +36,7 @@ type CollectionTypeMap = {
   'reminders': Reminder; 
 
 };
+*/
 
 // Funzione helper per deserializzare basata sul nome della collection
 function deserializeDocument<T>(collectionName: string, docData: any): T {

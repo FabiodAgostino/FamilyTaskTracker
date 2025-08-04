@@ -59,7 +59,7 @@ export function ShoppingItemCard({
   onEdit, 
   onDelete, 
   onComplete,
-  onUpdate, // ✅ NUOVO: Supporto per aggiornamenti
+  _onUpdate, // ✅ NUOVO: Supporto per aggiornamenti
   onClick
 }: ShoppingItemCardProps) {
   

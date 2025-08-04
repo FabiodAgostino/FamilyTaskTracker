@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Edit, Trash2, Globe, Lock, User, Clock, Pin, Tag } from 'lucide-react';
+import { useState } from 'react';
+import { Edit, Trash2, Globe, Lock, User, Clock, Pin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -17,7 +17,7 @@ interface NoteCardProps {
 
 // Componente per l'anteprima formattata del contenuto nella card
 const FormattedContentPreview = ({ text }: { text: string }) => {
-  const [checkboxStates, setCheckboxStates] = useState<Record<number, boolean>>({});
+  const [, setCheckboxStates] = useState<Record<number, boolean>>({});
 
   const toggleCheckbox = (index: number) => {
     setCheckboxStates(prev => ({
@@ -128,7 +128,7 @@ export function NoteCard({
 }: NoteCardProps) {
   const { user } = useAuthContext();
   const { toast } = useToast();
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [, setIsDeleting] = useState(false);
 
   const canEdit = user?.username === note.createdBy || user?.role === 'admin' || note.isPublic;
 
@@ -229,7 +229,7 @@ export function NoteCard({
     return luminance > 0.5 ? '#111827' : '#FFFFFF';
   };
 
-  const textColor = getTextColorFromBg(note.color || '#F3F4F6');
+  // Removed unused textColor variable
 
   return (
     <Card 

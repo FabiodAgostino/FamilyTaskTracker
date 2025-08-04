@@ -10,25 +10,11 @@ import {
   Filter,
   Star,
   RotateCcw,
-  X,
   Users, // Aggiunto per le statistiche "mie carte"
-  Gift, // Nuova icona per "carte con punti"
-  Calendar,
-  Tag, // Nuova icona per "più vecchia/recente"
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Dialog, // Aggiunto per il popup delle statistiche
   DialogContent,
@@ -44,7 +30,7 @@ import { cn } from '@/lib/utils';
 import { LoadingScreen, useLoadingTransition } from '../ui/loading-screen';
 import { FidelityCard, FidelityCardFactory } from '@/lib/models/FidelityCard';
 import { LuChartColumnBig } from "react-icons/lu"; // ✅ NUOVO: Import dell'icona LuChartColumnBig
-import { formatDistanceToNow, min, max } from 'date-fns'; // Importato formatDistanceToNow, min, max
+import { min, max } from 'date-fns'; // Importato min, max
 import { it } from 'date-fns/locale'; // Importata la locale italiana
 
 // Import dei nuovi componenti
@@ -187,7 +173,7 @@ const DigitalWallet = () => {
   }, [visibleCards, user]);
 
   // Handlers
-  const handleCardUsed = async (cardId: string) => {
+  const _handleCardUsed = async (cardId: string) => {
     const card = localCards.find(c => c.id === cardId);
     if (!card) return;
 

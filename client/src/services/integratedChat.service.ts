@@ -232,7 +232,7 @@ export class IntegratedChatService {
   /**
    * 🧪 RICERCA MOCK DINAMICA (per testing)
    */
-  private async mockDynamicSearch(criteria: SearchCriteria): Promise<SearchResult[]> {
+  private async __mockDynamicSearch(criteria: SearchCriteria): Promise<SearchResult[]> {
     const config = this.searchConfigs[criteria.entityType];
     if (!config) return [];
 
@@ -366,8 +366,8 @@ export class IntegratedChatService {
    */
   private async handleDeleteItem(
     smartResponse: { type: "delete_query"; data: DeleteOperation }, 
-    originalMessage: string, 
-    isVoice: boolean
+    __originalMessage: string, 
+    _isVoice: boolean
   ): Promise<IntegratedChatResponse> {
     
     let responseMessage = "";
@@ -380,7 +380,7 @@ export class IntegratedChatService {
         preview = this.generateResultsPreview(searchResults, smartResponse.data.entityType);
         
         if (searchResults.length === 0) {
-          responseMessage = `🔍 Non ho trovato nessun elemento corrispondente a "${originalMessage}". Puoi essere più specifico?`;
+          responseMessage = `🔍 Non ho trovato nessun elemento corrispondente a "${__originalMessage}". Puoi essere più specifico?`;
         } else if (searchResults.length === 1) {
           responseMessage = `Mi hai chiesto di eliminare ${preview}, vero? Sei davvero sicuro? l'azione non può essere annullata! 🤔`;
         } else {
@@ -431,8 +431,8 @@ export class IntegratedChatService {
    */
   private async handleUpdateItem(
     smartResponse: { type: "update_query"; data: UpdateOperation }, 
-    originalMessage: string, 
-    isVoice: boolean
+    __originalMessage: string, 
+    _isVoice: boolean
   ): Promise<IntegratedChatResponse> {
     
     console.log('✏️ Gestione modifica:', smartResponse.data);
@@ -444,7 +444,7 @@ export class IntegratedChatService {
       let responseMessage: string;
       
       if (searchResults.length === 0) {
-        responseMessage = `🔍 Non ho trovato nessun elemento da modificare corrispondente a "${originalMessage}". Prova ad essere più specifico!`;
+        responseMessage = `🔍 Non ho trovato nessun elemento da modificare corrispondente a "${__originalMessage}". Prova ad essere più specifico!`;
       } else if (searchResults.length === 1) {
         const updatesDescription = this.describeUpdates(smartResponse.data.updates, smartResponse.data.entityType);
         responseMessage = `Vuoi che modifico ${preview} con le seguenti modifiche da applicare: ${updatesDescription}\n\n${smartResponse.data.confirmationRequired ? ', confermi le modifiche?' : ' procedo con le modifiche!'}`;
@@ -513,7 +513,7 @@ export class IntegratedChatService {
   /**
    * 📝 DESCRIVI LE MODIFICHE DA APPLICARE
    */
-  private describeUpdates(updates: UpdateOperation['updates'], entityType: string): string {
+  private describeUpdates(updates: UpdateOperation['updates'], _entityType: string): string {
     const descriptions: string[] = [];
     
     if (updates.title) {
@@ -688,7 +688,7 @@ export class IntegratedChatService {
   }
 
   // Handler per creazione (esistenti - mantenuti identici)
-  private handleCalendarEventCreation(data: CalendarEventData, originalMessage: string, isVoice: boolean): IntegratedChatResponse {
+  private handleCalendarEventCreation(data: CalendarEventData, _originalMessage: string, _isVoice: boolean): IntegratedChatResponse {
     const validation = this.validateCalendarEventData(data);
     const responseMessage = validation.isValid 
       ? `Dunque il titolo è "${data.title}" e l'ho fissato per il ${this.formatDateRange(data.startDate, data.endDate, data.isAllDay)}.\nIl promemoria ti avvertirà ${data.reminderMinutes} minuti prima.`
@@ -717,7 +717,7 @@ export class IntegratedChatService {
     };
   }
 
-  private handleReminderCreation(data: ReminderData, originalMessage: string, isVoice: boolean): IntegratedChatResponse {
+  private handleReminderCreation(data: ReminderData, _originalMessage: string, _isVoice: boolean): IntegratedChatResponse {
     const validation = this.validateReminderData(data);
     const responseMessage = validation.isValid 
       ? `Ok! vediamo un po'... Il titolo è: "${data.title}", schedulata per il ${this.formatDateTime(data.scheduledTime)} con il messaggio: "${data.message}".`
@@ -746,7 +746,7 @@ export class IntegratedChatService {
     };
   }
 
-  private handleNoteCreation(data: NoteData, originalMessage: string, isVoice: boolean): IntegratedChatResponse {
+  private handleNoteCreation(data: NoteData, _originalMessage: string, _isVoice: boolean): IntegratedChatResponse {
     const validation = this.validateNoteData(data);
     const responseMessage = validation.isValid 
       ? `Quindi la nota avrà questo titolo: "${data.title}" e il contenuto: ${data.content}?.\n`
@@ -775,7 +775,7 @@ export class IntegratedChatService {
     };
   }
 
-  private handleShoppingListCreation(data: ShoppingFoodData, originalMessage: string, isVoice: boolean): IntegratedChatResponse {
+  private handleShoppingListCreation(data: ShoppingFoodData, _originalMessage: string, _isVoice: boolean): IntegratedChatResponse {
     const validation = this.validateShoppingFoodData(data);
     const responseMessage = validation.isValid 
       ? `Quindi il titolo sarà "${data.title}" e i prodotti saranno: ${data.items.slice(0, 5).map(item => `${item},`).join('\n')}${data.items.length > 5 ? `\n... e altri ${data.items.length - 5} prodotti, corretto?` : ' corretto?'}`
@@ -806,8 +806,8 @@ export class IntegratedChatService {
 
   private handleClarificationRequest(
     smartResponse: { type: "clarification"; message: string; missingFields: string[] }, 
-    originalMessage: string, 
-    isVoice: boolean
+    __originalMessage: string, 
+    _isVoice: boolean
   ): IntegratedChatResponse {
     const message: Message = {
       id: this.generateId(),

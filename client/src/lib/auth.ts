@@ -1,7 +1,7 @@
 // Sostituisci il contenuto di client/src/lib/auth.ts
 
 import { UserLogin } from "./models/types";
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { db, hasFirebaseConfig } from '@/lib/firebase';
 
 export interface LoginCredentials {

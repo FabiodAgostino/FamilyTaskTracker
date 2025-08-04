@@ -1,5 +1,4 @@
-// client/src/components/notes/NotesList.tsx - VERSIONE CORRETTA E AGGIORNATA
-import React, { useState, useMemo, useRef, useEffect } from 'react'; // Importato useEffect
+import React, { useState, useMemo, useRef } from 'react';
 import {
   Plus,
   ChevronLeft,

@@ -1,5 +1,5 @@
 // client/src/components/admin/FCMDashboard.tsx
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Bell, 
   BellOff, 
@@ -10,7 +10,6 @@ import {
   Trash2, 
   RefreshCw, 
   Send, 
-  AlertTriangle,
   CheckCircle,
   Clock,
   Wifi,
@@ -25,7 +24,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useFirestore } from '@/hooks/useFirestore';
 import { useToast } from '@/hooks/use-toast';
 import { User } from '@/lib/models/types';
-import { collection, query, where, getDocs, updateDoc, doc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { db, hasFirebaseConfig } from '@/lib/firebase';
 import { FCMToken } from '@/lib/models/fcmtoken';
 

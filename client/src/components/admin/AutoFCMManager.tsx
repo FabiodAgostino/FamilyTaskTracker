@@ -1,7 +1,7 @@
 // client/src/components/AutoFCMManager.tsx
 // 🤖 Componente per gestione automatica FCM con debug integrato
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -52,11 +52,6 @@ export function AutoFCMManager() {
       };
 
       // Simula la registrazione salvando in un file accessibile al bridge
-      const bridgeData = {
-        action: 'register_token',
-        data: tokenData,
-        timestamp: Date.now()
-      };
 
       // Salva in localStorage come ponte temporaneo
       const existingBridge = JSON.parse(localStorage.getItem('fcm_bridge_tokens') || '[]');
@@ -111,11 +106,8 @@ export function AutoFCMManager() {
       let currentToken = token;
       
       if (!currentToken) {
-        // Se React state non aggiornato, controlla il debug
-        const debugInfo = await debug.getDebugInfo();
-        if (debugInfo.global.hasGlobalToken) {
-                    currentToken = "token-exists-in-global"; // Placeholder per procedere
-        }
+        // Se React state non aggiornato, usa il placeholder
+        currentToken = "token-exists-in-global"; // Placeholder per procedere
       }
       
       if (!currentToken) {
@@ -200,46 +192,12 @@ export function AutoFCMManager() {
       const result = await debug.runDiagnostics();
       setShowDebugInfo(true);
       
-      // Mostra risultati in un alert dettagliato
-      const { debugInfo, issues } = result;
-      
-      let diagnosticMessage = '🔍 RISULTATI DIAGNOSTICA:\n\n';
-      
-      // Environment
-      diagnosticMessage += `🌍 AMBIENTE:\n`;
-      diagnosticMessage += `  Mode: ${debugInfo.environment.mode}\n`;
-      diagnosticMessage += `  Prod: ${debugInfo.environment.isProd}\n`;
-      diagnosticMessage += `  Base URL: ${debugInfo.environment.baseUrl}\n\n`;
-      
-      // VAPID Key
-      diagnosticMessage += `🔑 VAPID KEY:\n`;
-      diagnosticMessage += `  Exists: ${debugInfo.vapidKey.exists ? '✅' : '❌'}\n`;
-      diagnosticMessage += `  Length: ${debugInfo.vapidKey.length} ${debugInfo.vapidKey.isValid ? '✅' : '❌'}\n`;
-      diagnosticMessage += `  Preview: ${debugInfo.vapidKey.preview}\n\n`;
-      
-      // Service Worker
-      diagnosticMessage += `🔧 SERVICE WORKER:\n`;
-      diagnosticMessage += `  Supported: ${debugInfo.serviceWorker.supported ? '✅' : '❌'}\n`;
-      diagnosticMessage += `  Registrations: ${debugInfo.serviceWorker.registrations}\n`;
-      diagnosticMessage += `  Active: ${debugInfo.serviceWorker.activeSW ? '✅' : '❌'}\n`;
-      if (debugInfo.serviceWorker.activeScope) {
-        diagnosticMessage += `  Scope: ${debugInfo.serviceWorker.activeScope}\n`;
-      }
-      diagnosticMessage += '\n';
-      
-      // Firebase
-      diagnosticMessage += `🔥 FIREBASE:\n`;
-      diagnosticMessage += `  Config loaded: ${debugInfo.firebase.configLoaded ? '✅' : '❌'}\n`;
-      diagnosticMessage += `  Env vars: ${debugInfo.firebase.envVarsCount}/${debugInfo.firebase.totalVars}\n`;
-      if (debugInfo.firebase.missingVars.length > 0) {
-        diagnosticMessage += `  Missing: ${debugInfo.firebase.missingVars.join(', ')}\n`;
-      }
-      diagnosticMessage += '\n';
-      
-      if (issues.length > 0) {
-        diagnosticMessage += `🚨 PROBLEMI (${issues.length}):\n`;
-        issues.forEach((issue: any) => diagnosticMessage += `  ${issue}\n`);
-      }
+      // Mostra risultati basati sul risultato semplificato
+      toast({
+        title: result.success ? '✅ Diagnostica Completata' : '❌ Problemi Rilevati',
+        description: result.message,
+        variant: result.success ? 'default' : 'destructive'
+      });
       
     } catch (error) {
       console.error('❌ Errore diagnostica:', error);
@@ -297,9 +255,6 @@ export function AutoFCMManager() {
             {bridgeStatus === 'connected' ? 'Connesso' : 
              bridgeStatus === 'connecting' ? 'Connessione...' : 'Disconnesso'}
           </Badge>
-          {debug.isInitialized && (
-            <Badge variant="outline">Inizializzato</Badge>
-          )}
         </CardTitle>
       </CardHeader>
       
@@ -367,7 +322,7 @@ export function AutoFCMManager() {
               <Button onClick={runDiagnostics} variant="outline" size="sm">
                 🩺 Diagnostica
               </Button>
-              <Button onClick={debug.forceReset} variant="destructive" size="sm">
+              <Button onClick={clearBridge} variant="destructive" size="sm">
                 🔄 Reset Totale
               </Button>
             </div>

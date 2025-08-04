@@ -33,7 +33,7 @@ const DEFAULT_VIEW_SETTINGS: ShoppingViewSettings = {
 };
 
 export function useShoppingPreferences() {
-  const { preferences, updatePreference, updatePreferences } = useUserPreferences();
+  const { preferences, updatePreference } = useUserPreferences();
   
   // Stato locale per filtri (non persistiti)
   const [filters, setFilters] = useState<ShoppingFilters>({

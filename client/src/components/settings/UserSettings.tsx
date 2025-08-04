@@ -1,5 +1,5 @@
 // src/components/settings/UserSettings.tsx
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -41,12 +41,12 @@ export function UserSettings() {
   const { 
     preferences, 
     updatePreference, 
-    updatePreferences, 
+    // updatePreferences unused 
     resetPreferences, 
     isLoading 
   } = useUserPreferences();
 
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [, setHasUnsavedChanges] = useState(false);
   const { toast } = useToast();
 
   // Gestione cambi temporanei

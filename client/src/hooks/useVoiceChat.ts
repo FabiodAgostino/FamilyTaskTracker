@@ -264,7 +264,7 @@ export const useVoiceChat = (config: VoiceChatConfig) => {
             resolve();
           };
           
-          audio.onerror = (err) => {
+          audio.onerror = (_err) => {
             console.log(`❌ Voice Chat [${instanceId}]: Audio playback failed, uso fallback`);
             URL.revokeObjectURL(audioUrl);
             speakWithNativeSynthesis(text, 'audio playback error');

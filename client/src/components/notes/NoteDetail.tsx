@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+// useState not needed for this component
 import { 
   Globe, 
   Lock, 
@@ -9,8 +9,7 @@ import {
   Edit,
   Calendar,
   Copy,
-  Share2,
-  Palette
+  Share2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -250,6 +249,8 @@ export function NoteDetail({
   };
 
   // Determina il nome del colore
+  // Removed unused getColorName function
+  /*
   const getColorName = (colorValue: string): string => {
     const colorMap: Record<string, string> = {
       '#F3F4F6': 'Predefinito',
@@ -263,6 +264,7 @@ export function NoteDetail({
     };
     return colorMap[colorValue] || 'Personalizzato';
   };
+  */
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

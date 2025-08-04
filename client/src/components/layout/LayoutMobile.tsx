@@ -5,9 +5,7 @@ import MobileFooter from './MobileFooter';
 import AIChatComponent from '../chat/AIChatComponent';
 
 
-interface LayoutProps {
-  children: React.ReactNode;
-}
+// Removed unused interface
 
 export function LayoutMobile({ children }: { children: React.ReactNode }) {
   return (
@@ -30,6 +28,4 @@ export function LayoutMobile({ children }: { children: React.ReactNode }) {
   );
 }
 
-function useEffect(arg0: () => void, arg1: never[]) {
-  throw new Error('Function not implemented.');
-}
+// Removed unused function declaration

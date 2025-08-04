@@ -1,4 +1,4 @@
-import { Home, LogOut, Menu, User, Sun, Moon, ExternalLink, Settings, ChevronDown, Users } from 'lucide-react';
+import { Home, LogOut, Menu, User, Sun, Moon, Settings, ChevronDown, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -34,7 +34,7 @@ const RatIcon = ({ className }: { className?: string }) => (
 );
 
 export function Header({ onMenuToggle }: HeaderProps) {
-const { permission, requestPermission, isSupported, token, debug, isInitializing, disableNotifications, enableNotifications, isManuallyDisabled } = useNotifications();
+const { permission, requestPermission, isSupported, token, isInitializing, disableNotifications, enableNotifications, isManuallyDisabled } = useNotifications();
   const priceSelectionService = usePriceSelectionService();
 
 

@@ -1,6 +1,6 @@
 // src/pages/TestPage.tsx
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Calendar } from '@/components/ui/calendar'; // Il nostro componente completo
 import { Button } from '@/components/ui/button';
 import { 
@@ -11,8 +11,6 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
 

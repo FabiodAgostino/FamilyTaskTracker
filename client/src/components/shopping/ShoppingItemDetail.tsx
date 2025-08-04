@@ -1,7 +1,6 @@
 // src/components/shopping/ShoppingItemDetail.tsx - CORREZIONE PREZZO
 import { useState } from 'react';
 import { 
-  X, 
   ExternalLink, 
   User, 
   Clock, 
@@ -15,8 +14,6 @@ import {
   Award,
   Zap,
   Sparkles,
-  Tag,
-  Euro,
   Edit,
   Calendar,
   Copy,

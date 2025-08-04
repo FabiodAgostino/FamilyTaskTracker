@@ -1,16 +1,16 @@
-import { ShoppingCart, StickyNote, Calendar, User, Clock, ExternalLink } from 'lucide-react';
+import { Clock, ExternalLink } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { useFirestore } from '@/hooks/useFirestore';
 import { useAuthContext } from '@/contexts/AuthContext';
 import {Note, CalendarEvent } from '@/lib/models/types';
-import { startOfDay, endOfDay, isSameDay, isAfter } from 'date-fns';
+import { isSameDay, isAfter } from 'date-fns';
 import { ShoppingItem } from '@/lib/models/shopping-item';
-import { FaShoppingBag,FaCalendar  } from "react-icons/fa";
+// Removed unused react-icons imports
 import { ShoppingFood } from '@/lib/models/food';
-import { FaCartShopping, FaNoteSticky  } from "react-icons/fa6";
-import { CiCreditCard1 } from "react-icons/ci";
+// Removed unused FaCartShopping, FaNoteSticky imports
+// Removed unused CiCreditCard1 import
 import { useMenu } from '@/hooks/use-menu';
 
 interface SidebarProps {

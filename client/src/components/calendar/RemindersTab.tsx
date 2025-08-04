@@ -42,7 +42,7 @@ import { it } from 'date-fns/locale';
 import { Reminder } from '@/lib/models/reminder';
 
 
-export const RemindersTab = React.forwardRef<{ openModal: () => void }>((props, ref) => {
+export const RemindersTab = React.forwardRef<{ openModal: () => void }>((_props, ref) => {
   const { user } = useAuthContext();
   const { toast } = useToast();
   const isMobile = useIsMobile();

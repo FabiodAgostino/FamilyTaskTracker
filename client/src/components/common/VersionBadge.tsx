@@ -1,7 +1,7 @@
 // client/src/components/common/VersionBadge.tsx
 // 🏷️ Componente per visualizzare la versione nell'header
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { 
   Popover, 
@@ -14,7 +14,7 @@ import {
   getEnvironmentColor, 
   getEnvironmentEmoji 
 } from '@/hooks/useVersion';
-import { Info, GitCommit, Calendar, Hash, Server } from 'lucide-react';
+import { Info, GitCommit, Calendar, Hash } from 'lucide-react';
 
 interface VersionBadgeProps {
   variant?: 'default' | 'compact' | 'icon-only';

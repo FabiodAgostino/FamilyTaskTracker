@@ -1,5 +1,5 @@
 // client/src/hooks/useNotifications.ts
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 import { collection, addDoc, updateDoc, doc, query, where, getDocs, deleteDoc, orderBy, Timestamp } from 'firebase/firestore';
 import { useToast } from './use-toast';

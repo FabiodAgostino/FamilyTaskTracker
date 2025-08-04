@@ -1,6 +1,6 @@
 // client/src/components/admin/UserManagement.tsx
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Users, Plus, Edit, Trash2, Shield, Mail, Calendar, Key, Copy, Check, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -51,7 +51,7 @@ interface GeneratedCredentials {
 
 export function UserManagement() {
   const { user: currentUser } = useAuthContext();
-  const { data: users, loading, error, add, update, remove } = useFirestore<User>('users');
+  const { data: users, loading, error, add } = useFirestore<User>('users');
   const { toast } = useToast();
   
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);

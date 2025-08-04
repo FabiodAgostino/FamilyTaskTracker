@@ -1,6 +1,6 @@
 // src/components/chat/AIChatComponent.tsx (CON WAKE WORD GARIBALDI)
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useButtonVisibility } from '@/hooks/useButtonVisibility';
 import { useAuthContext } from '@/contexts/AuthContext';
 import { useChat } from '../../hooks/useChat';
@@ -12,7 +12,7 @@ import { ShoppingFood } from '@/lib/models/food';
 import { Reminder } from '@/lib/models/reminder';
 import { CalendarEvent, Note } from '@/lib/models/types';
 import { Mic, MicOff, Volume2 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 // ==================== COMPONENTE INDICATORE WAKE WORD ====================
 interface WakeWordIndicatorProps {

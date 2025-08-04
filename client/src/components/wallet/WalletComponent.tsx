@@ -1,27 +1,13 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { 
-  Scan,
-  Lock,
-  Camera,
-  RotateCcw,
-  Edit,
-  CheckCircle,
-  ArrowLeft,
-  ArrowRight,
-  Plus,
-  Palette,
-  AlertCircle,
+  Trash2, // Aggiunto per il pulsante elimina
   Globe,
-  Search,
-  Tag,
-  X,
-  ChevronDown,
-  ChevronUp,
+  Lock,
   Filter,
-  Star,
-  Store,
-  Trash2 // Aggiunto per il pulsante elimina
+  ChevronUp,
+  ChevronDown,
+  Tag
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -43,7 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn, viewImage } from '@/lib/utils';
-import { supermarketData, type SupermarketKey, suggestedColors } from './walletConstants';
+import { supermarketData, type SupermarketKey } from './walletConstants';
 import { FidelityCard } from '@/lib/models/FidelityCard';
 import { 
   BrowserMultiFormatReader, 

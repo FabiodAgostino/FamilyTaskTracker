@@ -207,7 +207,7 @@ updateWithMultiplePrices(detectedPrices: DetectedPrice[]): void {
     // Estrai tutti gli alternativeSelectors da ogni elemento
     const allSelectors: any[] = [];
     
-    detectedPrices.forEach((price: any, index: number) => {
+    detectedPrices.forEach((price: any) => {
       if (price?.alternativeSelectors && Array.isArray(price.alternativeSelectors)) {
         allSelectors.push(...price.alternativeSelectors);
       }

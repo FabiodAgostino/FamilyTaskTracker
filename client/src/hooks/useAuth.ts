@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { AuthService, LoginCredentials } from '@/lib/auth';
-import { User, UserLogin } from '@/lib/models/types';
+import { User } from '@/lib/models/types';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -8,13 +8,13 @@ export function useAuth() {
 
   useEffect(() => {
     const currentUser = AuthService.getCurrentUser();
-    setUser(currentUser);
+    setUser(currentUser as unknown as User);
     setIsLoading(false);
   }, []);
 
   const login = async (credentials: LoginCredentials): Promise<void> => {
-    const user = await AuthService.login(credentials);
-    setUser(user);
+    const userData = await AuthService.login(credentials);
+    setUser(userData as unknown as User);
   };
 
   const logout = (): void => {

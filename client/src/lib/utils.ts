@@ -1,5 +1,5 @@
 import { clsx, type ClassValue } from "clsx"
-import { useCallback } from "react";
+// removed unused useCallback import
 import { twMerge } from "tailwind-merge"
 
 export function cn(...inputs: ClassValue[]) {
@@ -158,7 +158,7 @@ export function extractMainDomain(url: string): string | null {
     
     // Ricostruisci il dominio per confrontare con TLD doppi
     const lastTwoParts = parts.slice(-2).join('.');
-    const lastThreeParts = parts.length >= 3 ? parts.slice(-3).join('.') : '';
+    // removed unused lastThreeParts variable
     
     // Controlla se ha un TLD doppio (es: .co.uk)
     if (commonTlds.includes(lastTwoParts)) {

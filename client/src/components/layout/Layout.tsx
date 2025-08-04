@@ -11,13 +11,7 @@ interface LayoutProps {
 export function Layout({ children }: LayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  const handleMenuToggle = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
-
-  const handleSidebarClose = () => {
-    setIsSidebarOpen(false);
-  };
+  // Removed unused handlers - using inline functions instead
 
    return (
     <div className="h-screen bg-background flex flex-col">
