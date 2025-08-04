@@ -188,7 +188,9 @@ export const useWakeWord = (config: UseWakeWordConfig): UseWakeWordReturn => {
       // 🆕 DOPPIO CONTROLLO PRIMA DEL RESTART
       if (mountedRef.current && isActiveRef.current && !isStartingRef.current && canStart() && enabled) {
         console.log(`⚡ Wake Word [${instanceId}]: Esecuzione restart programmato`);
-        startRecognitionInternal();
+        startRecognitionInternal().catch(error => {
+          console.error(`❌ Wake Word [${instanceId}]: Errore restart:`, error);
+        });
       } else {
         console.log(`⏸️ Wake Word [${instanceId}]: Restart annullato (enabled=${enabled}, active=${isActiveRef.current})`);
       }
@@ -196,7 +198,7 @@ export const useWakeWord = (config: UseWakeWordConfig): UseWakeWordReturn => {
   }, [safeCleanup, onError, canStart, enabled]); // 🆕 AGGIUNTO ENABLED ALLE DIPENDENZE
 
   // ==================== AVVIO RICONOSCIMENTO INTERNO ====================
-  const startRecognitionInternal = useCallback(() => {
+  const startRecognitionInternal = useCallback(async () => {
     const instanceId = instanceIdRef.current;
     
     if (!mountedRef.current) {
@@ -229,6 +231,10 @@ export const useWakeWord = (config: UseWakeWordConfig): UseWakeWordReturn => {
         recognitionRef.current.stop();
         recognitionRef.current = null;
       }
+
+      // 🆕 CONTROLLO AGGIUNTIVO: VERIFICA SE ALTRI SISTEMI STANNO USANDO SPEECH RECOGNITION
+      // Aspetta un po' per lasciare che altri sistemi si disconnettano
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const recognition = new SpeechRecognition();
@@ -377,7 +383,9 @@ export const useWakeWord = (config: UseWakeWordConfig): UseWakeWordReturn => {
     // Avvia con delay per evitare conflitti
     setTimeout(() => {
       if (mountedRef.current && isActiveRef.current && enabled) { // 🆕 CONTROLLO ENABLED NEL TIMEOUT
-        startRecognitionInternal();
+        startRecognitionInternal().catch(error => {
+          console.error(`❌ Wake Word [${instanceId}]: Errore avvio:`, error);
+        });
       }
     }, 500);
 
@@ -424,18 +432,25 @@ export const useWakeWord = (config: UseWakeWordConfig): UseWakeWordReturn => {
     const instanceId = instanceIdRef.current;
     
     if (!enabled && isActiveRef.current) {
-      console.log(`⏸️ Wake Word [${instanceId}]: Disabilitato - ferma ascolto`);
+      console.log(`⏸️ Wake Word [${instanceId}]: Disabilitato - ferma ascolto (enabled=${enabled})`);
       safeCleanup();
     } else if (enabled && !isActiveRef.current && hasPermission === true) {
-      console.log(`▶️ Wake Word [${instanceId}]: Riabilitato - riavvia ascolto`);
+      console.log(`▶️ Wake Word [${instanceId}]: Riabilitato - riavvia ascolto (enabled=${enabled})`);
       // 🆕 DELAY PIÙ LUNGO PER EVITARE CONFLITTI CON VOICE CHAT
-      setTimeout(() => {
+      setTimeout(async () => {
         if (mountedRef.current && enabled && !isActiveRef.current) {
-          startListening();
+          console.log(`🔄 Wake Word [${instanceId}]: Eseguo riavvio differito (enabled=${enabled})`);
+          try {
+            await startListening();
+          } catch (error) {
+            console.error(`❌ Wake Word [${instanceId}]: Errore riavvio differito:`, error);
+          }
+        } else {
+          console.log(`❌ Wake Word [${instanceId}]: Riavvio differito annullato (mounted=${mountedRef.current}, enabled=${enabled}, active=${isActiveRef.current})`);
         }
-      }, 1000); // Delay di 1 secondo per sicurezza
+      }, 1500); // Delay aumentato a 1.5 secondi per sicurezza
     }
-  }, [enabled, hasPermission]); // 🆕 RIMOSSE LE DIPENDENZE PROBLEMATICHE
+  }, [enabled, hasPermission, startListening]); // 🆕 AGGIUNTE DIPENDENZE NECESSARIE
 
   return {
     isListeningForWakeWord,

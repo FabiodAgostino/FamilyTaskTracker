@@ -49,8 +49,8 @@ const WakeWordIndicator: React.FC<WakeWordIndicatorProps> = ({
     statusColor = 'bg-green-500';
     icon = <Mic size={16} />;
   } else {
-    statusText = 'Wake word pausa (chat aperta)'; // 🆕 TESTO AGGIORNATO
-    statusColor = 'bg-blue-400'; // 🆕 COLORE BLU PER "PAUSA"
+    statusText = 'Wake word inattivo';
+    statusColor = 'bg-gray-500';
     icon = <MicOff size={16} />;
   }
 
@@ -159,7 +159,7 @@ const AIChatComponent: React.FC = () => {
         startVoiceChat();
       }, 500); // Piccolo ritardo per assicurarsi che la chat sia aperta
     },
-    !isOpen && !isVoiceChatActive // 🆕 DISABILITA ANCHE QUANDO VOICE CHAT È ATTIVA
+    !isOpen && !isVoiceChatActive && !isListening && !isSpeaking && !isProcessing // 🆕 DISABILITA DURANTE QUALSIASI ATTIVITÀ VOCALE
   );
 
   // ==================== GESTIONE STATO WAKE WORD ====================
@@ -186,11 +186,28 @@ const AIChatComponent: React.FC = () => {
   // ==================== AUTO-AVVIO WAKE WORD ====================
   useEffect(() => {
     // Avvia automaticamente il wake word quando il componente si monta
-    if (wakeWordSupported && hasPermission === true) {
+    if (wakeWordSupported && hasPermission === true && !isVoiceChatActive) {
       startWakeWordListener();
       setWakeWordEnabled(true);
     }
-  }, [wakeWordSupported, hasPermission, startWakeWordListener]);
+  }, [wakeWordSupported, hasPermission, startWakeWordListener, isVoiceChatActive]);
+
+  // ==================== GESTIONE CONFLITTI SPEECH RECOGNITION ====================
+  useEffect(() => {
+    // Ferma il wake word quando la voice chat è attiva
+    if (isVoiceChatActive && wakeWordEnabled) {
+      console.log('🔄 Voice Chat attiva - sospendo wake word');
+      stopWakeWordListener();
+    }
+    // Riavvia il wake word quando la voice chat si disattiva
+    else if (!isVoiceChatActive && !wakeWordEnabled && hasPermission === true && wakeWordSupported) {
+      console.log('🔄 Voice Chat disattiva - riattivo wake word');
+      setTimeout(() => {
+        startWakeWordListener();
+        setWakeWordEnabled(true);
+      }, 1000); // Delay per evitare conflitti
+    }
+  }, [isVoiceChatActive, wakeWordEnabled, hasPermission, wakeWordSupported, startWakeWordListener, stopWakeWordListener]);
 
   // ==================== CLEANUP ====================
   useEffect(() => {
