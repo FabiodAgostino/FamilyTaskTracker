@@ -32,27 +32,7 @@ const WakeWordIndicator: React.FC<WakeWordIndicatorProps> = ({
 }) => {
   if (!isSupported) return null;
 
-  let statusText = '';
-  let statusColor = '';
-  let icon = <MicOff size={16} />;
-
-  if (hasPermission === null) {
-    statusText = 'Permessi richiesti';
-    statusColor = 'bg-yellow-500';
-    icon = <Volume2 size={16} />;
-  } else if (hasPermission === false) {
-    statusText = 'Permessi negati';
-    statusColor = 'bg-red-500';
-    icon = <MicOff size={16} />;
-  } else if (isListening) {
-    statusText = 'Ascoltando "Garibaldi"';
-    statusColor = 'bg-green-500';
-    icon = <Mic size={16} />;
-  } else {
-    statusText = 'Wake word inattivo';
-    statusColor = 'bg-gray-500';
-    icon = <MicOff size={16} />;
-  }
+ 
 
   const handleClick = () => {
     if (hasPermission === false) {
@@ -62,33 +42,7 @@ const WakeWordIndicator: React.FC<WakeWordIndicatorProps> = ({
     }
   };
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="fixed bottom-4 left-4 z-30"
-    >
-      <button
-        onClick={handleClick}
-        className={`flex items-center gap-2 px-3 py-2 rounded-full text-white text-sm font-medium shadow-lg transition-all duration-300 hover:scale-105 ${statusColor}`}
-        title={statusText}
-      >
-        {icon}
-        <span className="hidden sm:inline">{statusText}</span>
-        
-        {/* Animazione pulsante quando sta ascoltando */}
-        {isListening && (
-          <motion.div
-            className="absolute inset-0 rounded-full border-2 border-white"
-            animate={{ scale: [1, 1.2, 1], opacity: [0.7, 0, 0.7] }}
-            transition={{ duration: 2, repeat: Infinity }}
-          />
-        )}
-      </button>
-    </motion.div>
-  );
-};
-
+}
 // ==================== COMPONENTE PRINCIPALE ====================
 const AIChatComponent: React.FC = () => {
   const isButtonVisible = useButtonVisibility();
