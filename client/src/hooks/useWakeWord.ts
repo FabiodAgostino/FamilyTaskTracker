@@ -82,7 +82,6 @@ export const useWakeWord = (config: UseWakeWordConfig): UseWakeWordReturn => {
           oscillator.stop(audioContext.currentTime + duration);
         }, delay);
       };
-
       // Suono: Do-Mi (C4-E4) - suono piacevole di attivazione
       playBeep(261.63, 0.15, 0);    // Do4
       playBeep(329.63, 0.15, 100);  // Mi4
@@ -400,57 +399,57 @@ export const useWakeWord = (config: UseWakeWordConfig): UseWakeWordReturn => {
   // ==================== EFFETTI CONTROLLATI ====================
   
   // 🔒 AUTO-START E GESTIONE ENABLED
-  useEffect(() => {
-    if (autoStart && isSupported && mountedRef.current && enabled) {
-      console.log(`🚀 Wake Word [${instanceIdRef.current}]: Auto-start attivato`);
-      startListening();
-    }
+  // useEffect(() => {
+  //   if (autoStart && isSupported && mountedRef.current && enabled) {
+  //     console.log(`🚀 Wake Word [${instanceIdRef.current}]: Auto-start attivato`);
+  //     startListening();
+  //   }
 
-    // Cleanup finale solo su unmount
-    return () => {
-      mountedRef.current = false;
-      console.log(`💀 Wake Word [${instanceIdRef.current}]: Componente unmounted - cleanup finale`);
+  //   // Cleanup finale solo su unmount
+  //   return () => {
+  //     mountedRef.current = false;
+  //     console.log(`💀 Wake Word [${instanceIdRef.current}]: Componente unmounted - cleanup finale`);
       
-      // Cleanup immediato su unmount
-      if (restartTimeoutRef.current) {
-        clearTimeout(restartTimeoutRef.current);
-      }
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch (error) {
-          // Ignora
-        }
-      }
-    };
-  }, []); // 🎯 DIPENDENZE VUOTE - NESSUN RE-TRIGGER
+  //     // Cleanup immediato su unmount
+  //     if (restartTimeoutRef.current) {
+  //       clearTimeout(restartTimeoutRef.current);
+  //     }
+  //     if (recognitionRef.current) {
+  //       try {
+  //         recognitionRef.current.stop();
+  //       } catch (error) {
+  //         // Ignora
+  //       }
+  //     }
+  //   };
+  // }, []); // 🎯 DIPENDENZE VUOTE - NESSUN RE-TRIGGER
 
   // ==================== GESTIONE DINAMICA ENABLED/DISABLED ====================
-  useEffect(() => {
-    if (!mountedRef.current) return;
+  // useEffect(() => {
+  //   if (!mountedRef.current) return;
     
-    const instanceId = instanceIdRef.current;
+  //   const instanceId = instanceIdRef.current;
     
-    if (!enabled && isActiveRef.current) {
-      console.log(`⏸️ Wake Word [${instanceId}]: Disabilitato - ferma ascolto (enabled=${enabled})`);
-      safeCleanup();
-    } else if (enabled && !isActiveRef.current && hasPermission === true) {
-      console.log(`▶️ Wake Word [${instanceId}]: Riabilitato - riavvia ascolto (enabled=${enabled})`);
-      // 🆕 DELAY PIÙ LUNGO PER EVITARE CONFLITTI CON VOICE CHAT
-      setTimeout(async () => {
-        if (mountedRef.current && enabled && !isActiveRef.current) {
-          console.log(`🔄 Wake Word [${instanceId}]: Eseguo riavvio differito (enabled=${enabled})`);
-          try {
-            await startListening();
-          } catch (error) {
-            console.error(`❌ Wake Word [${instanceId}]: Errore riavvio differito:`, error);
-          }
-        } else {
-          console.log(`❌ Wake Word [${instanceId}]: Riavvio differito annullato (mounted=${mountedRef.current}, enabled=${enabled}, active=${isActiveRef.current})`);
-        }
-      }, 1500); // Delay aumentato a 1.5 secondi per sicurezza
-    }
-  }, [enabled, hasPermission, startListening]); // 🆕 AGGIUNTE DIPENDENZE NECESSARIE
+  //   if (!enabled && isActiveRef.current) {
+  //     console.log(`⏸️ Wake Word [${instanceId}]: Disabilitato - ferma ascolto (enabled=${enabled})`);
+  //     safeCleanup();
+  //   } else if (enabled && !isActiveRef.current && hasPermission === true) {
+  //     console.log(`▶️ Wake Word [${instanceId}]: Riabilitato - riavvia ascolto (enabled=${enabled})`);
+  //     // 🆕 DELAY PIÙ LUNGO PER EVITARE CONFLITTI CON VOICE CHAT
+  //     setTimeout(async () => {
+  //       if (mountedRef.current && enabled && !isActiveRef.current) {
+  //         console.log(`🔄 Wake Word [${instanceId}]: Eseguo riavvio differito (enabled=${enabled})`);
+  //         try {
+  //           await startListening();
+  //         } catch (error) {
+  //           console.error(`❌ Wake Word [${instanceId}]: Errore riavvio differito:`, error);
+  //         }
+  //       } else {
+  //         console.log(`❌ Wake Word [${instanceId}]: Riavvio differito annullato (mounted=${mountedRef.current}, enabled=${enabled}, active=${isActiveRef.current})`);
+  //       }
+  //     }, 1500); // Delay aumentato a 1.5 secondi per sicurezza
+  //   }
+  // }, [enabled, hasPermission, startListening]); // 🆕 AGGIUNTE DIPENDENZE NECESSARIE
 
   return {
     isListeningForWakeWord,
